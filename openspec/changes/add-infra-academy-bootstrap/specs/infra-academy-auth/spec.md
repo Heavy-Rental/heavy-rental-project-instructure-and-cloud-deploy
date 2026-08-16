@@ -6,22 +6,24 @@ The Academy infra workflow authenticates as a Vocareum Learner Lab session. Paid
 
 ## ADDED Requirements
 
-### Requirement: Vocareum credentials from Environment secrets only
-The workflow SHALL read `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_SESSION_TOKEN` only from Environment `academy` secrets. It SHALL NOT declare those values as `workflow_dispatch` inputs. It SHALL NOT write them to `$GITHUB_ENV`.
+### Requirement: Vocareum credentials from form or Environment, masked in logs
+The workflow SHALL accept `aws_access_key_id`, `aws_secret_access_key`, and `aws_session_token` on `workflow_dispatch` and SHALL fall back to Environment `academy` secrets when those inputs are empty. It SHALL read form values from `$GITHUB_EVENT_PATH`, SHALL NOT put them in a step `env:` map or in `${{ inputs.aws_* }}`, and SHALL `::add-mask::` them before writing `$GITHUB_ENV`.
 
-#### Scenario: Operator set Environment secrets after Start Lab
+#### Scenario: Operator pastes AWS Details
 - GIVEN a live Vocareum Start Lab
-- AND Environment `academy` has the three AWS secrets set from AWS Details
-- WHEN the operator runs the Academy workflow
+- WHEN the operator runs the Academy workflow and pastes the three AWS Details values
 - THEN `assert-lab` calls `sts get-caller-identity` successfully
-- AND the run Inputs page does not list access key, secret access key, or session token
-- AND the three values are masked in job logs (`::add-mask::`)
+- AND job logs do not print the three values in plaintext (`***` after mask)
 
-#### Scenario: Environment secrets unset
-- GIVEN Environment `academy` AWS secrets are unset
+#### Scenario: Empty form uses Environment
+- GIVEN Environment `academy` has the three secrets set
+- WHEN the operator leaves the three form fields empty
+- THEN the job uses `secrets.AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_SESSION_TOKEN`
+
+#### Scenario: Neither form nor Environment
+- GIVEN the form fields are empty and Environment secrets are unset
 - WHEN `assert-lab` runs
-- THEN the job fails with a message to Start Lab and set the three Environment secrets
-- AND it tells the operator not to put keys on the Run form
+- THEN the job fails with a message to Start Lab and paste AWS Details or set Environment academy secrets
 
 ### Requirement: Refuse non-academy Environment
 The workflow SHALL run only with GitHub Environment `academy`.

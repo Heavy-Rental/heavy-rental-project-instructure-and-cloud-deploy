@@ -5,7 +5,7 @@ This repo’s pipeline is **AWS Academy Learner Lab (Vocareum) only**. There is 
 ## One-time GitHub setup
 
 1. Repo **Settings → Environments → New environment** named **`academy`**.
-2. **Required each Start Lab** — Environment secrets (never Run-form inputs; GitHub prints those on the run page):
+2. Optional fallback AWS secrets (if you do not paste keys on the Run form):
    - `AWS_ACCESS_KEY_ID`
    - `AWS_SECRET_ACCESS_KEY`
    - `AWS_SESSION_TOKEN`
@@ -18,8 +18,8 @@ This repo’s pipeline is **AWS Academy Learner Lab (Vocareum) only**. There is 
 Vocareum tokens **expire when the session ends**.
 
 1. Instructure → **Start Lab** → AWS Details.
-2. Update Environment **`academy`** secrets `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN` from AWS Details. **Do not** put them on the Run form.
-3. Actions → **AWS infrastructure (Academy)** → Run workflow.
+2. Actions → **AWS infrastructure (Academy)** → Run workflow.
+3. Paste `aws_access_key_id`, `aws_secret_access_key`, `aws_session_token` (or leave empty to use Environment AWS secrets). Job logs mask these; the run Inputs page may still show them.
 4. Set `aws_environment` = `academy`.
 5. Choose `action`:
    - **`plan`** — show the estate (no apply). Works without `SPRING_DATASOURCE_PASSWORD` (uses a plan-only placeholder).
@@ -51,6 +51,7 @@ Expect **15–20 minutes** on apply (RDS + ALBs). This spends lab credits. **End
 - Create IAM roles or an OIDC provider (`LabInstanceProfile` only)
 - Create a NAT Gateway or Marketplace Neo4j
 - Write Vocareum keys into Secrets Manager or onto EC2
-- Put Vocareum AWS keys or `SPRING_DATASOURCE_PASSWORD` on the Run form
+- Put `SPRING_DATASOURCE_PASSWORD` on the Run form
+- Echo Vocareum keys in job logs (`env:` / `${{ inputs.aws_* }}`)
 - Fill secret JSON, install Docker, or compose (branch 3)
 - Target a billed / paid account

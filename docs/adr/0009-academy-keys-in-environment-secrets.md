@@ -1,27 +1,34 @@
-# ADR 0009: Vocareum keys live in Environment secrets only
+# ADR 0009: Vocareum keys on the Run form, masked in logs
 
 - **Status:** Accepted
 - **Date:** 2026-08-16
 - **Branch:** `HR-161-implement-aws-infrastructure-academy-by-building-resources`
 - **Supersedes:** [0002](0002-vocareum-keys-on-dispatch.md)
+- **Amended:** form fields restored; logs must not dump plaintext
 
 ## Context
 
-ADR 0002 put Vocareum AWS Details on `workflow_dispatch` so operators could paste a fresh session without editing Environment secrets. GitHub has no secret-typed dispatch input. Every string input is printed on the run **Inputs** page. Writing those values to `GITHUB_ENV` also risked showing them in step logs.
+ADR 0002 put Vocareum AWS Details on `workflow_dispatch`. GitHub has no secret-typed dispatch input. Putting `inputs.*` in a step `env:` block prints them in the **env:** dump *before* `::add-mask::` runs (seen in Academy run #6). Interpolating `${{ inputs.aws_* }}` into the `run:` script prints them in the **Run** group.
+
+Operators still need to paste a fresh session after each Start Lab.
 
 ## Decision
 
-**Academy workflows MUST NOT declare** `aws_access_key_id`, `aws_secret_access_key`, or `aws_session_token` on `workflow_dispatch`.
+**Academy workflows SHALL declare** optional `aws_access_key_id`, `aws_secret_access_key`, and `aws_session_token` on `workflow_dispatch`.
 
-Read the three values only from Environment **`academy`** secrets (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`). Pass them straight into `aws-actions/configure-aws-credentials`. Do **not** echo them into `$GITHUB_ENV`. Fail if any secret is empty. Still `set +x` and `::add-mask::`.
+Resolve order: form if **all three** are set, else Environment `academy` secrets, else fail.
 
-Operators update the Environment secrets after each Start Lab. `SPRING_DATASOURCE_PASSWORD` stays an Environment secret (never a Run-form field).
+Read form values from `$GITHUB_EVENT_PATH` with `jq`. **Do not** put form values in `env:` or in `${{ inputs.aws_* }}`. `::add-mask::` before writing `$GITHUB_ENV`. Then `configure-aws-credentials` uses `env.AWS_*`. `set +x`. Environment `secrets.*` may sit in `env:` (GitHub already masks them).
 
-**Paid workflows MUST NOT declare these inputs either.**
+The run **Inputs** page may still show the three strings. That is a GitHub limitation. This ADR only requires **job logs** to show `***`.
+
+`SPRING_DATASOURCE_PASSWORD` stays an Environment secret (never a Run-form field).
+
+**Paid workflows MUST NOT declare these inputs.**
 
 ## Consequences
 
-- The run Inputs page shows only `action`, `aws_environment`, and `confirm_destroy`.
-- GitHub redacts `secrets.*` in logs. There is no plaintext copy in `GITHUB_ENV`.
-- Each Start Lab requires updating three Environment secrets (slower than paste-on-run; accepted to keep keys off the run page).
+- Operators can paste AWS Details on Run workflow.
+- Job logs do not dump `FORM_KEY` / `FORM_SECRET` / `FORM_TOKEN`.
+- Anyone who can view the run may still see the Inputs panel.
 - Never write these values to Secrets Manager or onto EC2 (`LabRole` is the guest).
