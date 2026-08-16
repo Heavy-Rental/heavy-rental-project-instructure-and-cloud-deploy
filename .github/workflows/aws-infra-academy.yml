@@ -184,20 +184,29 @@ jobs:
 
       - uses: hashicorp/setup-terraform@v4.0.1
         with:
-          terraform_version: "1.9.8"
+          terraform_version: "1.15.8"
           terraform_wrapper: false
 
       - name: Create backend if missing
         env:
           BUCKET: ${{ needs.assert-lab.outputs.bucket }}
+          LOCK_TABLE: heavy-rental-tfstate-lock-academy
         working-directory: terraform/backend
         run: |
           set -euo pipefail
+          BUCKET_OK=0
+          TABLE_OK=0
           if aws s3api head-bucket --bucket "${BUCKET}" 2>/dev/null; then
-            echo "State bucket already exists: ${BUCKET}"
+            BUCKET_OK=1
+          fi
+          if aws dynamodb describe-table --table-name "${LOCK_TABLE}" >/dev/null 2>&1; then
+            TABLE_OK=1
+          fi
+          if [ "${BUCKET_OK}" = "1" ] && [ "${TABLE_OK}" = "1" ]; then
+            echo "State bucket ${BUCKET} and lock table ${LOCK_TABLE} already exist."
             exit 0
           fi
-          echo "Creating Vocareum Academy state bucket ${BUCKET} (no VPC)."
+          echo "Creating/repairing Vocareum Academy state backend (bucket=${BUCKET} table=${LOCK_TABLE})."
           terraform init -input=false
           terraform apply -auto-approve -input=false
           if [ -f terraform.tfstate ]; then
@@ -249,7 +258,7 @@ jobs:
 
       - uses: hashicorp/setup-terraform@v4.0.1
         with:
-          terraform_version: "1.9.8"
+          terraform_version: "1.15.8"
           terraform_wrapper: false
 
       - name: Resolve RDS master password
@@ -271,19 +280,46 @@ jobs:
           echo "::add-mask::${PASS}"
           echo "TF_VAR_db_master_password=${PASS}" >> "$GITHUB_ENV"
 
-      - name: terraform init + plan
+      - name: Preflight Vocareum data sources
+        run: |
+          set -euo pipefail
+          if ! aws iam get-instance-profile --instance-profile-name LabInstanceProfile >/dev/null; then
+            echo "::error::IAM instance profile LabInstanceProfile was not found. Vocareum must expose this name for every ASG."
+            exit 1
+          fi
+          echo "LabInstanceProfile exists."
+          echo "Available Postgres engine versions (first 8):"
+          aws rds describe-db-engine-versions \
+            --engine postgres \
+            --query 'DBEngineVersions[0:8].EngineVersion' \
+            --output text
+
+      - name: terraform init
         env:
           BUCKET: ${{ needs.assert-lab.outputs.bucket }}
         working-directory: terraform/academy
         run: |
           set -euo pipefail
-          terraform init -input=false -reconfigure \
+          if ! terraform init -input=false -reconfigure \
             -backend-config="bucket=${BUCKET}" \
             -backend-config="key=estate/terraform.tfstate" \
             -backend-config="region=${AWS_DEFAULT_REGION}" \
             -backend-config="dynamodb_table=heavy-rental-tfstate-lock-academy" \
-            -backend-config="encrypt=true"
-          terraform plan -input=false -no-color -out=tfplan
+            -backend-config="encrypt=true"; then
+            echo "::error::terraform init failed. Check S3 bucket ${BUCKET} and DynamoDB table heavy-rental-tfstate-lock-academy."
+            exit 1
+          fi
+
+      - name: terraform plan
+        env:
+          BUCKET: ${{ needs.assert-lab.outputs.bucket }}
+        working-directory: terraform/academy
+        run: |
+          set -euo pipefail
+          if ! terraform plan -input=false -no-color -out=tfplan; then
+            echo "::error::terraform plan failed. Search this log for Error: (RDS engine version, LabInstanceProfile, or AccessDenied)."
+            exit 1
+          fi
           {
             echo "### Terraform plan (Academy estate)"
             echo ""

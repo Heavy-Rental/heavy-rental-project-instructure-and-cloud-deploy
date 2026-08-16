@@ -1,0 +1,30 @@
+# Pinned versions (Academy estate)
+
+Contract: `heavy-rental-project-pipeline-development/cloud-deployment-feasibility-studies/` — AWS study §4.3 / §6.1 / §6.4 / §6.4a / §7.1, `TERRAFORM-PROCESS.md`, `ANSIBLE-PROCESS.md`.
+
+Recorded **2026-08-16**. Terraform CLI is the live pin. Ansible and compose image rows are **branch 3** (not installed in `aws-infra-academy.yml` yet).
+
+## Toolchain
+
+| Component | Design source | Recorded version | Where pinned |
+| --- | --- | --- | --- |
+| Terraform CLI | `TERRAFORM-PROCESS.md` | **1.15.8** (latest stable, 8 Jul 2026) | `.github/workflows/aws-infra-academy.yml` (`terraform_version`); `terraform/{backend,academy}/versions.tf` (`required_version >= 1.15.8`) |
+| hashicorp/aws provider | estate `.tf` | `~> 5.0` (do not bump; latest is 6.60.0) | `terraform/{backend,academy}/versions.tf` |
+| hashicorp/setup-terraform | Actions | **v4.0.1** | `aws-infra-academy.yml` |
+| actions/checkout | Actions | **v7.0.1** | `aws-infra-academy.yml` |
+| aws-actions/configure-aws-credentials | Actions | **v6.2.3** | `aws-infra-academy.yml` |
+| Ansible community package | `ANSIBLE-PROCESS.md` / study §7.1a | **14.3.1** (14 Aug 2026; depends on ansible-core **2.21.3**) | Not installed until branch 3 |
+
+## Estate runtime
+
+| Component | Design source | Recorded version |
+| --- | --- | --- |
+| Guest AMI | study §6.2b / `terraform/academy/data.tf` | Amazon Linux 2023 via SSM `/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64` |
+| RDS PostgreSQL | study §6.1 `postgres-primary` / `data.tf` | Prefer **16.8**, then 16.6 / 16.4 / 16, then 15.x, then 14.x (Vocareum allow-list) |
+| RDS class | study §6.4 | `db.t3.micro` |
+| Neo4j | study §6.1 / ANSIBLE §4.4 | `neo4j:5` (branch 3 compose) |
+| REST image | study §4.3 | `tomcat:10.1-jdk21` (branch 3 compose) |
+| Haystack runtime | study §4.3 | Python **3.12** + uv + uvicorn (branch 3 compose) |
+| pgvector fallback | study §6.1 | `pgvector/pgvector:pg17` (branch 3, only if RDS cannot `CREATE EXTENSION vector`) |
+| Portal | study §6.4a | nginx (no numeric tag in the study; branch 3 compose) |
+| Instance types | study §6.4 | NAT `t3.nano`; portal `t3.micro`; rest/haystack `t3.small`; neo4j `t3.large` |

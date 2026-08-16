@@ -186,6 +186,7 @@ Protect `master` (and `develop` if more than one operator). Environment `academy
 
 ## 10. Pointers
 
+- Pinned versions: [`docs/VERSIONS.md`](docs/VERSIONS.md)
 - Estate + E2E: `../heavy-rental-project-pipeline-development/cloud-deployment-feasibility-studies/AWS-INFRASTRUCTURE-FEASIBILITY.md` §8
 - Terraform jobs: `.../TERRAFORM-PROCESS.md`
 - Ansible jobs: `.../ANSIBLE-PROCESS.md`
