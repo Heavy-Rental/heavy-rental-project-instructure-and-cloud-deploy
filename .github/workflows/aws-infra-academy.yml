@@ -1,0 +1,288 @@
+# AWS Academy (Vocareum) infrastructure — branch 1 bootstrap.
+# Not paid. Not OIDC. Not app CI.
+#
+# Operator:
+#   1. Start Lab → AWS Details
+#   2. Run workflow → paste the three Vocareum keys (they change every session)
+#      or leave empty to use Environment academy secrets
+#   3. action=plan  (first run also creates the S3/DynamoDB state backend)
+#
+# Do not point aws_environment at paid. Do not write keys to Secrets Manager.
+
+name: AWS infrastructure (Academy)
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: plan (branch 1). apply/configure/stop/destroy wait for later branches.
+        required: true
+        type: choice
+        default: plan
+        options:
+          - plan
+          - bootstrap
+          - apply
+          - configure-only
+          - stop
+          - destroy
+      aws_environment:
+        description: Must be academy (Vocareum Learner Lab)
+        required: true
+        type: environment
+        default: academy
+      aws_access_key_id:
+        description: Vocareum AWS Details access key (changes every Start Lab)
+        required: false
+        type: string
+        default: ""
+      aws_secret_access_key:
+        description: Vocareum secret access key
+        required: false
+        type: string
+        default: ""
+      aws_session_token:
+        description: Vocareum session token
+        required: false
+        type: string
+        default: ""
+      confirm_destroy:
+        description: Unused until branch 3
+        required: false
+        type: string
+        default: ""
+
+concurrency:
+  group: aws-infra-academy-${{ github.repository }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+  AWS_DEFAULT_REGION: us-east-1
+
+jobs:
+  assert-lab:
+    name: Assert Vocareum session
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.aws_environment }}
+    timeout-minutes: 5
+    outputs:
+      account_id: ${{ steps.sts.outputs.account_id }}
+      bucket: ${{ steps.sts.outputs.bucket }}
+    steps:
+      - name: Refuse paid Environment
+        env:
+          ENV_NAME: ${{ inputs.aws_environment }}
+        run: |
+          set -euo pipefail
+          if [ "${ENV_NAME}" != "academy" ]; then
+            echo "::error::This workflow is AWS Academy / Vocareum only. Use Environment academy (got '${ENV_NAME}')."
+            exit 1
+          fi
+
+      - name: Resolve Vocareum credentials
+        env:
+          FORM_KEY: ${{ inputs.aws_access_key_id }}
+          FORM_SECRET: ${{ inputs.aws_secret_access_key }}
+          FORM_TOKEN: ${{ inputs.aws_session_token }}
+          ENV_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          ENV_SECRET: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          ENV_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+        run: |
+          set +x
+          KEY="${FORM_KEY:-${ENV_KEY}}"
+          SECRET="${FORM_SECRET:-${ENV_SECRET}}"
+          TOKEN="${FORM_TOKEN:-${ENV_TOKEN}}"
+          if [ -z "${KEY}" ] || [ -z "${SECRET}" ] || [ -z "${TOKEN}" ]; then
+            echo "::error::Start Lab in Vocareum. Paste AWS Details on this form or set Environment academy secrets."
+            exit 1
+          fi
+          echo "::add-mask::${KEY}"
+          echo "::add-mask::${SECRET}"
+          echo "::add-mask::${TOKEN}"
+          {
+            echo "AWS_ACCESS_KEY_ID=${KEY}"
+            echo "AWS_SECRET_ACCESS_KEY=${SECRET}"
+            echo "AWS_SESSION_TOKEN=${TOKEN}"
+          } >> "$GITHUB_ENV"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ env.AWS_SESSION_TOKEN }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Prove the Vocareum session is live
+        id: sts
+        run: |
+          set -euo pipefail
+          if ! ARN=$(aws sts get-caller-identity --query Arn --output text); then
+            echo "::error::sts failed. Start Lab and paste a fresh session token."
+            exit 1
+          fi
+          ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+          echo "account_id=${ACCOUNT}" >> "$GITHUB_OUTPUT"
+          echo "bucket=heavy-rental-tfstate-${ACCOUNT}-academy" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Vocareum / Academy"
+            echo ""
+            echo "Caller: \`${ARN}\`"
+            echo "Account: \`${ACCOUNT}\`"
+            echo "Action: \`${{ inputs.action }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  ensure-backend:
+    name: Ensure S3 + DynamoDB state backend
+    needs: [assert-lab]
+    if: inputs.action == 'plan' || inputs.action == 'bootstrap' || inputs.action == 'apply'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.aws_environment }}
+    timeout-minutes: 15
+    steps:
+      - name: Resolve Vocareum credentials
+        env:
+          FORM_KEY: ${{ inputs.aws_access_key_id }}
+          FORM_SECRET: ${{ inputs.aws_secret_access_key }}
+          FORM_TOKEN: ${{ inputs.aws_session_token }}
+          ENV_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          ENV_SECRET: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          ENV_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+        run: |
+          set +x
+          KEY="${FORM_KEY:-${ENV_KEY}}"
+          SECRET="${FORM_SECRET:-${ENV_SECRET}}"
+          TOKEN="${FORM_TOKEN:-${ENV_TOKEN}}"
+          if [ -z "${KEY}" ] || [ -z "${SECRET}" ] || [ -z "${TOKEN}" ]; then
+            echo "::error::Start Lab. Paste AWS Details on the form or set Environment academy secrets."
+            exit 1
+          fi
+          echo "::add-mask::${KEY}"
+          echo "::add-mask::${SECRET}"
+          echo "::add-mask::${TOKEN}"
+          {
+            echo "AWS_ACCESS_KEY_ID=${KEY}"
+            echo "AWS_SECRET_ACCESS_KEY=${SECRET}"
+            echo "AWS_SESSION_TOKEN=${TOKEN}"
+          } >> "$GITHUB_ENV"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ env.AWS_SESSION_TOKEN }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+          terraform_wrapper: false
+
+      - name: Create backend if missing
+        env:
+          BUCKET: ${{ needs.assert-lab.outputs.bucket }}
+        working-directory: terraform/backend
+        run: |
+          set -euo pipefail
+          if aws s3api head-bucket --bucket "${BUCKET}" 2>/dev/null; then
+            echo "State bucket already exists: ${BUCKET}"
+            exit 0
+          fi
+          echo "Creating Vocareum Academy state bucket ${BUCKET} (no VPC)."
+          terraform init -input=false
+          terraform apply -auto-approve -input=false
+          if [ -f terraform.tfstate ]; then
+            aws s3 cp terraform.tfstate "s3://${BUCKET}/backend/terraform.tfstate"
+          fi
+
+  terraform:
+    name: Terraform plan (Academy estate placeholder)
+    needs: [assert-lab, ensure-backend]
+    if: always() && needs.assert-lab.result == 'success' && needs.ensure-backend.result == 'success' && (inputs.action == 'plan' || inputs.action == 'apply')
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.aws_environment }}
+    timeout-minutes: 15
+    steps:
+      - name: Resolve Vocareum credentials
+        env:
+          FORM_KEY: ${{ inputs.aws_access_key_id }}
+          FORM_SECRET: ${{ inputs.aws_secret_access_key }}
+          FORM_TOKEN: ${{ inputs.aws_session_token }}
+          ENV_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          ENV_SECRET: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          ENV_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+        run: |
+          set +x
+          KEY="${FORM_KEY:-${ENV_KEY}}"
+          SECRET="${FORM_SECRET:-${ENV_SECRET}}"
+          TOKEN="${FORM_TOKEN:-${ENV_TOKEN}}"
+          if [ -z "${KEY}" ] || [ -z "${SECRET}" ] || [ -z "${TOKEN}" ]; then
+            echo "::error::Start Lab. Paste AWS Details on the form or set Environment academy secrets."
+            exit 1
+          fi
+          echo "::add-mask::${KEY}"
+          echo "::add-mask::${SECRET}"
+          echo "::add-mask::${TOKEN}"
+          {
+            echo "AWS_ACCESS_KEY_ID=${KEY}"
+            echo "AWS_SECRET_ACCESS_KEY=${SECRET}"
+            echo "AWS_SESSION_TOKEN=${TOKEN}"
+          } >> "$GITHUB_ENV"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ env.AWS_SESSION_TOKEN }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+          terraform_wrapper: false
+
+      - name: Refuse estate apply on branch 1
+        if: inputs.action == 'apply'
+        run: |
+          echo "::error::action=apply creates the VPC estate in feat/infra-academy-estate (branch 2). Use action=plan on this branch."
+          exit 1
+
+      - name: terraform init + plan (no VPC)
+        env:
+          BUCKET: ${{ needs.assert-lab.outputs.bucket }}
+        working-directory: terraform/academy
+        run: |
+          set -euo pipefail
+          terraform init -input=false -reconfigure \
+            -backend-config="bucket=${BUCKET}" \
+            -backend-config="key=estate/terraform.tfstate" \
+            -backend-config="region=${AWS_DEFAULT_REGION}" \
+            -backend-config="dynamodb_table=heavy-rental-tfstate-lock-academy" \
+            -backend-config="encrypt=true"
+          terraform plan -input=false -no-color
+          {
+            echo "### Terraform plan (Academy placeholder)"
+            echo ""
+            echo "Backend: \`s3://${BUCKET}/estate/terraform.tfstate\`"
+            echo "No VPC / ALB / RDS on this branch."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  not-in-branch-1:
+    name: Not implemented on branch 1
+    if: inputs.action == 'configure-only' || inputs.action == 'stop' || inputs.action == 'destroy'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Fail closed
+        run: |
+          echo "::error::action=${{ inputs.action }} is feat/infra-academy-configure (branch 3). This branch only supports plan/bootstrap."
+          exit 1
