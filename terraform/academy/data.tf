@@ -10,10 +10,14 @@ data "aws_ssm_parameter" "al2023" {
   name = "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64"
 }
 
+# Academy labs do not always offer Postgres 16. Prefer 16, then 15, then 14.
 data "aws_rds_engine_version" "postgres" {
-  engine  = "postgres"
-  version = "16"
-  latest  = true
+  engine = "postgres"
+  preferred_versions = [
+    "16.8", "16.6", "16.4", "16",
+    "15.12", "15.10", "15.8", "15",
+    "14.17", "14.15", "14",
+  ]
 }
 
 data "aws_region" "current" {}
