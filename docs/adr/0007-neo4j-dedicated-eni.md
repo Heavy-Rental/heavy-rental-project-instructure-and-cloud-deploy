@@ -17,3 +17,4 @@ Create an `aws_network_interface` in a data subnet and attach it as the only NIC
 - Bolt address is known at apply time without a `data.aws_instances` race.
 - The graph host is pinned to one AZ (already required by `max=1`).
 - Replacement instances reuse the same IP if the ENI `delete_on_termination` is false.
+- `asg-neo4j` must **not** set `vpc_zone_identifier`. AWS rejects a launch template that names a network interface ID **and** an ASG subnet.

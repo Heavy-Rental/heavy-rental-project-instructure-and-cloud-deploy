@@ -69,7 +69,9 @@ locals {
   app_cidrs    = ["10.0.10.0/24", "10.0.11.0/24"]
   data_cidrs   = ["10.0.20.0/24", "10.0.21.0/24"]
 
-  ami_id = data.aws_ami.al2023.id
+  ami_id         = data.aws_ami.al2023.id
+  # AL2023 snapshot on this lab is 30 GiB. Smaller root volumes fail ASG create.
+  root_volume_gb = 30
 
   secret_ids = toset([
     "heavy-rental/portal",
