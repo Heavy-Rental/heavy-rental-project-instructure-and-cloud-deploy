@@ -1,0 +1,19 @@
+# ADR 0005: LabInstanceProfile only — never create IAM
+
+- **Status:** Accepted
+- **Date:** 2026-08-16
+- **Branch:** `feat/infra-academy-estate` (`HR-161`)
+
+## Context
+
+AWS Academy cannot create IAM users, groups, or roles. Vocareum pre-creates `LabRole` / `LabInstanceProfile`. GitHub OIDC is also forbidden on this account.
+
+## Decision
+
+Every launch template and the NAT instance **data-source** `LabInstanceProfile` by name. Terraform SHALL NOT contain `aws_iam_role`, `aws_iam_instance_profile`, or an OIDC provider.
+
+## Consequences
+
+- Apply works under the Vocareum federated user.
+- All guests share `LabRole` (Academy accepted risk). Per-secret isolation waits for paid instance profiles.
+- If the profile name differs in a future lab image, apply fails at plan — operators fix the data source, they do not create IAM.

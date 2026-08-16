@@ -1,11 +1,12 @@
-# AWS Academy (Vocareum) infrastructure — branch 1 bootstrap.
-# Not paid. Not OIDC. Not app CI.
+# AWS Academy (Vocareum) infrastructure — branch 2 estate.
+# Not paid. Not OIDC. Not app CI. Not Ansible / sync-secrets.
 #
 # Operator:
 #   1. Start Lab → AWS Details
-#   2. Run workflow → paste the three Vocareum keys (they change every session)
-#      or leave empty to use Environment academy secrets
-#   3. action=plan  (first run also creates the S3/DynamoDB state backend)
+#   2. Environment academy secret SPRING_DATASOURCE_PASSWORD (required for apply)
+#   3. Run workflow → paste the three Vocareum keys (they change every session)
+#      or leave empty to use Environment academy AWS_* secrets
+#   4. action=plan | action=apply
 #
 # Do not point aws_environment at paid. Do not write keys to Secrets Manager.
 
@@ -15,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: plan (branch 1). apply/configure/stop/destroy wait for later branches.
+        description: plan or apply the estate. configure/stop/destroy wait for branch 3.
         required: true
         type: choice
         default: plan
@@ -63,6 +64,7 @@ env:
   TF_IN_AUTOMATION: "true"
   TF_INPUT: "false"
   AWS_DEFAULT_REGION: us-east-1
+  DB_PASSWORD_PLAN_PLACEHOLDER: "PlanOnlyNotApplied1!"
 
 jobs:
   assert-lab:
@@ -203,12 +205,12 @@ jobs:
           fi
 
   terraform:
-    name: Terraform plan (Academy estate placeholder)
+    name: Terraform estate (Academy)
     needs: [assert-lab, ensure-backend]
     if: always() && needs.assert-lab.result == 'success' && needs.ensure-backend.result == 'success' && (inputs.action == 'plan' || inputs.action == 'apply')
     runs-on: ubuntu-latest
     environment: ${{ inputs.aws_environment }}
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - name: Resolve Vocareum credentials
         env:
@@ -250,13 +252,26 @@ jobs:
           terraform_version: "1.9.8"
           terraform_wrapper: false
 
-      - name: Refuse estate apply on branch 1
-        if: inputs.action == 'apply'
+      - name: Resolve RDS master password
+        env:
+          DB_PASS: ${{ secrets.SPRING_DATASOURCE_PASSWORD }}
+          ACTION: ${{ inputs.action }}
         run: |
-          echo "::error::action=apply creates the VPC estate in feat/infra-academy-estate (branch 2). Use action=plan on this branch."
-          exit 1
+          set +x
+          PLACEHOLDER="${DB_PASSWORD_PLAN_PLACEHOLDER}"
+          if [ "${ACTION}" = "apply" ]; then
+            if [ -z "${DB_PASS}" ] || [ "${DB_PASS}" = "${PLACEHOLDER}" ]; then
+              echo "::error::Set Environment academy secret SPRING_DATASOURCE_PASSWORD before action=apply. Do not put it on the Run form."
+              exit 1
+            fi
+            PASS="${DB_PASS}"
+          else
+            PASS="${DB_PASS:-${PLACEHOLDER}}"
+          fi
+          echo "::add-mask::${PASS}"
+          echo "TF_VAR_db_master_password=${PASS}" >> "$GITHUB_ENV"
 
-      - name: terraform init + plan (no VPC)
+      - name: terraform init + plan
         env:
           BUCKET: ${{ needs.assert-lab.outputs.bucket }}
         working-directory: terraform/academy
@@ -268,21 +283,42 @@ jobs:
             -backend-config="region=${AWS_DEFAULT_REGION}" \
             -backend-config="dynamodb_table=heavy-rental-tfstate-lock-academy" \
             -backend-config="encrypt=true"
-          terraform plan -input=false -no-color
+          terraform plan -input=false -no-color -out=tfplan
           {
-            echo "### Terraform plan (Academy placeholder)"
+            echo "### Terraform plan (Academy estate)"
             echo ""
             echo "Backend: \`s3://${BUCKET}/estate/terraform.tfstate\`"
-            echo "No VPC / ALB / RDS on this branch."
+            echo "Action: \`${{ inputs.action }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
-  not-in-branch-1:
-    name: Not implemented on branch 1
+      - name: terraform apply
+        if: inputs.action == 'apply'
+        working-directory: terraform/academy
+        run: |
+          set -euo pipefail
+          terraform apply -input=false -auto-approve tfplan
+          {
+            echo "### Terraform apply"
+            echo ""
+            echo "- portal ALB: \`$(terraform output -raw portal_alb_dns)\`"
+            echo "- REST ALB (internal): \`$(terraform output -raw rest_alb_dns)\`"
+            echo "- Haystack ALB (internal): \`$(terraform output -raw haystack_alb_dns)\`"
+            echo "- RDS: \`$(terraform output -raw rds_endpoint)\`"
+            echo "- Neo4j IP: \`$(terraform output -raw neo4j_private_ip)\`"
+            echo ""
+            echo "Guests have **no containers** yet. Public portal ALB may 502 until branch 3."
+            echo "Session end does **not** stop RDS or ALB billing."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  not-in-branch-2:
+    name: Not implemented on branch 2
     if: inputs.action == 'configure-only' || inputs.action == 'stop' || inputs.action == 'destroy'
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
       - name: Fail closed
+        env:
+          ACTION: ${{ inputs.action }}
         run: |
-          echo "::error::action=${{ inputs.action }} is feat/infra-academy-configure (branch 3). This branch only supports plan/bootstrap."
+          echo "::error::action=${ACTION} is feat/infra-academy-configure (branch 3). This branch supports plan/bootstrap/apply only."
           exit 1
