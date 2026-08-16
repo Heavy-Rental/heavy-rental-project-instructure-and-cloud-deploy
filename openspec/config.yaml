@@ -2,6 +2,6 @@
 schema: spec-driven
 context: |
   This repository specifies GitHub Actions that create and operate the
-  Academy Learner Lab (Vocareum) estate. Branch 1 (feat/infra-academy-bootstrap)
-  only authenticates to Vocareum, bootstraps remote Terraform state, and
-  terraform plans an empty estate. It does not create a VPC and is not paid/OIDC.
+  Academy Learner Lab (Vocareum) estate. Branch 2 (feat/infra-academy-estate)
+  applies the three-tier VPC, four ASGs, ALBs, one RDS, and empty secret
+  shells. It is not paid/OIDC and does not run Ansible.

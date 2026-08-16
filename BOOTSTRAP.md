@@ -1,16 +1,17 @@
-# Academy / Vocareum bootstrap (branch 1)
+# Academy / Vocareum estate (branch 2)
 
-This repo’s first pipeline is **AWS Academy Learner Lab (Vocareum) only**. There is no paid / OIDC workflow on this branch.
+This repo’s pipeline is **AWS Academy Learner Lab (Vocareum) only**. There is no paid / OIDC workflow on this branch.
 
 ## One-time GitHub setup
 
 1. Repo **Settings → Environments → New environment** named **`academy`**.
-2. Optional fallback secrets (if you do not want to paste keys every run):
+2. Optional fallback AWS secrets (if you do not want to paste keys every run):
    - `AWS_ACCESS_KEY_ID`
    - `AWS_SECRET_ACCESS_KEY`
    - `AWS_SESSION_TOKEN`
-3. Variable: `AWS_REGION` = `us-east-1`.
-4. GitHub cannot create this Environment from git. Paid Environment must **not** exist on this workflow.
+3. **Required for `action=apply`:** secret `SPRING_DATASOURCE_PASSWORD` (RDS master; later copied into `heavy-rental/rest` by branch 3). **Not** a workflow input.
+4. Variable: `AWS_REGION` = `us-east-1`.
+5. GitHub cannot create this Environment from git. Do **not** point this workflow at a `paid` Environment.
 
 ## Every lab session
 
@@ -18,24 +19,38 @@ Vocareum tokens **expire when the session ends**.
 
 1. Instructure → **Start Lab** → AWS Details.
 2. Actions → **AWS infrastructure (Academy)** → Run workflow.
-3. Paste `aws_access_key_id`, `aws_secret_access_key`, `aws_session_token` (or leave empty to use Environment secrets).
+3. Paste `aws_access_key_id`, `aws_secret_access_key`, `aws_session_token` (or leave empty to use Environment AWS secrets).
 4. Set `aws_environment` = `academy`.
-5. Choose `action` = **`plan`**.
+5. Choose `action`:
+   - **`plan`** — show the estate (no apply). Works without `SPRING_DATASOURCE_PASSWORD` (uses a plan-only placeholder).
+   - **`apply`** — create the VPC, four ASGs, three ALBs, one RDS, SM shells, ECR. Needs `SPRING_DATASOURCE_PASSWORD`.
+   - **`bootstrap`** — state bucket + lock table only.
 
-First `plan` creates the **state bucket + lock table** if they are missing, then `terraform plan` on an empty estate. **No VPC, ALB, or RDS.**
+Expect **15–20 minutes** on apply (RDS + ALBs). This spends lab credits. **Ending the Vocareum session does not stop RDS or ALB billing.**
+
+## After apply
+
+| Check | Expect |
+| --- | --- |
+| `describe-auto-scaling-groups --auto-scaling-group-names asg-portal asg-rest asg-haystack asg-neo4j` | All four exist |
+| Public portal ALB DNS (job summary) | Resolves; **may 502** (no nginx yet) |
+| `describe-secret --secret-id heavy-rental/portal` | Shell exists; no `REST_BASE_URL` yet |
+| `configure-only` / `stop` / `destroy` | **Fail** — branch 3 |
 
 ## Actions
 
-| `action` | Branch 1 behaviour |
+| `action` | Branch 2 behaviour |
 | --- | --- |
-| `plan` | assert-lab → ensure backend → `terraform plan` (placeholder) |
+| `plan` | assert-lab → ensure backend → `terraform plan` (estate) |
 | `bootstrap` | assert-lab → ensure backend only |
-| `apply` | **Fails** — estate is branch 2 |
-| `configure-only` / `stop` / `destroy` | **Fails** — not in branch 1 |
+| `apply` | assert-lab → ensure backend → `init` + `plan` + `apply` |
+| `configure-only` / `stop` / `destroy` | **Fails** — `feat/infra-academy-configure` |
 
 ## What this must not do
 
-- Create IAM roles or an OIDC provider
+- Create IAM roles or an OIDC provider (`LabInstanceProfile` only)
 - Create a NAT Gateway or Marketplace Neo4j
 - Write Vocareum keys into Secrets Manager or onto EC2
+- Put `SPRING_DATASOURCE_PASSWORD` on the Run form
+- Fill secret JSON, install Docker, or compose (branch 3)
 - Target a billed / paid account

@@ -3,7 +3,7 @@
 **Repo:** this tree (`heavy-rental-project-instructure-and-cloud-deploy`).  
 **Contract:** `heavy-rental-project-pipeline-development/cloud-deployment-feasibility-studies/` — especially `AWS-INFRASTRUCTURE-FEASIBILITY.md` §8, `TERRAFORM-PROCESS.md`, `ANSIBLE-PROCESS.md`, `aws-infra-pipeline.example.yml`.
 
-**Status:** Plan. Branch 1 implementation lives in this repo on `feat/infra-academy-bootstrap` (workflow + backend TF + OpenSpec / OpenSPDD / ADR).
+**Status:** Branch 1 merged. Branch 2 (`feat/infra-academy-estate`) is implemented on `HR-161-implement-aws-infrastructure-academy-by-building-resources` (estate Terraform + `action=apply`).
 
 Each feature branch SHALL add or extend **OpenSpec + OpenSPDD + ADR** before expanding YAML or Terraform. Conflict order: OpenSpec scenarios → OpenSPDD Safeguards → ADR → code. See [`specification/README.md`](specification/README.md).
 
@@ -89,6 +89,7 @@ Start Lab → Run workflow → paste the three keys → `action=plan` is **green
 
 ## 5. Branch 2 — `feat/infra-academy-estate`
 
+**Delivery branch:** `HR-161-implement-aws-infrastructure-academy-by-building-resources`.  
 **Purpose:** `action=apply` creates the AWS estate. Containers may be absent.
 
 ### Tasks
