@@ -17,12 +17,17 @@ Terraform SHALL create `asg-portal`, `asg-rest`, `asg-haystack` in private-app s
 - AND `asg-neo4j` has max=1 and scale-in protection
 
 ### Requirement: LabInstanceProfile only
-Launch templates SHALL attach the existing instance profile named `LabInstanceProfile`. The configuration SHALL NOT contain `aws_iam_role` or `aws_iam_instance_profile`.
+Launch templates SHALL attach the existing instance profile named `LabInstanceProfile`. That profile SHALL use the existing IAM role named `LabRole`. The configuration SHALL NOT contain `aws_iam_role` or `aws_iam_instance_profile` resources (data sources only).
 
 #### Scenario: No IAM create
 - GIVEN `terraform/academy/` is validated
 - WHEN resources are listed
-- THEN there is no `aws_iam_role`
+- THEN there is no `aws_iam_role` resource
+
+#### Scenario: Profile uses LabRole
+- GIVEN Vocareum pre-created `LabInstanceProfile` and `LabRole`
+- WHEN `action=plan` runs
+- THEN plan fails unless `LabInstanceProfile` role is `LabRole`
 
 ### Requirement: No SSH key in Terraform
 Launch templates SHALL NOT set `key_name`. The configuration SHALL NOT contain `tls_private_key`.

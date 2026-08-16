@@ -10,7 +10,7 @@ AWS Academy cannot create IAM users, groups, or roles. Vocareum pre-creates `Lab
 
 ## Decision
 
-Every launch template and the NAT instance **data-source** `LabInstanceProfile` by name. Terraform SHALL NOT contain `aws_iam_role`, `aws_iam_instance_profile`, or an OIDC provider.
+Every launch template and the NAT instance **data-source** `LabInstanceProfile` by name and **data-source** `LabRole`. Plan fails unless the profile’s role is `LabRole`. Terraform SHALL NOT contain `aws_iam_role` / `aws_iam_instance_profile` **resources**, or an OIDC provider.
 
 ## Consequences
 

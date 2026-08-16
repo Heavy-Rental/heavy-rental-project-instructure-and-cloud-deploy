@@ -2,21 +2,58 @@ data "aws_availability_zones" "available" {
   state = "available"
 }
 
+data "aws_iam_role" "lab" {
+  name = var.lab_role_name
+}
+
+# Vocareum pre-creates this pair. Do not create aws_iam_role or aws_iam_instance_profile.
 data "aws_iam_instance_profile" "lab" {
   name = var.lab_instance_profile_name
+
+  lifecycle {
+    postcondition {
+      condition     = self.role_name == data.aws_iam_role.lab.name
+      error_message = "LabInstanceProfile must use IAM role LabRole. Vocareum pre-creates this pairing; do not create IAM."
+    }
+  }
 }
 
-data "aws_ssm_parameter" "al2023" {
-  name = "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64"
+# DescribeImages is on the Vocareum allow-list. Public SSM parameter
+# /aws/service/ami-amazon-linux-latest/... is often AccessDenied.
+data "aws_ami" "al2023" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["al2023-ami-*-kernel-*-x86_64"]
+  }
+
+  filter {
+    name   = "state"
+    values = ["available"]
+  }
+
+  filter {
+    name   = "architecture"
+    values = ["x86_64"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
 }
 
-# Academy labs do not always offer Postgres 16. Prefer 16, then 15, then 14.
+# Vocareum Learner Lab (run 2026-08-16) advertised only 11.22* and 12.22*.
+# A list that stops at 14 matches nothing and plan dies in the data source.
+# Prefer the clean community versions (not 11.22-rds.YYYYMMDD).
 data "aws_rds_engine_version" "postgres" {
   engine = "postgres"
   preferred_versions = [
-    "16.8", "16.6", "16.4", "16",
-    "15.12", "15.10", "15.8", "15",
-    "14.17", "14.15", "14",
+    "16", "15", "14", "13",
+    "12.22", "12",
+    "11.22", "11",
   ]
 }
 
@@ -32,7 +69,7 @@ locals {
   app_cidrs    = ["10.0.10.0/24", "10.0.11.0/24"]
   data_cidrs   = ["10.0.20.0/24", "10.0.21.0/24"]
 
-  ami_id = data.aws_ssm_parameter.al2023.value
+  ami_id = data.aws_ami.al2023.id
 
   secret_ids = toset([
     "heavy-rental/portal",

@@ -69,3 +69,13 @@ output "vpc_id" {
 output "lab" {
   value = "aws-academy-vocareum"
 }
+
+output "lab_instance_profile" {
+  value       = data.aws_iam_instance_profile.lab.name
+  description = "Instance profile on NAT + four ASGs. Must be LabInstanceProfile."
+}
+
+output "lab_role" {
+  value       = data.aws_iam_role.lab.name
+  description = "IAM role inside LabInstanceProfile. Must be LabRole."
+}

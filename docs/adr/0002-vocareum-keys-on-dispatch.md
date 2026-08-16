@@ -1,6 +1,6 @@
 # ADR 0002: Vocareum session keys on Run workflow
 
-- **Status:** Accepted
+- **Status:** Superseded by [0009](0009-academy-keys-in-environment-secrets.md)
 - **Date:** 2026-08-16
 - **Branch:** `feat/infra-academy-bootstrap`
 

@@ -3,12 +3,14 @@
 #
 # Operator:
 #   1. Start Lab → AWS Details
-#   2. Environment academy secret SPRING_DATASOURCE_PASSWORD (required for apply)
-#   3. Run workflow → paste the three Vocareum keys (they change every session)
-#      or leave empty to use Environment academy AWS_* secrets
+#   2. Environment academy secrets AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY /
+#      AWS_SESSION_TOKEN (update each session; never on the Run form)
+#   3. Environment academy secret SPRING_DATASOURCE_PASSWORD (required for apply)
 #   4. action=plan | action=apply
 #
 # Do not point aws_environment at paid. Do not write keys to Secrets Manager.
+# Do not put Vocareum keys on workflow_dispatch — GitHub prints those inputs
+# on the run page.
 
 name: AWS infrastructure (Academy)
 
@@ -32,21 +34,6 @@ on:
         required: true
         type: environment
         default: academy
-      aws_access_key_id:
-        description: Vocareum AWS Details access key (changes every Start Lab)
-        required: false
-        type: string
-        default: ""
-      aws_secret_access_key:
-        description: Vocareum secret access key
-        required: false
-        type: string
-        default: ""
-      aws_session_token:
-        description: Vocareum session token
-        required: false
-        type: string
-        default: ""
       confirm_destroy:
         description: Unused until branch 3
         required: false
@@ -86,38 +73,27 @@ jobs:
             exit 1
           fi
 
-      - name: Resolve Vocareum credentials
+      - name: Require Environment academy AWS secrets
         env:
-          FORM_KEY: ${{ inputs.aws_access_key_id }}
-          FORM_SECRET: ${{ inputs.aws_secret_access_key }}
-          FORM_TOKEN: ${{ inputs.aws_session_token }}
-          ENV_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          ENV_SECRET: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          ENV_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+          KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          SECRET: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
         run: |
           set +x
-          KEY="${FORM_KEY:-${ENV_KEY}}"
-          SECRET="${FORM_SECRET:-${ENV_SECRET}}"
-          TOKEN="${FORM_TOKEN:-${ENV_TOKEN}}"
           if [ -z "${KEY}" ] || [ -z "${SECRET}" ] || [ -z "${TOKEN}" ]; then
-            echo "::error::Start Lab in Vocareum. Paste AWS Details on this form or set Environment academy secrets."
+            echo "::error::Start Lab. Set Environment academy secrets AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_SESSION_TOKEN. Do not put keys on the Run form."
             exit 1
           fi
           echo "::add-mask::${KEY}"
           echo "::add-mask::${SECRET}"
           echo "::add-mask::${TOKEN}"
-          {
-            echo "AWS_ACCESS_KEY_ID=${KEY}"
-            echo "AWS_SECRET_ACCESS_KEY=${SECRET}"
-            echo "AWS_SESSION_TOKEN=${TOKEN}"
-          } >> "$GITHUB_ENV"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6.2.3
         with:
-          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ env.AWS_SESSION_TOKEN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
 
       - name: Prove the Vocareum session is live
@@ -125,7 +101,7 @@ jobs:
         run: |
           set -euo pipefail
           if ! ARN=$(aws sts get-caller-identity --query Arn --output text); then
-            echo "::error::sts failed. Start Lab and paste a fresh session token."
+            echo "::error::sts failed. Start Lab and update Environment academy AWS_* secrets."
             exit 1
           fi
           ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
@@ -147,37 +123,26 @@ jobs:
     environment: ${{ inputs.aws_environment }}
     timeout-minutes: 15
     steps:
-      - name: Resolve Vocareum credentials
+      - name: Require Environment academy AWS secrets
         env:
-          FORM_KEY: ${{ inputs.aws_access_key_id }}
-          FORM_SECRET: ${{ inputs.aws_secret_access_key }}
-          FORM_TOKEN: ${{ inputs.aws_session_token }}
-          ENV_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          ENV_SECRET: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          ENV_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+          KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          SECRET: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
         run: |
           set +x
-          KEY="${FORM_KEY:-${ENV_KEY}}"
-          SECRET="${FORM_SECRET:-${ENV_SECRET}}"
-          TOKEN="${FORM_TOKEN:-${ENV_TOKEN}}"
           if [ -z "${KEY}" ] || [ -z "${SECRET}" ] || [ -z "${TOKEN}" ]; then
-            echo "::error::Start Lab. Paste AWS Details on the form or set Environment academy secrets."
+            echo "::error::Start Lab. Set Environment academy secrets AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_SESSION_TOKEN. Do not put keys on the Run form."
             exit 1
           fi
           echo "::add-mask::${KEY}"
           echo "::add-mask::${SECRET}"
           echo "::add-mask::${TOKEN}"
-          {
-            echo "AWS_ACCESS_KEY_ID=${KEY}"
-            echo "AWS_SECRET_ACCESS_KEY=${SECRET}"
-            echo "AWS_SESSION_TOKEN=${TOKEN}"
-          } >> "$GITHUB_ENV"
 
       - uses: aws-actions/configure-aws-credentials@v6.2.3
         with:
-          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ env.AWS_SESSION_TOKEN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
 
       - uses: actions/checkout@v7.0.1
@@ -190,23 +155,14 @@ jobs:
       - name: Create backend if missing
         env:
           BUCKET: ${{ needs.assert-lab.outputs.bucket }}
-          LOCK_TABLE: heavy-rental-tfstate-lock-academy
         working-directory: terraform/backend
         run: |
           set -euo pipefail
-          BUCKET_OK=0
-          TABLE_OK=0
           if aws s3api head-bucket --bucket "${BUCKET}" 2>/dev/null; then
-            BUCKET_OK=1
-          fi
-          if aws dynamodb describe-table --table-name "${LOCK_TABLE}" >/dev/null 2>&1; then
-            TABLE_OK=1
-          fi
-          if [ "${BUCKET_OK}" = "1" ] && [ "${TABLE_OK}" = "1" ]; then
-            echo "State bucket ${BUCKET} and lock table ${LOCK_TABLE} already exist."
+            echo "State bucket ${BUCKET} already exists (S3 native lockfile; no DynamoDB)."
             exit 0
           fi
-          echo "Creating/repairing Vocareum Academy state backend (bucket=${BUCKET} table=${LOCK_TABLE})."
+          echo "Creating Vocareum Academy state backend (bucket=${BUCKET})."
           terraform init -input=false
           terraform apply -auto-approve -input=false
           if [ -f terraform.tfstate ]; then
@@ -221,37 +177,26 @@ jobs:
     environment: ${{ inputs.aws_environment }}
     timeout-minutes: 30
     steps:
-      - name: Resolve Vocareum credentials
+      - name: Require Environment academy AWS secrets
         env:
-          FORM_KEY: ${{ inputs.aws_access_key_id }}
-          FORM_SECRET: ${{ inputs.aws_secret_access_key }}
-          FORM_TOKEN: ${{ inputs.aws_session_token }}
-          ENV_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          ENV_SECRET: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          ENV_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+          KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          SECRET: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
         run: |
           set +x
-          KEY="${FORM_KEY:-${ENV_KEY}}"
-          SECRET="${FORM_SECRET:-${ENV_SECRET}}"
-          TOKEN="${FORM_TOKEN:-${ENV_TOKEN}}"
           if [ -z "${KEY}" ] || [ -z "${SECRET}" ] || [ -z "${TOKEN}" ]; then
-            echo "::error::Start Lab. Paste AWS Details on the form or set Environment academy secrets."
+            echo "::error::Start Lab. Set Environment academy secrets AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_SESSION_TOKEN. Do not put keys on the Run form."
             exit 1
           fi
           echo "::add-mask::${KEY}"
           echo "::add-mask::${SECRET}"
           echo "::add-mask::${TOKEN}"
-          {
-            echo "AWS_ACCESS_KEY_ID=${KEY}"
-            echo "AWS_SECRET_ACCESS_KEY=${SECRET}"
-            echo "AWS_SESSION_TOKEN=${TOKEN}"
-          } >> "$GITHUB_ENV"
 
       - uses: aws-actions/configure-aws-credentials@v6.2.3
         with:
-          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ env.AWS_SESSION_TOKEN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
 
       - uses: actions/checkout@v7.0.1
@@ -269,13 +214,18 @@ jobs:
           set +x
           PLACEHOLDER="${DB_PASSWORD_PLAN_PLACEHOLDER}"
           if [ "${ACTION}" = "apply" ]; then
-            if [ -z "${DB_PASS}" ] || [ "${DB_PASS}" = "${PLACEHOLDER}" ]; then
-              echo "::error::Set Environment academy secret SPRING_DATASOURCE_PASSWORD before action=apply. Do not put it on the Run form."
+            if [ -z "${DB_PASS}" ] || [ "${DB_PASS}" = "${PLACEHOLDER}" ] || [ "${#DB_PASS}" -lt 8 ]; then
+              echo "::error::Set Environment academy secret SPRING_DATASOURCE_PASSWORD (>= 8 chars) before action=apply. Do not put it on the Run form."
               exit 1
             fi
             PASS="${DB_PASS}"
           else
-            PASS="${DB_PASS:-${PLACEHOLDER}}"
+            # Plan must not fail validation if the secret is unset or shorter than 8.
+            if [ -n "${DB_PASS}" ] && [ "${DB_PASS}" != "${PLACEHOLDER}" ] && [ "${#DB_PASS}" -ge 8 ]; then
+              PASS="${DB_PASS}"
+            else
+              PASS="${PLACEHOLDER}"
+            fi
           fi
           echo "::add-mask::${PASS}"
           echo "TF_VAR_db_master_password=${PASS}" >> "$GITHUB_ENV"
@@ -287,11 +237,32 @@ jobs:
             echo "::error::IAM instance profile LabInstanceProfile was not found. Vocareum must expose this name for every ASG."
             exit 1
           fi
-          echo "LabInstanceProfile exists."
+          if ! aws iam get-role --role-name LabRole >/dev/null; then
+            echo "::error::IAM role LabRole was not found. Vocareum must pre-create LabRole."
+            exit 1
+          fi
+          PROFILE_ROLE="$(aws iam get-instance-profile \
+            --instance-profile-name LabInstanceProfile \
+            --query 'InstanceProfile.Roles[0].RoleName' \
+            --output text)"
+          if [ "${PROFILE_ROLE}" != "LabRole" ]; then
+            echo "::error::LabInstanceProfile must use LabRole (got '${PROFILE_ROLE}'). Do not create IAM."
+            exit 1
+          fi
+          echo "LabInstanceProfile uses LabRole."
           echo "Available Postgres engine versions (first 8):"
           aws rds describe-db-engine-versions \
             --engine postgres \
             --query 'DBEngineVersions[0:8].EngineVersion' \
+            --output text
+          echo "Latest Amazon Linux 2023 x86_64 AMI (DescribeImages):"
+          aws ec2 describe-images \
+            --owners amazon \
+            --filters \
+              Name=name,Values=al2023-ami-*-kernel-*-x86_64 \
+              Name=state,Values=available \
+              Name=architecture,Values=x86_64 \
+            --query 'sort_by(Images,&CreationDate)[-1].[ImageId,Name]' \
             --output text
 
       - name: terraform init
@@ -304,9 +275,9 @@ jobs:
             -backend-config="bucket=${BUCKET}" \
             -backend-config="key=estate/terraform.tfstate" \
             -backend-config="region=${AWS_DEFAULT_REGION}" \
-            -backend-config="dynamodb_table=heavy-rental-tfstate-lock-academy" \
-            -backend-config="encrypt=true"; then
-            echo "::error::terraform init failed. Check S3 bucket ${BUCKET} and DynamoDB table heavy-rental-tfstate-lock-academy."
+            -backend-config="encrypt=true" \
+            -backend-config="use_lockfile=true"; then
+            echo "::error::terraform init failed. Check S3 bucket ${BUCKET} (S3 native lockfile)."
             exit 1
           fi
 
@@ -316,15 +287,29 @@ jobs:
         working-directory: terraform/academy
         run: |
           set -euo pipefail
-          if ! terraform plan -input=false -no-color -out=tfplan; then
-            echo "::error::terraform plan failed. Search this log for Error: (RDS engine version, LabInstanceProfile, or AccessDenied)."
+          set +e
+          terraform plan -input=false -no-color -out=tfplan > /tmp/tfplan.out 2>&1
+          rc=$?
+          cat /tmp/tfplan.out
+          if [ "${rc}" -ne 0 ]; then
+            {
+              echo "### Terraform plan failed"
+              echo ""
+              echo '```'
+              grep -E '^Error:|  on |AccessDenied|UnauthorizedOperation' /tmp/tfplan.out | head -n 40 || true
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::terraform plan failed. See job summary and the Error: lines above."
             exit 1
           fi
+          set -euo pipefail
           {
             echo "### Terraform plan (Academy estate)"
             echo ""
             echo "Backend: \`s3://${BUCKET}/estate/terraform.tfstate\`"
             echo "Action: \`${{ inputs.action }}\`"
+            echo "- instance profile: \`LabInstanceProfile\`"
+            echo "- IAM role: \`LabRole\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: terraform apply
@@ -341,6 +326,8 @@ jobs:
             echo "- Haystack ALB (internal): \`$(terraform output -raw haystack_alb_dns)\`"
             echo "- RDS: \`$(terraform output -raw rds_endpoint)\`"
             echo "- Neo4j IP: \`$(terraform output -raw neo4j_private_ip)\`"
+            echo "- instance profile: \`$(terraform output -raw lab_instance_profile)\`"
+            echo "- IAM role: \`$(terraform output -raw lab_role)\`"
             echo ""
             echo "Guests have **no containers** yet. Public portal ALB may 502 until branch 3."
             echo "Session end does **not** stop RDS or ALB billing."

@@ -2,18 +2,18 @@
 
 ## Purpose
 
-Terraform estate state lives in S3 with a DynamoDB lock. That backend is not part of the estate state.
+Terraform estate state lives in S3 with native S3 locking (`use_lockfile`). That backend is not part of the estate state.
 
 ## ADDED Requirements
 
 ### Requirement: Backend exists before estate plan
-`action=plan` and `action=bootstrap` SHALL ensure an S3 bucket `heavy-rental-tfstate-<account>-academy` and a DynamoDB table `heavy-rental-tfstate-lock-academy` exist in `us-east-1`.
+`action=plan` and `action=bootstrap` SHALL ensure an S3 bucket `heavy-rental-tfstate-<account>-academy` exists in `us-east-1`. Estate `terraform init` SHALL set `use_lockfile=true` and SHALL NOT pass `dynamodb_table`.
 
 #### Scenario: First plan creates the backend
 - GIVEN the bucket does not exist
 - WHEN `action=plan` or `action=bootstrap` runs after a successful `assert-lab`
-- THEN Terraform in `terraform/backend/` creates the bucket and lock table
-- AND no VPC, ALB, or RDS is created
+- THEN Terraform in `terraform/backend/` creates the bucket
+- AND no VPC, ALB, RDS, or DynamoDB lock table is created
 
 #### Scenario: Later plan skips create
 - GIVEN the bucket already exists
@@ -36,5 +36,5 @@ The estate workspace SHALL store state at key `estate/terraform.tfstate` in that
 #### Scenario: Vocareum identity creates the bucket
 - GIVEN the Vocareum federated user from `assert-lab`
 - WHEN backend apply runs
-- THEN only S3 and DynamoDB resources are created
+- THEN only the S3 state bucket (and its encryption/versioning/public-access settings) is created
 - AND LabRole is not replaced

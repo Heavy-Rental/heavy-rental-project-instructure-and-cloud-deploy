@@ -1,4 +1,4 @@
-# No key_name. No tls_private_key. LabInstanceProfile only.
+# No key_name. No tls_private_key. LabInstanceProfile (LabRole) only.
 # health_check_type = EC2 until branch 3 compose (ADR 0008).
 
 resource "aws_launch_template" "portal" {
