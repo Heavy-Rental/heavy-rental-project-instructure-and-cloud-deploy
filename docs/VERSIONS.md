@@ -19,8 +19,8 @@ Recorded **2026-08-16**. Terraform CLI is the live pin. Ansible and compose imag
 
 | Component | Design source | Recorded version |
 | --- | --- | --- |
-| Guest AMI | study §6.2b / `terraform/academy/data.tf` | Amazon Linux 2023 via SSM `/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64` |
-| RDS PostgreSQL | study §6.1 `postgres-primary` / `data.tf` | Prefer **16.8**, then 16.6 / 16.4 / 16, then 15.x, then 14.x (Vocareum allow-list) |
+| Guest AMI | study §6.2b / `terraform/academy/data.tf` | Amazon Linux 2023 via `aws_ami` (`al2023-ami-*-kernel-*-x86_64`, owner `amazon`). Not the public SSM parameter (often AccessDenied on Vocareum). |
+| RDS PostgreSQL | study §6.1 `postgres-primary` / `data.tf` | Prefer **12.22** (what Vocareum listed 2026-08-16), then 11.22, then 13–16 if the lab adds them. Not 16-only. |
 | RDS class | study §6.4 | `db.t3.micro` |
 | Neo4j | study §6.1 / ANSIBLE §4.4 | `neo4j:5` (branch 3 compose) |
 | REST image | study §4.3 | `tomcat:10.1-jdk21` (branch 3 compose) |

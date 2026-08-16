@@ -9,11 +9,12 @@ terraform {
   }
 
   # Bucket name is account-specific; workflow passes -backend-config=bucket=...
+  # Terraform 1.15: S3 native lock (use_lockfile). dynamodb_table is deprecated.
   backend "s3" {
-    key            = "estate/terraform.tfstate"
-    region         = "us-east-1"
-    dynamodb_table = "heavy-rental-tfstate-lock-academy"
-    encrypt        = true
+    key          = "estate/terraform.tfstate"
+    region       = "us-east-1"
+    encrypt      = true
+    use_lockfile = true
   }
 }
 

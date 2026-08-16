@@ -6,14 +6,14 @@ The Academy infra workflow authenticates as a Vocareum Learner Lab session. Paid
 
 ## ADDED Requirements
 
-### Requirement: Vocareum credentials from form or Environment
-The workflow SHALL accept `aws_access_key_id`, `aws_secret_access_key`, and `aws_session_token` on `workflow_dispatch` and SHALL fall back to Environment `academy` secrets when those inputs are empty.
+### Requirement: Vocareum credentials from form or Environment, masked in logs
+The workflow SHALL accept `aws_access_key_id`, `aws_secret_access_key`, and `aws_session_token` on `workflow_dispatch` and SHALL fall back to Environment `academy` secrets when those inputs are empty. It SHALL read form values from `$GITHUB_EVENT_PATH`, SHALL NOT put them in a step `env:` map or in `${{ inputs.aws_* }}`, and SHALL `::add-mask::` them before writing `$GITHUB_ENV`.
 
 #### Scenario: Operator pastes AWS Details
 - GIVEN a live Vocareum Start Lab
 - WHEN the operator runs the Academy workflow and pastes the three AWS Details values
 - THEN `assert-lab` calls `sts get-caller-identity` successfully
-- AND the three values are masked in job logs (`::add-mask::`)
+- AND job logs do not print the three values in plaintext (`***` after mask)
 
 #### Scenario: Empty form uses Environment
 - GIVEN Environment `academy` has the three secrets set
@@ -23,7 +23,7 @@ The workflow SHALL accept `aws_access_key_id`, `aws_secret_access_key`, and `aws
 #### Scenario: Neither form nor Environment
 - GIVEN the form fields are empty and Environment secrets are unset
 - WHEN `assert-lab` runs
-- THEN the job fails with a message to Start Lab and paste AWS Details
+- THEN the job fails with a message to Start Lab and paste AWS Details or set Environment academy secrets
 
 ### Requirement: Refuse non-academy Environment
 The workflow SHALL run only with GitHub Environment `academy`.

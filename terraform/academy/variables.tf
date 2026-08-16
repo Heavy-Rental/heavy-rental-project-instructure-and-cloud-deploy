@@ -32,5 +32,11 @@ variable "db_password_plan_placeholder" {
 variable "lab_instance_profile_name" {
   type        = string
   default     = "LabInstanceProfile"
-  description = "Pre-created Vocareum instance profile. Do not create IAM."
+  description = "Pre-created Vocareum instance profile. Must contain LabRole. Do not create IAM."
+}
+
+variable "lab_role_name" {
+  type        = string
+  default     = "LabRole"
+  description = "Pre-created Vocareum IAM role. LabInstanceProfile must use this role. Do not create IAM."
 }

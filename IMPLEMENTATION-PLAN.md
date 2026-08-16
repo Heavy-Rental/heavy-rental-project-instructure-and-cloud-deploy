@@ -75,15 +75,15 @@ Academy and paid **never** share a Terraform state key. Paid is out of the first
 
 0. OpenSpec change `add-infra-academy-bootstrap`, OpenSPDD REASONS Canvas, ADRs 0001–0003 (this branch).
 1. Copy `aws-infra-pipeline.example.yml` → `.github/workflows/aws-infra-academy.yml`.
-2. Keep Vocareum **form** inputs (`aws_access_key_id`, `aws_secret_access_key`, `aws_session_token`) + Environment `academy` fallback + `::add-mask::`. **Do not** add these inputs to any paid file.
+2. Vocareum form keys + Environment `academy` fallback (ADR 0009). Read form from `$GITHUB_EVENT_PATH` and mask in logs. **Do not** add these inputs to any paid file.
 3. Implement `assert-lab` for real (`sts get-caller-identity`).
 4. Create GitHub Environment **`academy`** (reviewers if more than one operator). Optional fallback secrets; form is the every-Start-Lab path. Variable `AWS_REGION=us-east-1`.
-5. Bootstrap remote state **outside** the estate state: S3 bucket + DynamoDB lock table (tiny Terraform in `terraform/backend/` applied once, or console). Document the bucket/key. Estate `init` uses that backend; the bucket is **not** in the estate state.
+5. Bootstrap remote state **outside** the estate state: S3 bucket (tiny Terraform in `terraform/backend/` applied once, or console). Estate `init` uses that backend with `use_lockfile=true` (Terraform 1.15; no DynamoDB). The bucket is **not** in the estate state.
 6. Wire `action=plan` to `terraform init` + `plan` on an empty `terraform/academy/` (or a `null_resource` placeholder). `apply` may still no-op or refuse until branch 2.
 
 ### Done when
 
-Start Lab → Run workflow → paste the three keys → `action=plan` is **green**. No billable VPC/ALB/RDS yet.
+Start Lab → Run workflow → paste the three keys (or Environment fallback) → `action=plan` is **green**. No billable VPC/ALB/RDS yet.
 
 ---
 
