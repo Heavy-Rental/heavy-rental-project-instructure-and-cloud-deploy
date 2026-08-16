@@ -20,7 +20,7 @@ resource "aws_launch_template" "portal" {
   block_device_mappings {
     device_name = "/dev/xvda"
     ebs {
-      volume_size           = 16
+      volume_size           = local.root_volume_gb
       volume_type           = "gp3"
       delete_on_termination = true
       encrypted             = true
@@ -80,7 +80,7 @@ resource "aws_launch_template" "rest" {
   block_device_mappings {
     device_name = "/dev/xvda"
     ebs {
-      volume_size           = 16
+      volume_size           = local.root_volume_gb
       volume_type           = "gp3"
       delete_on_termination = true
       encrypted             = true
@@ -140,7 +140,7 @@ resource "aws_launch_template" "haystack" {
   block_device_mappings {
     device_name = "/dev/xvda"
     ebs {
-      volume_size           = 16
+      volume_size           = local.root_volume_gb
       volume_type           = "gp3"
       delete_on_termination = true
       encrypted             = true
@@ -181,7 +181,7 @@ resource "aws_autoscaling_group" "haystack" {
   }
 }
 
-# Dedicated ENI — stable Bolt IP (ADR 0007).
+# Dedicated ENI - stable Bolt IP (ADR 0007).
 resource "aws_network_interface" "neo4j" {
   subnet_id       = aws_subnet.data[0].id
   security_groups = [aws_security_group.neo4j.id]
@@ -215,7 +215,7 @@ resource "aws_launch_template" "neo4j" {
   block_device_mappings {
     device_name = "/dev/xvda"
     ebs {
-      volume_size           = 20
+      volume_size           = local.root_volume_gb
       volume_type           = "gp3"
       delete_on_termination = true
       encrypted             = true
@@ -246,7 +246,7 @@ resource "aws_autoscaling_group" "neo4j" {
   min_size                  = 1
   max_size                  = 1
   desired_capacity          = 1
-  vpc_zone_identifier       = [aws_subnet.data[0].id]
+  # Launch template binds a network_interface_id. ASG must not also set a subnet.
   health_check_type         = "EC2"
   health_check_grace_period = 300
   protect_from_scale_in     = true

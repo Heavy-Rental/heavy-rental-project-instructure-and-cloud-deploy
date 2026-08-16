@@ -61,7 +61,7 @@ resource "aws_security_group" "neo4j" {
 
 resource "aws_security_group" "nat" {
   name        = "hr-nat"
-  description = "NAT instance — no SSH from internet"
+  description = "NAT instance - no SSH from internet"
   vpc_id      = aws_vpc.academy.id
   tags        = { Name = "sg-nat" }
 }
