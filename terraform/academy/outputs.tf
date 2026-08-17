@@ -15,22 +15,37 @@ output "haystack_alb_dns" {
 
 output "rds_endpoint" {
   value       = aws_db_instance.heavy_rental.address
-  description = "RDS hostname (data subnet). Not public."
+  description = "REST SoR RDS hostname (data subnet). Not public."
 }
 
 output "rds_port" {
   value       = aws_db_instance.heavy_rental.port
-  description = "RDS port (5432)."
+  description = "REST SoR RDS port (5432)."
 }
 
 output "rds_database" {
   value       = aws_db_instance.heavy_rental.db_name
-  description = "Initial database heavy_rental."
+  description = "REST SoR database heavy_rental."
+}
+
+output "rds_haystack_endpoint" {
+  value       = aws_db_instance.haystack.address
+  description = "Haystack RDS hostname (data subnet). Not public."
+}
+
+output "rds_haystack_port" {
+  value       = aws_db_instance.haystack.port
+  description = "Haystack RDS port (5432)."
+}
+
+output "rds_haystack_database" {
+  value       = aws_db_instance.haystack.db_name
+  description = "Haystack database name."
 }
 
 output "rds_username" {
   value       = aws_db_instance.heavy_rental.username
-  description = "Master username. Password is not an output."
+  description = "Master username on both RDS instances. Password is not an output."
 }
 
 output "neo4j_private_ip" {

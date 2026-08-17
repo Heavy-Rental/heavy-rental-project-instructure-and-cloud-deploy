@@ -20,8 +20,8 @@ Recorded **2026-08-16**. Terraform CLI is the live pin. Ansible and compose imag
 | Component | Design source | Recorded version |
 | --- | --- | --- |
 | Guest AMI | study §6.2b / `terraform/academy/data.tf` | Amazon Linux 2023 via `aws_ami` (`al2023-ami-*-kernel-*-x86_64`, owner `amazon`). Not the public SSM parameter (often AccessDenied on Vocareum). |
-| RDS PostgreSQL | study §6.1 `postgres-primary` / `data.tf` | Prefer **12.22** (what Vocareum listed 2026-08-16), then 11.22, then 13–16 if the lab adds them. Not 16-only. |
-| RDS class | study §6.4 | `db.t3.micro` |
+| RDS PostgreSQL | study §6.1 / `rds.tf` | Two instances: SoR `heavy_rental` + Haystack `haystack`. Prefer engine **12.22**, then 11.22. |
+| RDS class | study §6.4 | `db.t3.micro` (both) |
 | Neo4j | study §6.1 / ANSIBLE §4.4 | `neo4j:5` (branch 3 compose) |
 | REST image | study §4.3 | `tomcat:10.1-jdk21` (branch 3 compose) |
 | Haystack runtime | study §4.3 | Python **3.12** + uv + uvicorn (branch 3 compose) |

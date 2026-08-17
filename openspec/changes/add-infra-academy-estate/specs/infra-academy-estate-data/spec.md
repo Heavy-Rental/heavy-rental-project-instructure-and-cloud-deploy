@@ -2,19 +2,20 @@
 
 ## Purpose
 
-Academy has **one** RDS and **one** Neo4j. Two data subnets exist so RDS can have a subnet group — not one database per AZ.
+Academy has **two** PostgreSQL instances (REST SoR `heavy_rental` and Haystack) and **one** Neo4j. Two data subnets exist so RDS can have a subnet group — not one database per AZ.
 
 ## ADDED Requirements
 
-### Requirement: Single-AZ RDS in the data subnet group
-Terraform SHALL create one PostgreSQL instance with `publicly_accessible = false`, `multi_az = false`, `deletion_protection = false`, in a subnet group that lists **both** data subnets.
+### Requirement: Two single-AZ RDS instances in the data subnet group
+Terraform SHALL create two PostgreSQL instances (`heavy-rental-academy` database `heavy_rental`, `heavy-rental-haystack-academy` database `haystack`) with `publicly_accessible = false`, `multi_az = false`, `deletion_protection = false`. The subnet group SHALL list both data subnets (AWS requires two AZs). Both instances SHALL set `availability_zone` to the first data subnet so they land in the **same** subnet.
 
-#### Scenario: One RDS after apply
+#### Scenario: Two RDS after apply
 - GIVEN `action=apply` succeeded
 - WHEN `describe-db-instances` is called
-- THEN exactly one Heavy Rental instance exists
-- AND it is not publicly accessible
-- AND Multi-AZ is false
+- THEN both Heavy Rental instances exist
+- AND neither is publicly accessible
+- AND Multi-AZ is false on both
+- AND both instances are in the same Availability Zone as `data[0]`
 
 ### Requirement: Master password from Environment, not the form
 The RDS master password SHALL come from `TF_VAR_db_master_password` (GitHub Environment secret `SPRING_DATASOURCE_PASSWORD`). `action=apply` SHALL fail if that value is empty or the plan-only placeholder.

@@ -23,7 +23,7 @@ Vocareum tokens **expire when the session ends**.
 4. Set `aws_environment` = `academy`.
 5. Choose `action`:
    - **`plan`** — show the estate (no apply). Works without `SPRING_DATASOURCE_PASSWORD` (uses a plan-only placeholder).
-   - **`apply`** — create the VPC, four ASGs, three ALBs, one RDS, SM shells, ECR. Needs `SPRING_DATASOURCE_PASSWORD`.
+   - **`apply`** — create the VPC, four ASGs, three ALBs, two RDS (`heavy_rental` + `haystack`), SM shells, ECR. Needs `SPRING_DATASOURCE_PASSWORD`.
    - **`bootstrap`** — state bucket only (S3 native lockfile).
 
 Expect **15–20 minutes** on apply (RDS + ALBs). This spends lab credits. **Ending the Vocareum session does not stop RDS or ALB billing.**
