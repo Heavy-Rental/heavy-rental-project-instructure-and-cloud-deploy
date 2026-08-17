@@ -12,7 +12,7 @@ On `action=apply` and `action=configure-only`, after Terraform has created the s
 #### Scenario: Portal and REST URLs come from Terraform
 - GIVEN estate outputs exist
 - WHEN `sync-secrets` runs
-- THEN `heavy-rental/portal` contains `REST_BASE_URL` and `STRIPE_PUBLISHABLE_KEY`
+- THEN `heavy-rental/portal` contains `REST_BASE_URL`, `STRIPE_PUBLISHABLE_KEY`, and `VITE_STRIPE_PUBLISHABLE_KEY` (same `pk_` value)
 - AND `heavy-rental/rest` contains `POSTGRES_*`, `SPRING_DATASOURCE_*`, `HAYSTACK_URL`, and the Stripe trio
 - AND `heavy-rental/portal` does not contain `STRIPE_SECRET_KEY` or `STRIPE_WEBHOOK_SECRET`
 
