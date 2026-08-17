@@ -11,7 +11,8 @@ This repo’s pipeline is **AWS Academy Learner Lab (Vocareum) only**. There is 
    - `AWS_SESSION_TOKEN`
 3. **Required for `action=apply`:** secret `SPRING_DATASOURCE_PASSWORD` (RDS master; later copied into `heavy-rental/rest` by branch 3). **Not** a workflow input.
 4. Variable: `AWS_REGION` = `us-east-1`.
-5. GitHub cannot create this Environment from git. Do **not** point this workflow at a `paid` Environment.
+5. Optional image variables (not secrets): `PORTAL_IMAGE` (nginx-based React CI tag; empty = stock `nginx`), `REST_IMAGE`, `HAYSTACK_IMAGE`, `IMAGE_HTTP_URL`.
+6. GitHub cannot create this Environment from git. Do **not** point this workflow at a `paid` Environment.
 
 ## Every lab session
 
@@ -23,7 +24,7 @@ Vocareum tokens **expire when the session ends**.
 4. Set `aws_environment` = `academy`.
 5. Choose `action`:
    - **`plan`** — show the estate (no apply). Works without `SPRING_DATASOURCE_PASSWORD` (uses a plan-only placeholder).
-   - **`apply`** — create the estate, then `sync-secrets` → `sync-ssh-keys` → Ansible. Needs `SPRING_DATASOURCE_PASSWORD`, `NEO4J_PASSWORD`, Stripe trio. REST/Haystack need `image_ref` or Environment `REST_IMAGE` / `HAYSTACK_IMAGE`. Guest count is **8 EC2**. NAT Gateways bill until `destroy`.
+   - **`apply`** — create the estate, then `sync-secrets` → `sync-ssh-keys` → Ansible. Needs `SPRING_DATASOURCE_PASSWORD`, `NEO4J_PASSWORD`, Stripe trio. Portal uses Environment `PORTAL_IMAGE` or stock `nginx`. REST/Haystack need `REST_IMAGE` / `HAYSTACK_IMAGE` or `image_ref`. Guest count is **8 EC2**. NAT Gateways bill until `destroy`.
    - **`configure-only`** — no Terraform apply. Refill secrets, PEMs, compose (after Start Lab / image change).
    - **`stop`** — ASG desired=0 + stop both RDS. **NAT Gateways and ALBs still bill.**
    - **`destroy`** — wipe the estate. Set **both** `action=destroy` **and** `confirm_destroy=destroy`. Terminates EC2 first. **Keeps** the state bucket.
@@ -49,7 +50,7 @@ To wipe the whole half-applied estate instead: `action=destroy` with `confirm_de
 | `describe-auto-scaling-groups --auto-scaling-group-names asg-portal asg-rest asg-haystack asg-neo4j` | All four exist |
 | Public portal ALB DNS (job summary) | Resolves; `:80` after configure (stock nginx until a portal CI image) |
 | `describe-secret --secret-id heavy-rental/portal` | Has `REST_BASE_URL` after `sync-secrets` |
-| `configure-only` | Fills SM + compose. Portal ALB `:80` (stock nginx). REST/Haystack need images. |
+| `configure-only` | Fills SM + compose. Portal uses `PORTAL_IMAGE` or stock nginx. REST/Haystack need images. |
 | `stop` | ASGs desired=0; both RDS stopped; Gateways still bill |
 
 ## Actions
