@@ -276,6 +276,15 @@ resource "aws_vpc_security_group_ingress_rule" "neo4j_bolt_from_haystack" {
   referenced_security_group_id = aws_security_group.haystack.id
 }
 
+resource "aws_vpc_security_group_ingress_rule" "neo4j_bolt_from_vpc" {
+  security_group_id = aws_security_group.neo4j.id
+  ip_protocol       = "tcp"
+  from_port         = 7687
+  to_port           = 7687
+  cidr_ipv4         = local.vpc_cidr
+  description       = "Bolt via internal NLB node IPs"
+}
+
 resource "aws_vpc_security_group_ingress_rule" "neo4j_browser_from_haystack" {
   security_group_id            = aws_security_group.neo4j.id
   ip_protocol                  = "tcp"

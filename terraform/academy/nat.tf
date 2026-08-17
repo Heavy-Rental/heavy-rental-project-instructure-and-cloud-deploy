@@ -1,5 +1,5 @@
-# Documented exception: NAT is a lone aws_instance, not an ASG.
-# Do not replace this with aws_nat_gateway.
+# One NAT instance (Vocareum 9-EC2 cap). Both private AZs share it.
+# Not a NAT Gateway.
 
 resource "aws_instance" "nat" {
   ami                         = local.ami_id

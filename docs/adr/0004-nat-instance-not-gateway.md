@@ -10,10 +10,12 @@ Private app and data subnets need outbound HTTPS (SSM, ECR, yum, Secrets Manager
 
 ## Decision
 
-Use a **`t3.nano` NAT instance** in a public subnet: source/dest check disabled, IP forwarding + MASQUERADE, `LabInstanceProfile` for SSM. Private route tables send `0.0.0.0/0` to that ENI. Add a free **S3 gateway** endpoint. Do not create `aws_nat_gateway`.
+Use **one `t3.nano` NAT instance** in public AZ-0: source/dest check disabled, IP forwarding + MASQUERADE, `LabInstanceProfile` for SSM. Both private app/data route tables send `0.0.0.0/0` to that ENI (cross-AZ). Add a free **S3 gateway** endpoint. Do not create `aws_nat_gateway`.
+
+A second NAT would make 10 EC2 and break the Vocareum default cap of **9**. App/Neo4j stay at desired=2 instead.
 
 ## Consequences
 
-- Fifth instance (four ASGs + NAT) stays under the Vocareum cap of 9.
-- Operator must treat the NAT host as a dependency for SSM and image pull.
+- If the NAT or public AZ-0 dies, **all** private outbound (SSM, ECR, yum) fails.
+- Instance count: 8 ASG guests + 1 NAT = **9**.
 - Throughput is limited (`t3.nano`). Acceptable for a class demo.

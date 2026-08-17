@@ -135,3 +135,46 @@ resource "aws_lb_listener" "haystack" {
     target_group_arn = aws_lb_target_group.haystack.arn
   }
 }
+
+# Internal NLB so two Neo4j guests share one Bolt DNS (TCP 7687).
+resource "aws_lb" "neo4j" {
+  name               = "hr-nlb-neo4j"
+  load_balancer_type = "network"
+  internal           = true
+  subnets            = aws_subnet.data[*].id
+
+  tags = {
+    Name = "nlb-neo4j"
+  }
+}
+
+resource "aws_lb_target_group" "neo4j" {
+  name     = "tg-neo4j"
+  port     = 7687
+  protocol = "TCP"
+  vpc_id   = aws_vpc.academy.id
+
+  health_check {
+    enabled             = true
+    protocol            = "TCP"
+    port                = "7687"
+    interval            = 30
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+  }
+
+  tags = {
+    Name = "tg-neo4j"
+  }
+}
+
+resource "aws_lb_listener" "neo4j_bolt" {
+  load_balancer_arn = aws_lb.neo4j.arn
+  port              = 7687
+  protocol          = "TCP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.neo4j.arn
+  }
+}

@@ -48,13 +48,13 @@ output "rds_username" {
   description = "Master username on both RDS instances. Password is not an output."
 }
 
-output "neo4j_private_ip" {
-  value       = aws_network_interface.neo4j.private_ip
-  description = "Dedicated ENI IP for bolt://<ip>:7687."
+output "neo4j_nlb_dns" {
+  value       = aws_lb.neo4j.dns_name
+  description = "Internal Bolt NLB. Two asg-neo4j guests, one per data AZ."
 }
 
 output "neo4j_uri" {
-  value       = "bolt://${aws_network_interface.neo4j.private_ip}:7687"
+  value       = "bolt://${aws_lb.neo4j.dns_name}:7687"
   description = "NEO4J_URI for heavy-rental/haystack (branch 3)."
 }
 
@@ -74,7 +74,7 @@ output "asg_names" {
 
 output "nat_instance_id" {
   value       = aws_instance.nat.id
-  description = "NAT instance (not a NAT Gateway)."
+  description = "Single NAT instance in public AZ-0 (not a NAT Gateway). Both private AZs share it."
 }
 
 output "vpc_id" {
