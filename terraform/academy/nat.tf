@@ -37,7 +37,10 @@ resource "aws_instance" "nat" {
     Role = "nat"
   }
 
+  # Do not create_before_destroy: routes pin this guest's eth0, and AWS
+  # refuses DetachNetworkInterface on device index 0. A new AL2023 AMI
+  # must not replace the NAT (most_recent data source).
   lifecycle {
-    create_before_destroy = true
+    ignore_changes = [ami]
   }
 }

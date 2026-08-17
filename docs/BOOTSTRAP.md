@@ -28,6 +28,15 @@ Vocareum tokens **expire when the session ends**.
 
 Expect **15–20 minutes** on apply (RDS + ALBs). This spends lab credits. **Ending the Vocareum session does not stop RDS or ALB billing.**
 
+### Apply fails: `device index 0 … cannot be detached`
+
+AWS will not detach an instance’s **primary** ENI (eth0). Terraform is destroying a leftover dedicated Neo4j ENI or replacing the NAT while routes still pin that eth0.
+
+1. Console → EC2 → Network Interfaces → the `eni-…` in the error. Note the attached instance Name (`asg-neo4j` vs `nat-academy`).
+2. **Terminate** that instance (ASG relaunches without the dedicated ENI; NAT is recreated on apply). That is what releases eth0.
+3. If state still lists `aws_network_interface*` / `aws_network_interface_attachment*`, `terraform state rm` that address. Do not `destroy` it while the guest is running.
+4. Re-run **apply**. Do not put a dedicated ENI back on Neo4j or NAT.
+
 ## After apply
 
 | Check | Expect |
