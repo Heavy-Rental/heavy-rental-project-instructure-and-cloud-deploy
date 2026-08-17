@@ -41,6 +41,23 @@
     state: started
     enabled: true
 
+# LabRole can pull ECR. Private GHCR needs a token we do not put on the guest.
+- name: Log in to ECR when a compose image is in this account
+  ansible.builtin.shell: |
+    set -euo pipefail
+    set +x
+    IMAGES="{{ portal_image | default('') }} {{ rest_image | default('') }} {{ haystack_image | default('') }} {{ neo4j_image | default('') }}"
+    REGISTRY="$(printf '%s\n' ${IMAGES} | grep -E '\.dkr\.ecr\.[^/]+\.amazonaws\.com' | head -n1 | cut -d/ -f1 || true)"
+    if [ -z "${REGISTRY}" ]; then
+      exit 0
+    fi
+    aws ecr get-login-password --region "{{ aws_region }}" \
+      | docker login --username AWS --password-stdin "${REGISTRY}"
+  args:
+    executable: /bin/bash
+  no_log: true
+  changed_when: false
+
 - name: Compose and secret directories
   ansible.builtin.file:
     path: "{{ item.path }}"
