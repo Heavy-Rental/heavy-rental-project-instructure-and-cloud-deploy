@@ -1,23 +1,39 @@
 ---
-# AL2023 ships `docker` in Amazon repos. It does not ship
-# docker-compose-plugin (that RPM is Docker CE). Install Compose v2 as a CLI plugin.
+# AL2023: Amazon `docker` RPM. `docker-compose-plugin` is sometimes missing
+# (this lab had no package). Try dnf first; otherwise Compose v2 from GitHub.
 - name: Install Docker
   ansible.builtin.dnf:
     name: docker
     state: present
+
+- name: Try Amazon docker-compose-plugin
+  ansible.builtin.dnf:
+    name: docker-compose-plugin
+    state: present
+  register: compose_rpm
+  failed_when: false
+
+- name: Check docker compose v2
+  ansible.builtin.command:
+    argv: [docker, compose, version]
+  register: compose_cli
+  changed_when: false
+  failed_when: false
 
 - name: Docker CLI plugin directory
   ansible.builtin.file:
     path: /usr/libexec/docker/cli-plugins
     state: directory
     mode: "0755"
+  when: compose_cli.rc != 0
 
-- name: Install Docker Compose v2 plugin
+- name: Install Docker Compose v2 plugin from GitHub
   ansible.builtin.get_url:
     url: "https://github.com/docker/compose/releases/download/v{{ docker_compose_version }}/docker-compose-linux-x86_64"
     dest: /usr/libexec/docker/cli-plugins/docker-compose
     mode: "0755"
     force: true
+  when: compose_cli.rc != 0
 
 - name: Start Docker
   ansible.builtin.service:

@@ -1,0 +1,3 @@
+---
+# Not a GitHub Environment var. Role default so group_vars load location cannot break get_url.
+docker_compose_version: "2.39.2"
