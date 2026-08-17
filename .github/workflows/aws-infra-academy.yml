@@ -393,6 +393,7 @@ jobs:
             echo "- RDS SoR (\`heavy_rental\`): \`$(terraform output -raw rds_endpoint)\`"
             echo "- RDS Haystack (\`haystack\`): \`$(terraform output -raw rds_haystack_endpoint)\`"
             echo "- Neo4j Bolt NLB: \`$(terraform output -raw neo4j_uri)\`"
+            echo "- NAT Gateways: \`$(terraform output -json nat_gateway_ids)\`"
             echo "- instance profile: \`$(terraform output -raw lab_instance_profile)\`"
             echo "- IAM role: \`$(terraform output -raw lab_role)\`"
             echo ""
@@ -537,7 +538,7 @@ jobs:
               echo "### Terraform destroy"
               echo ""
               echo "Estate state emptied. S3 backend bucket **kept**."
-              echo "Re-run \`action=apply\` to recreate (9 EC2, two Multi-AZ RDS, Bolt NLB)."
+              echo "Re-run \`action=apply\` to recreate (8 EC2, two NAT Gateways, two Multi-AZ RDS, Bolt NLB)."
             } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi

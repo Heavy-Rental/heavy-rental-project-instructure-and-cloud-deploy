@@ -7,14 +7,22 @@ Every compute role is a launch template + Auto Scaling group with `LabInstancePr
 ## ADDED Requirements
 
 ### Requirement: Four named ASGs
-Terraform SHALL create `asg-portal`, `asg-rest`, `asg-haystack` in both private-app subnets and `asg-neo4j` in both private-data subnets.
+Terraform SHALL create `asg-portal` (React/nginx), `asg-rest` (Spring Boot), `asg-haystack` in both private-app subnets and `asg-neo4j` in both private-data subnets. Each of those four groups SHALL be Multi-AZ: `min=2 desired=2 max=2`, `vpc_zone_identifier` spanning both subnets of that tier, and balanced AZ distribution so one guest lands in each AZ.
 
 #### Scenario: Describe returns the groups
 - GIVEN `action=apply` succeeded
 - WHEN `describe-auto-scaling-groups` is called for those four names
 - THEN each group exists
-- AND portal/rest/haystack have min=2 desired=2 max=2
+- AND portal/rest/haystack have min=2 desired=2 max=2 across both app AZs
 - AND `asg-neo4j` has min=2 desired=2 max=2 across both data AZs
+
+### Requirement: App load balancers span both AZs
+The public portal ALB SHALL register both public subnets. The internal REST and Haystack ALBs SHALL register both private-app subnets. The Bolt NLB SHALL register both private-data subnets.
+
+#### Scenario: Each ALB has two subnets
+- GIVEN `action=apply` succeeded
+- WHEN each load balancer is described
+- THEN it lists two subnets in two different AZs
 
 ### Requirement: LabInstanceProfile only
 Launch templates SHALL attach the existing instance profile named `LabInstanceProfile`. That profile SHALL use the existing IAM role named `LabRole`. The configuration SHALL NOT contain `aws_iam_role` or `aws_iam_instance_profile` resources (data sources only).

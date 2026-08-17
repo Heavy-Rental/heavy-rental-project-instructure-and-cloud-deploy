@@ -22,7 +22,7 @@ Stand up the **Academy (Vocareum)** estate from GitHub Actions:
 
 - Paid / OIDC (`aws-infra-paid.yml`)
 - Portal / REST / Haystack **app CD** (they consume this estate; they do not create it)
-- CDK, Marketplace Neo4j CFT, NAT Gateway, new IAM roles, EKS
+- CDK, Marketplace Neo4j CFT, NAT **instance**, new IAM roles, EKS
 
 ---
 
@@ -97,9 +97,9 @@ Start Lab → Run workflow → paste the three keys (or Environment fallback) �
 Terraform in `terraform/academy/` (see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and AWS study §8.1):
 
 - VPC, IGW, public / private-app / private-data subnets (**2 AZs**)
-- **One NAT instance** in public AZ-0 (both private AZs share it). Not a NAT Gateway. Keeps the lab at **9 EC2**.
+- **Two NAT Gateways** (one per public AZ) + EIP each. Per-AZ private route tables. Guest count **8 EC2**. Gateways bill until `destroy`.
 - Security groups (portal :80 from public ALB; REST :8080 from portal; Haystack :8000 from rest; RDS :5432 from rest+haystack; Bolt :7687 from haystack / NLB)
-- Four launch templates + ASGs with **`LabInstanceProfile` → `LabRole`**. Portal/REST/Haystack **desired=2** (one per app AZ). `asg-neo4j` **desired=2** (one per data AZ)
+- Four launch templates + ASGs with **`LabInstanceProfile` → `LabRole`**. Portal (React), REST (Spring Boot), Haystack **desired=2** (one per app AZ, ALBs span both). `asg-neo4j` **desired=2** (one per data AZ)
 - Public portal ALB + `tg-portal` :80; internal REST + Haystack ALBs
 - Internal **Bolt NLB** + `tg-neo4j` :7687
 - Two **Multi-AZ** RDS (`heavy_rental` SoR + `haystack`). No third RDS for db-sync
@@ -138,7 +138,7 @@ Terraform in `terraform/academy/` (see [`docs/ARCHITECTURE.md`](docs/ARCHITECTUR
 
 3. **Ansible** (`ANSIBLE-PROCESS.md`): SSM inventory `portal` / `rest` / `haystack` / `neo4j`; Docker; `get-secret-value` → `.env`; CI image load/pull; compose with §6.4a limits; portal nginx `/api` → `REST_BASE_URL`; Haystack must not start `neo4j`; RDS logical via `delegate_to` rest or haystack.
 
-4. **`stop`:** ASG desired=0 (all four + NAT) + `rds stop-db-instance`.
+4. **`stop`:** ASG desired=0 (all four) + `rds stop-db-instance` on both RDS. NAT Gateways **cannot** be stopped — they bill until `destroy`.
 
 5. **`destroy`:** already on branch 2 (`confirm_destroy=destroy`). Branch 3 must keep the same confirm gate.
 
@@ -176,7 +176,7 @@ Protect `master` (and `develop` if more than one operator). Environment `academy
 ## 9. Forbidden in every branch
 
 - `aws_iam_role` / OIDC provider on Academy
-- NAT Gateway, Marketplace Neo4j CFT
+- NAT **instance**, Marketplace Neo4j CFT
 - Neo4j causal cluster (two guests share an NLB; they are not clustered)
 - REST or Haystack on the public ALB
 - Vocareum keys in Secrets Manager or on the guest

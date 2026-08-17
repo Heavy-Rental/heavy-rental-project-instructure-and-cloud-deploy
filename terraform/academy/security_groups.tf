@@ -59,13 +59,6 @@ resource "aws_security_group" "neo4j" {
   tags        = { Name = "sg-neo4j" }
 }
 
-resource "aws_security_group" "nat" {
-  name        = "hr-nat"
-  description = "NAT instance - no SSH from internet"
-  vpc_id      = aws_vpc.academy.id
-  tags        = { Name = "sg-nat" }
-}
-
 # --- public ALB ---
 resource "aws_vpc_security_group_ingress_rule" "alb_public_http" {
   security_group_id = aws_security_group.alb_public.id
@@ -107,7 +100,7 @@ resource "aws_vpc_security_group_egress_rule" "portal_https" {
   from_port         = 443
   to_port           = 443
   cidr_ipv4         = "0.0.0.0/0"
-  description       = "SSM / ECR / Secrets Manager via NAT"
+  description       = "SSM / ECR / Secrets Manager via NAT Gateway"
 }
 
 resource "aws_vpc_security_group_egress_rule" "portal_http" {
@@ -309,16 +302,4 @@ resource "aws_vpc_security_group_egress_rule" "neo4j_http" {
   cidr_ipv4         = "0.0.0.0/0"
 }
 
-# --- nat ---
-resource "aws_vpc_security_group_ingress_rule" "nat_from_vpc" {
-  security_group_id = aws_security_group.nat.id
-  ip_protocol       = "-1"
-  cidr_ipv4         = local.vpc_cidr
-  description       = "Forwarded traffic from private subnets"
-}
 
-resource "aws_vpc_security_group_egress_rule" "nat_all" {
-  security_group_id = aws_security_group.nat.id
-  ip_protocol       = "-1"
-  cidr_ipv4         = "0.0.0.0/0"
-}

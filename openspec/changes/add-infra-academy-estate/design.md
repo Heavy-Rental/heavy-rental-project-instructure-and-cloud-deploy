@@ -2,7 +2,7 @@
 
 ## Context
 
-AWS study §6 / §8.1 and `TERRAFORM-PROCESS.md` define a three-tier VPC on Vocareum: public portal ALB only, internal REST and Haystack ALBs, two RDS (`heavy_rental` + `haystack`), one Neo4j ASG (`max=1`), `LabInstanceProfile` on every guest, NAT **instance** (not Gateway). Branch 1 left `terraform/academy/` as a placeholder so `plan` could succeed without spending credits.
+AWS study §6 / §8.1 and `TERRAFORM-PROCESS.md` define a three-tier VPC on Vocareum: public portal ALB only, internal REST and Haystack ALBs, two Multi-AZ RDS (`heavy_rental` + `haystack`), four ASGs at desired=2, `LabInstanceProfile` on every guest, **two NAT Gateways** (one per public AZ). Branch 1 left `terraform/academy/` as a placeholder so `plan` could succeed without spending credits.
 
 ## Goals / Non-Goals
 
@@ -11,7 +11,7 @@ AWS study §6 / §8.1 and `TERRAFORM-PROCESS.md` define a three-tier VPC on Voca
 - `action=plan` shows add/change of VPC, ASGs, ALBs, RDS, SM shells.
 - `action=apply` creates those resources in the estate state key from branch 1.
 - Outputs: public + internal ALB DNS, RDS endpoint, Neo4j private IP, secret ARNs, ASG names.
-- Academy legal: no `aws_iam_role`, no NAT Gateway, no Marketplace AMI, no Multi-AZ, no `tls_private_key`.
+- Academy legal: no `aws_iam_role`, no Marketplace AMI, no `tls_private_key`. NAT is two Gateways (ADR 0010). App/RDS/Neo4j are Multi-AZ.
 
 **Non-Goals:**
 
@@ -22,8 +22,8 @@ AWS study §6 / §8.1 and `TERRAFORM-PROCESS.md` define a three-tier VPC on Voca
 
 ## Decisions
 
-1. **NAT instance `t3.nano`** in a public subnet; private app and data routes use its ENI. ADR 0004.
-2. **`LabInstanceProfile` data source** on NAT + four launch templates. ADR 0005.
+1. **Two NAT Gateways** (one per public AZ) + per-AZ private route tables. ADR 0010 (supersedes 0004).
+2. **`LabInstanceProfile` data source** on the four launch templates. ADR 0005.
 3. **Empty SM shells** (`recovery_window_in_days = 0`). No `secret_version`. ADR 0006.
 4. **Dedicated ENI for `asg-neo4j`** so Bolt IP is a Terraform output. ADR 0007.
 5. **ASG health = EC2** on portal / REST / Haystack until compose. Target groups still register. ADR 0008.

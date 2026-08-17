@@ -7,7 +7,7 @@ Branch 1 proved Vocareum auth and remote Terraform state. The class still has no
 ## What Changes
 
 - OpenSpec, OpenSPDD, and ADRs 0004–0008 for this branch.
-- Replace `terraform/academy/` placeholder with the §6 estate (VPC, NAT **instance**, SGs, four ASGs, three ALBs, one RDS, SM shells, ECR).
+- Replace `terraform/academy/` placeholder with the §6 estate (VPC, two NAT Gateways, SGs, four Multi-AZ ASGs, three ALBs, two Multi-AZ RDS, SM shells, ECR).
 - Enable `action=apply` on `aws-infra-academy.yml` (`init` → `plan` → `apply`). Vocareum form keys unchanged.
 - `configure-only` / `stop` / `destroy` stay fail-closed.
 

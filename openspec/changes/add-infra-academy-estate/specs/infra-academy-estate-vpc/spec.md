@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The Academy estate is one VPC in `us-east-1` with three subnet tiers and a NAT **instance**.
+The Academy estate is one VPC in `us-east-1` with three subnet tiers and **two NAT Gateways** (one per public AZ).
 
 ## ADDED Requirements
 
@@ -15,14 +15,14 @@ Terraform SHALL create a VPC `10.0.0.0/16` with public `10.0.0.0/24` + `10.0.1.0
 - THEN `map_public_ip_on_launch` is false
 - AND they have no Internet Gateway route
 
-### Requirement: NAT instance, not NAT Gateway
-Private app and data default routes SHALL target a `t3.nano` NAT **instance** ENI. The configuration SHALL NOT contain `aws_nat_gateway`.
+### Requirement: Two NAT Gateways, one per AZ
+Terraform SHALL create two `aws_nat_gateway` resources (one in each public subnet) each with a VPC Elastic IP. Each private-app and private-data subnet SHALL use a dedicated route table whose `0.0.0.0/0` target is the NAT Gateway in the **same** AZ. The configuration SHALL NOT contain an `aws_instance` used as NAT.
 
-#### Scenario: Private route uses the NAT instance
+#### Scenario: Private route uses the same-AZ NAT Gateway
 - GIVEN `action=apply` succeeds
-- WHEN a private-app route table is described
-- THEN `0.0.0.0/0` points at the NAT instance network interface
-- AND no NAT Gateway exists in the VPC
+- WHEN a private-app route table in AZ-n is described
+- THEN `0.0.0.0/0` points at the NAT Gateway in public AZ-n
+- AND no NAT instance exists in the VPC
 
 ### Requirement: S3 gateway endpoint
 The VPC SHALL have an S3 gateway endpoint associated with the private route tables.
