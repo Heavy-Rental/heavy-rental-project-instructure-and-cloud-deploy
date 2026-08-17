@@ -10,6 +10,6 @@ ADRs for this CD repo (Nygard format). Conflict order: **OpenSpec → OpenSPDD S
 | [0004](0004-nat-instance-not-gateway.md) | NAT instance, not NAT Gateway |
 | [0005](0005-labinstanceprofile-only.md) | LabInstanceProfile only — never create IAM |
 | [0006](0006-empty-secret-shells.md) | Empty Secrets Manager shells |
-| [0007](0007-neo4j-dedicated-eni.md) | Dedicated ENI for asg-neo4j |
+| [0007](0007-neo4j-dedicated-eni.md) | Two Neo4j guests + internal Bolt NLB |
 | [0008](0008-ec2-health-until-compose.md) | EC2 health on app ASGs until compose |
 | [0009](0009-academy-keys-in-environment-secrets.md) | Vocareum keys on the Run form, masked in logs |

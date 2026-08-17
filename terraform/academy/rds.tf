@@ -1,5 +1,4 @@
-# AWS requires the subnet group to span 2 AZs. Both instances pin
-# availability_zone to data[0] so they land in the same subnet.
+# AWS requires the subnet group to span 2 AZs. Multi-AZ uses both.
 resource "aws_db_subnet_group" "data" {
   name       = "heavy-rental-data"
   subnet_ids = aws_subnet.data[*].id
@@ -25,9 +24,8 @@ resource "aws_db_instance" "heavy_rental" {
   port     = 5432
 
   db_subnet_group_name         = aws_db_subnet_group.data.name
-  availability_zone            = aws_subnet.data[0].availability_zone
   vpc_security_group_ids       = [aws_security_group.rds.id]
-  multi_az                     = false
+  multi_az                     = true
   publicly_accessible          = false
   deletion_protection          = false
   skip_final_snapshot          = true
@@ -63,9 +61,8 @@ resource "aws_db_instance" "haystack" {
   port     = 5432
 
   db_subnet_group_name         = aws_db_subnet_group.data.name
-  availability_zone            = aws_subnet.data[0].availability_zone
   vpc_security_group_ids       = [aws_security_group.rds.id]
-  multi_az                     = false
+  multi_az                     = true
   publicly_accessible          = false
   deletion_protection          = false
   skip_final_snapshot          = true

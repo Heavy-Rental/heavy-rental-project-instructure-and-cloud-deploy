@@ -38,9 +38,9 @@ resource "aws_launch_template" "portal" {
 
 resource "aws_autoscaling_group" "portal" {
   name                      = "asg-portal"
-  min_size                  = 1
+  min_size                  = 2
   max_size                  = 2
-  desired_capacity          = 1
+  desired_capacity          = 2
   vpc_zone_identifier       = aws_subnet.app[*].id
   health_check_type         = "EC2"
   health_check_grace_period = 300
@@ -98,9 +98,9 @@ resource "aws_launch_template" "rest" {
 
 resource "aws_autoscaling_group" "rest" {
   name                      = "asg-rest"
-  min_size                  = 1
+  min_size                  = 2
   max_size                  = 2
-  desired_capacity          = 1
+  desired_capacity          = 2
   vpc_zone_identifier       = aws_subnet.app[*].id
   health_check_type         = "EC2"
   health_check_grace_period = 300
@@ -158,9 +158,9 @@ resource "aws_launch_template" "haystack" {
 
 resource "aws_autoscaling_group" "haystack" {
   name                      = "asg-haystack"
-  min_size                  = 1
+  min_size                  = 2
   max_size                  = 2
-  desired_capacity          = 1
+  desired_capacity          = 2
   vpc_zone_identifier       = aws_subnet.app[*].id
   health_check_type         = "EC2"
   health_check_grace_period = 300
@@ -181,17 +181,7 @@ resource "aws_autoscaling_group" "haystack" {
   }
 }
 
-# Dedicated ENI - stable Bolt IP (ADR 0007).
-resource "aws_network_interface" "neo4j" {
-  subnet_id       = aws_subnet.data[0].id
-  security_groups = [aws_security_group.neo4j.id]
-  description     = "asg-neo4j Bolt ENI"
-
-  tags = {
-    Name = "eni-neo4j"
-  }
-}
-
+# Two guests, one data AZ each. Bolt via internal NLB (no dedicated ENI).
 resource "aws_launch_template" "neo4j" {
   name_prefix   = "lt-neo4j-"
   image_id      = local.ami_id
@@ -201,15 +191,11 @@ resource "aws_launch_template" "neo4j" {
     name = data.aws_iam_instance_profile.lab.name
   }
 
+  vpc_security_group_ids = [aws_security_group.neo4j.id]
+
   metadata_options {
     http_endpoint = "enabled"
     http_tokens   = "required"
-  }
-
-  network_interfaces {
-    device_index          = 0
-    network_interface_id  = aws_network_interface.neo4j.id
-    delete_on_termination = false
   }
 
   block_device_mappings {
@@ -227,7 +213,7 @@ resource "aws_launch_template" "neo4j" {
     ebs {
       volume_size           = 20
       volume_type           = "gp3"
-      delete_on_termination = false
+      delete_on_termination = true
       encrypted             = true
     }
   }
@@ -243,15 +229,12 @@ resource "aws_launch_template" "neo4j" {
 
 resource "aws_autoscaling_group" "neo4j" {
   name                      = "asg-neo4j"
-  min_size                  = 1
-  max_size                  = 1
-  desired_capacity          = 1
-  # LT binds a network_interface_id: ASG must not set vpc_zone_identifier,
-  # but must still name the ENI's AZ.
-  availability_zones        = [aws_subnet.data[0].availability_zone]
+  min_size                  = 2
+  max_size                  = 2
+  desired_capacity          = 2
+  vpc_zone_identifier       = aws_subnet.data[*].id
   health_check_type         = "EC2"
   health_check_grace_period = 300
-  protect_from_scale_in     = true
   force_delete              = true
   wait_for_capacity_timeout = "10m"
 
@@ -259,6 +242,8 @@ resource "aws_autoscaling_group" "neo4j" {
     id      = aws_launch_template.neo4j.id
     version = "$Latest"
   }
+
+  target_group_arns = [aws_lb_target_group.neo4j.arn]
 
   tag {
     key                 = "Name"

@@ -3,7 +3,7 @@
 **Repo:** this tree (`heavy-rental-project-instructure-and-cloud-deploy`).  
 **Contract:** `heavy-rental-project-pipeline-development/cloud-deployment-feasibility-studies/` — especially `AWS-INFRASTRUCTURE-FEASIBILITY.md` §8, `TERRAFORM-PROCESS.md`, `ANSIBLE-PROCESS.md`, `aws-infra-pipeline.example.yml`.
 
-**Status:** Branch 1 merged. Branch 2 (`feat/infra-academy-estate`) is implemented on `HR-161-implement-aws-infrastructure-academy-by-building-resources` (estate Terraform + `action=apply`).
+**Status:** Branch 1 merged. Branch 2 (`feat/infra-academy-estate`) is on `HR-161-implement-aws-infrastructure-academy-by-building-resources` (`action=apply`). Layout: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 Each feature branch SHALL add or extend **OpenSpec + OpenSPDD + ADR** before expanding YAML or Terraform. Conflict order: OpenSpec scenarios → OpenSPDD Safeguards → ADR → code. See [`specification/README.md`](specification/README.md).
 
@@ -94,19 +94,18 @@ Start Lab → Run workflow → paste the three keys (or Environment fallback) �
 
 ### Tasks
 
-Terraform in `terraform/academy/` (see AWS study §8.1 / `TERRAFORM-PROCESS.md`):
+Terraform in `terraform/academy/` (see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and AWS study §8.1):
 
-- VPC, IGW, public / private-app / private-data subnets (2 AZs), NAT **instance** (not Gateway)
-- Security groups (portal :80 from public ALB; REST :8080 from portal; Haystack :8000 from rest; RDS :5432 from rest+haystack; Bolt :7687 from haystack only)
-- Four launch templates + ASGs with **`LabInstanceProfile`** only — **no** `aws_iam_role`
-- Public portal ALB + `tg-portal` :80
-- Internal REST ALB + `tg-rest` :8080; internal Haystack ALB + `tg-haystack` :8000
-- Two RDS instances in the **same** data subnet (`heavy_rental` SoR + `haystack`; both pin `availability_zone` to `data[0]`; `publicly_accessible=false`, `multi_az=false`, `deletion_protection=false`)
-- `asg-neo4j` `max=1`, data subnets, EC2 health, scale-in protection
-- Secrets Manager **shells**: `heavy-rental/{portal,rest,haystack,neo4j}` and `heavy-rental/ssh/*` (`recovery_window_in_days=0`)
-- Optional ECR repos
-- No `key_name` / no `tls_private_key`
-- Outputs: portal/REST/Haystack ALB DNS, RDS endpoint, Neo4j private IP, secret ARNs
+- VPC, IGW, public / private-app / private-data subnets (**2 AZs**)
+- **One NAT instance** in public AZ-0 (both private AZs share it). Not a NAT Gateway. Keeps the lab at **9 EC2**.
+- Security groups (portal :80 from public ALB; REST :8080 from portal; Haystack :8000 from rest; RDS :5432 from rest+haystack; Bolt :7687 from haystack / NLB)
+- Four launch templates + ASGs with **`LabInstanceProfile` → `LabRole`**. Portal/REST/Haystack **desired=2** (one per app AZ). `asg-neo4j` **desired=2** (one per data AZ)
+- Public portal ALB + `tg-portal` :80; internal REST + Haystack ALBs
+- Internal **Bolt NLB** + `tg-neo4j` :7687
+- Two **Multi-AZ** RDS (`heavy_rental` SoR + `haystack`). No third RDS for db-sync
+- Secrets Manager **shells**: `heavy-rental/{portal,rest,haystack,neo4j}` and `heavy-rental/ssh/*`
+- Optional ECR repos. No `key_name` / no `tls_private_key`
+- Outputs: ALB DNS, both RDS endpoints, `neo4j_uri` (NLB), NAT ids, secret ARNs
 
 `apply` = `init` → `plan` → `apply` against the estate state key from branch 1.
 
@@ -175,7 +174,8 @@ Protect `master` (and `develop` if more than one operator). Environment `academy
 ## 9. Forbidden in every branch
 
 - `aws_iam_role` / OIDC provider on Academy
-- NAT Gateway, Marketplace Neo4j CFT, Multi-AZ RDS
+- NAT Gateway, Marketplace Neo4j CFT
+- Neo4j causal cluster (two guests share an NLB; they are not clustered)
 - REST or Haystack on the public ALB
 - Vocareum keys in Secrets Manager or on the guest
 - Vocareum form keys on **paid** workflows
@@ -186,6 +186,7 @@ Protect `master` (and `develop` if more than one operator). Environment `academy
 
 ## 10. Pointers
 
+- Architecture layout: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - Pinned versions: [`docs/VERSIONS.md`](docs/VERSIONS.md)
 - Estate + E2E: `../heavy-rental-project-pipeline-development/cloud-deployment-feasibility-studies/AWS-INFRASTRUCTURE-FEASIBILITY.md` §8
 - Terraform jobs: `.../TERRAFORM-PROCESS.md`

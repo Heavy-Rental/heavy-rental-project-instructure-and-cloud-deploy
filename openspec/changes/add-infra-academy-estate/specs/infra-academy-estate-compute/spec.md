@@ -7,14 +7,14 @@ Every compute role is a launch template + Auto Scaling group with `LabInstancePr
 ## ADDED Requirements
 
 ### Requirement: Four named ASGs
-Terraform SHALL create `asg-portal`, `asg-rest`, `asg-haystack` in private-app subnets and `asg-neo4j` in a private-data subnet.
+Terraform SHALL create `asg-portal`, `asg-rest`, `asg-haystack` in both private-app subnets and `asg-neo4j` in both private-data subnets.
 
 #### Scenario: Describe returns the groups
 - GIVEN `action=apply` succeeded
 - WHEN `describe-auto-scaling-groups` is called for those four names
 - THEN each group exists
-- AND portal/rest/haystack have min=1 desired=1 max=2
-- AND `asg-neo4j` has max=1 and scale-in protection
+- AND portal/rest/haystack have min=2 desired=2 max=2
+- AND `asg-neo4j` has min=2 desired=2 max=2 across both data AZs
 
 ### Requirement: LabInstanceProfile only
 Launch templates SHALL attach the existing instance profile named `LabInstanceProfile`. That profile SHALL use the existing IAM role named `LabRole`. The configuration SHALL NOT contain `aws_iam_role` or `aws_iam_instance_profile` resources (data sources only).

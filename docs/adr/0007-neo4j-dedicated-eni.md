@@ -1,20 +1,22 @@
-# ADR 0007: Dedicated ENI for asg-neo4j
+# ADR 0007: Two Neo4j guests + internal Bolt NLB
 
 - **Status:** Accepted
-- **Date:** 2026-08-16
+- **Date:** 2026-08-17
 - **Branch:** `feat/infra-academy-estate` (`HR-161`)
+- **Supersedes:** dedicated single ENI (`max=1`)
 
 ## Context
 
-`sync-secrets` needs `NEO4J_URI=bolt://<private-ip>:7687`. An Auto Scaling group does not expose a stable private IP as a first-class Terraform attribute. Neo4j is `max=1` and lives in one data subnet.
+Haystack needs one `NEO4J_URI`. Operators asked for a Neo4j copy in each of the two `us-east-1` AZs. A single dedicated ENI cannot attach to two instances, and an ASG cannot combine `network_interface_id` with subnets.
 
 ## Decision
 
-Create an `aws_network_interface` in a data subnet and attach it as the only NIC on the Neo4j launch template. Output `neo4j_private_ip` from that ENI.
+`asg-neo4j` is **min=2 desired=2 max=2** across both data subnets. Bolt is reached through an **internal NLB** (`hr-nlb-neo4j`, TCP 7687). Output `neo4j_uri = bolt://<nlb-dns>:7687`.
+
+No dedicated ENI. Community Edition is still not a causal cluster: both guests can accept Bolt; graph state is not automatically replicated. Ansible/populate (branch 3) must treat this as two independent copies or a later clustering choice.
 
 ## Consequences
 
-- Bolt address is known at apply time without a `data.aws_instances` race.
-- The graph host is pinned to one AZ (already required by `max=1`).
-- Replacement instances reuse the same IP if the ENI `delete_on_termination` is false.
-- `asg-neo4j` must **not** set `vpc_zone_identifier` (AWS rejects an ENI id **and** an ASG subnet). It **must** set `availability_zones` to the ENI subnet’s AZ (`You must specify 1 of either AvailabilityZones, AvailabilityZoneIds, or Subnets`).
+- One AZ loss still leaves a Neo4j guest and an NLB node.
+- `NEO4J_URI` is stable (NLB DNS), not a private IP.
+- Two `t3.large` guests use more credits than `max=1`.

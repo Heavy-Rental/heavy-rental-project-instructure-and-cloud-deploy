@@ -389,7 +389,7 @@ jobs:
             echo "- Haystack ALB (internal): \`$(terraform output -raw haystack_alb_dns)\`"
             echo "- RDS SoR (\`heavy_rental\`): \`$(terraform output -raw rds_endpoint)\`"
             echo "- RDS Haystack (\`haystack\`): \`$(terraform output -raw rds_haystack_endpoint)\`"
-            echo "- Neo4j IP: \`$(terraform output -raw neo4j_private_ip)\`"
+            echo "- Neo4j Bolt NLB: \`$(terraform output -raw neo4j_uri)\`"
             echo "- instance profile: \`$(terraform output -raw lab_instance_profile)\`"
             echo "- IAM role: \`$(terraform output -raw lab_role)\`"
             echo ""
