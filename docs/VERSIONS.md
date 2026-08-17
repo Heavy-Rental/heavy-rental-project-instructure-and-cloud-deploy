@@ -15,6 +15,7 @@ Recorded **2026-08-16**. Terraform CLI is the live pin. Ansible and compose imag
 | aws-actions/configure-aws-credentials | Actions | **v6.2.3** | `aws-infra-academy.yml` |
 | Ansible community package | `ANSIBLE-PROCESS.md` / study §7.1a | **14.3.1** (depends on ansible-core **2.21.3**) | `aws-infra-academy.yml` (`pip install ansible==14.3.1`) |
 | amazon.aws collection | ansible `_text` deprecation | **>=11.3.0,<12** (uses `common.text.converters`) | `ansible/requirements.yml` |
+| boto3 / botocore (runner) | amazon.aws 11 | **>=1.35.0** | `aws-infra-academy.yml` pip (ubuntu image is older) |
 
 ## Estate runtime
 
