@@ -109,6 +109,8 @@ Terraform in `terraform/academy/` (see [`docs/ARCHITECTURE.md`](docs/ARCHITECTUR
 
 `apply` = `init` → `plan` → `apply` against the estate state key from branch 1.
 
+`destroy` is available on this branch (not waiting for branch 3) so a failed apply can be wiped and recreated: `confirm_destroy=destroy` → terminate estate EC2 (releases eth0) → `terraform destroy`. The state **bucket** stays.
+
 ### Done when
 
 `action=apply` creates those resources. `describe-auto-scaling-groups asg-portal` (etc.) returns the groups. App CD still **fails** `describe-secret` field checks until branch 3.
@@ -138,7 +140,7 @@ Terraform in `terraform/academy/` (see [`docs/ARCHITECTURE.md`](docs/ARCHITECTUR
 
 4. **`stop`:** ASG desired=0 (all four + NAT) + `rds stop-db-instance`.
 
-5. **`destroy`:** `confirm_destroy=destroy` → `terraform destroy` of **this** estate state only.
+5. **`destroy`:** already on branch 2 (`confirm_destroy=destroy`). Branch 3 must keep the same confirm gate.
 
 ### Done when
 

@@ -24,6 +24,7 @@ Vocareum tokens **expire when the session ends**.
 5. Choose `action`:
    - **`plan`** — show the estate (no apply). Works without `SPRING_DATASOURCE_PASSWORD` (uses a plan-only placeholder).
    - **`apply`** — create the VPC, one NAT, four ASGs (desired=2), three ALBs + Bolt NLB, two Multi-AZ RDS, SM shells, ECR. Needs `SPRING_DATASOURCE_PASSWORD`. Guest count is **9 EC2**.
+   - **`destroy`** — wipe the estate (set `confirm_destroy` to `destroy`). Terminates EC2 first so eth0 can be deleted. **Keeps** the state bucket. Then `apply` to recreate.
    - **`bootstrap`** — state bucket only (S3 native lockfile).
 
 Expect **15–20 minutes** on apply (RDS + ALBs). This spends lab credits. **Ending the Vocareum session does not stop RDS or ALB billing.**
@@ -37,6 +38,8 @@ AWS will not detach an instance’s **primary** ENI (eth0). Terraform is destroy
 3. If state still lists `aws_network_interface*` / `aws_network_interface_attachment*`, `terraform state rm` that address. Do not `destroy` it while the guest is running.
 4. Re-run **apply**. Do not put a dedicated ENI back on Neo4j or NAT.
 
+To wipe the whole half-applied estate instead: `action=destroy` with `confirm_destroy=destroy`, then `action=apply`. Destroy terminates estate EC2 first so this detach error does not block teardown.
+
 ## After apply
 
 | Check | Expect |
@@ -44,7 +47,7 @@ AWS will not detach an instance’s **primary** ENI (eth0). Terraform is destroy
 | `describe-auto-scaling-groups --auto-scaling-group-names asg-portal asg-rest asg-haystack asg-neo4j` | All four exist |
 | Public portal ALB DNS (job summary) | Resolves; **may 502** (no nginx yet) |
 | `describe-secret --secret-id heavy-rental/portal` | Shell exists; no `REST_BASE_URL` yet |
-| `configure-only` / `stop` / `destroy` | **Fail** — branch 3 |
+| `configure-only` / `stop` | **Fail** — branch 3 |
 
 ## Actions
 
@@ -53,7 +56,8 @@ AWS will not detach an instance’s **primary** ENI (eth0). Terraform is destroy
 | `plan` | assert-lab → ensure backend → `terraform plan` (estate) |
 | `bootstrap` | assert-lab → ensure backend only |
 | `apply` | assert-lab → ensure backend → `init` + `plan` + `apply` |
-| `configure-only` / `stop` / `destroy` | **Fails** — `feat/infra-academy-configure` |
+| `destroy` | assert-lab → ensure backend → terminate estate EC2 → `terraform destroy` (needs `confirm_destroy=destroy`) |
+| `configure-only` / `stop` | **Fails** — `feat/infra-academy-configure` |
 
 ## What this must not do
 
