@@ -1,0 +1,39 @@
+---
+- name: Data directory on extra EBS
+  ansible.builtin.shell: |
+    set -euo pipefail
+    mkdir -p /data
+    if [ -b /dev/xvdf ]; then
+      if ! blkid /dev/xvdf >/dev/null 2>&1; then
+        mkfs.xfs /dev/xvdf
+      fi
+      if ! mountpoint -q /data; then
+        mount /dev/xvdf /data
+      fi
+      if ! grep -q '/dev/xvdf' /etc/fstab; then
+        echo '/dev/xvdf /data xfs defaults,nofail 0 2' >> /etc/fstab
+      fi
+    fi
+    chown -R 7474:7474 /data || true
+  args:
+    executable: /bin/bash
+
+- name: Neo4j compose
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ compose_dir }}/compose.yml"
+    mode: "0644"
+
+- name: Compose Neo4j
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --env-file
+      - "{{ env_path }}"
+      - -f
+      - "{{ compose_dir }}/compose.yml"
+      - up
+      - -d
+      - --remove-orphans
+    chdir: "{{ compose_dir }}"

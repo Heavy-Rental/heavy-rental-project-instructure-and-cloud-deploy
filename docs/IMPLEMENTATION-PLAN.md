@@ -3,7 +3,7 @@
 **Repo:** this tree (`heavy-rental-project-instructure-and-cloud-deploy`).  
 **Contract:** `heavy-rental-project-pipeline-development/cloud-deployment-feasibility-studies/` — especially `AWS-INFRASTRUCTURE-FEASIBILITY.md` §8, `TERRAFORM-PROCESS.md`, `ANSIBLE-PROCESS.md`, `aws-infra-pipeline.example.yml`.
 
-**Status:** Branch 1 merged. Branch 2 (`feat/infra-academy-estate`) is on `HR-161-implement-aws-infrastructure-academy-by-building-resources` (`action=apply`). Layout: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+**Status:** Branch 1 and 2 merged. Branch 3 configure is on `HR-162-implement-aws-infrastructure-configuration-using-ansible-compose`. Layout: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 Each feature branch SHALL add or extend **OpenSpec + OpenSPDD + ADR** before expanding YAML or Terraform. Conflict order: OpenSpec scenarios → OpenSPDD Safeguards → ADR → code. See [`specification/README.md`](specification/README.md).
 
@@ -119,6 +119,7 @@ Terraform in `terraform/academy/` (see [`docs/ARCHITECTURE.md`](docs/ARCHITECTUR
 
 ## 6. Branch 3 — `feat/infra-academy-configure`
 
+**Delivery branch:** `HR-162-implement-aws-infrastructure-configuration-using-ansible-compose`.  
 **Purpose:** Fill secrets, first compose, operate.
 
 ### Tasks

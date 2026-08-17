@@ -13,7 +13,7 @@ Recorded **2026-08-16**. Terraform CLI is the live pin. Ansible and compose imag
 | hashicorp/setup-terraform | Actions | **v4.0.1** | `aws-infra-academy.yml` |
 | actions/checkout | Actions | **v7.0.1** | `aws-infra-academy.yml` |
 | aws-actions/configure-aws-credentials | Actions | **v6.2.3** | `aws-infra-academy.yml` |
-| Ansible community package | `ANSIBLE-PROCESS.md` / study §7.1a | **14.3.1** (14 Aug 2026; depends on ansible-core **2.21.3**) | Not installed until branch 3 |
+| Ansible community package | `ANSIBLE-PROCESS.md` / study §7.1a | **14.3.1** (depends on ansible-core **2.21.3**) | `aws-infra-academy.yml` (`pip install ansible==14.3.1`) |
 
 ## Estate runtime
 

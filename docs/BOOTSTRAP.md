@@ -1,4 +1,4 @@
-# Academy / Vocareum estate (branch 2)
+# Academy / Vocareum estate (branch 3 configure)
 
 This repo’s pipeline is **AWS Academy Learner Lab (Vocareum) only**. There is no paid / OIDC workflow on this branch.
 
@@ -23,8 +23,10 @@ Vocareum tokens **expire when the session ends**.
 4. Set `aws_environment` = `academy`.
 5. Choose `action`:
    - **`plan`** — show the estate (no apply). Works without `SPRING_DATASOURCE_PASSWORD` (uses a plan-only placeholder).
-   - **`apply`** — create the VPC, two NAT Gateways, four ASGs (desired=2, one guest per AZ), three ALBs + Bolt NLB, two Multi-AZ RDS, SM shells, ECR. Needs `SPRING_DATASOURCE_PASSWORD`. Guest count is **8 EC2**. NAT Gateways bill until `destroy`.
-   - **`destroy`** — wipe the estate. Set **both** `action=destroy` **and** `confirm_destroy=destroy` (dropdown; `action` alone is not enough). Terminates EC2 first so eth0 can be deleted. **Keeps** the state bucket. Then `apply` to recreate.
+   - **`apply`** — create the estate, then `sync-secrets` → `sync-ssh-keys` → Ansible. Needs `SPRING_DATASOURCE_PASSWORD`, `NEO4J_PASSWORD`, Stripe trio. REST/Haystack need `image_ref` or Environment `REST_IMAGE` / `HAYSTACK_IMAGE`. Guest count is **8 EC2**. NAT Gateways bill until `destroy`.
+   - **`configure-only`** — no Terraform apply. Refill secrets, PEMs, compose (after Start Lab / image change).
+   - **`stop`** — ASG desired=0 + stop both RDS. **NAT Gateways and ALBs still bill.**
+   - **`destroy`** — wipe the estate. Set **both** `action=destroy` **and** `confirm_destroy=destroy`. Terminates EC2 first. **Keeps** the state bucket.
    - **`bootstrap`** — state bucket only (S3 native lockfile).
 
 Expect **15–20 minutes** on apply (RDS + ALBs). This spends lab credits. **Ending the Vocareum session does not stop RDS or ALB billing.**
@@ -45,19 +47,21 @@ To wipe the whole half-applied estate instead: `action=destroy` with `confirm_de
 | Check | Expect |
 | --- | --- |
 | `describe-auto-scaling-groups --auto-scaling-group-names asg-portal asg-rest asg-haystack asg-neo4j` | All four exist |
-| Public portal ALB DNS (job summary) | Resolves; **may 502** (no nginx yet) |
-| `describe-secret --secret-id heavy-rental/portal` | Shell exists; no `REST_BASE_URL` yet |
-| `configure-only` / `stop` | **Fail** — branch 3 |
+| Public portal ALB DNS (job summary) | Resolves; `:80` after configure (stock nginx until a portal CI image) |
+| `describe-secret --secret-id heavy-rental/portal` | Has `REST_BASE_URL` after `sync-secrets` |
+| `configure-only` | Fills SM + compose. Portal ALB `:80` (stock nginx). REST/Haystack need images. |
+| `stop` | ASGs desired=0; both RDS stopped; Gateways still bill |
 
 ## Actions
 
-| `action` | Branch 2 behaviour |
+| `action` | Branch 3 behaviour |
 | --- | --- |
 | `plan` | assert-lab → ensure backend → `terraform plan` (estate) |
 | `bootstrap` | assert-lab → ensure backend only |
-| `apply` | assert-lab → ensure backend → `init` + `plan` + `apply` |
+| `apply` | assert-lab → ensure backend → terraform apply → sync-secrets → sync-ssh-keys → Ansible |
 | `destroy` | assert-lab → terminate estate EC2 → `terraform destroy` (needs `confirm_destroy=destroy`). Does **not** create a backend or run estate plan/apply. |
-| `configure-only` / `stop` | **Fails** — `feat/infra-academy-configure` |
+| `configure-only` | assert-lab → sync-secrets → sync-ssh-keys → Ansible (no terraform apply) |
+| `stop` | assert-lab → ASG desired=0 + stop both RDS |
 
 ## What this must not do
 
@@ -66,5 +70,5 @@ To wipe the whole half-applied estate instead: `action=destroy` with `confirm_de
 - Write Vocareum keys into Secrets Manager or onto EC2
 - Put `SPRING_DATASOURCE_PASSWORD` on the Run form
 - Echo Vocareum keys in job logs (`env:` / `${{ inputs.aws_* }}`)
-- Fill secret JSON, install Docker, or compose (branch 3)
+- Put `sk_` on the portal secret
 - Target a billed / paid account
