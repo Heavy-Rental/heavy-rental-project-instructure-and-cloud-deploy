@@ -17,7 +17,7 @@ This is the live target for `terraform/academy/`. `postgres-haystack-sync` is a 
      +------------------+------------------+
      |   public AZ-0         public AZ-1   |
      |  10.0.0.0/24         10.0.1.0/24    |
-     |  NAT t3.nano         (ALB only)     |
+     |  NAT GW + EIP        NAT GW + EIP   |
      |  portal ALB (spans both)            |
      +------------------+------------------+
                         |
@@ -28,7 +28,7 @@ This is the live target for `terraform/academy/`. `postgres-haystack-sync` is a 
      |  asg-rest x1         asg-rest x1    |
      |  asg-haystack x1     asg-haystack x1|
      |  internal REST ALB + Haystack ALB   |
-     |  0.0.0.0/0 -> shared NAT in AZ-0    |
+     |  0.0.0.0/0 -> NAT GW in same AZ     |
      +------------------+------------------+
                         |
      +------------------+------------------+
@@ -63,15 +63,16 @@ flowchart TB
   asgH1 --> nlbN
   nlbN --> n4j0[asg-neo4j AZ-0]
   nlbN --> n4j1[asg-neo4j AZ-1]
-  asgP0 --> nat0[NAT AZ-0 only]
+  asgP0 --> nat0[NAT GW AZ-0]
   asgR0 --> nat0
   asgH0 --> nat0
   n4j0 --> nat0
-  asgP1 --> nat0
-  asgR1 --> nat0
-  asgH1 --> nat0
-  n4j1 --> nat0
+  asgP1 --> nat1[NAT GW AZ-1]
+  asgR1 --> nat1
+  asgH1 --> nat1
+  n4j1 --> nat1
   nat0 --> igw
+  nat1 --> igw
 ```
 
 ## Counts
@@ -80,15 +81,15 @@ flowchart TB
 | --- | --- | --- |
 | Portal / REST / Haystack EC2 | 2 each (one per app AZ) | AZ loss keeps one guest behind the ALB |
 | Neo4j EC2 | 2 (one per data AZ) | AZ loss keeps one guest behind the Bolt NLB. **Not** a causal cluster |
-| NAT | **1** in public AZ-0 | Shared by both private AZs (Vocareum **9 EC2** cap). Not a NAT Gateway |
+| NAT | **2 Gateways** (one per public AZ) + EIP each | Same-AZ outbound for portal / REST / Haystack / Neo4j. Not an EC2 instance |
 | RDS `heavy_rental` | 1 Multi-AZ | Primary + standby |
 | RDS `haystack` | 1 Multi-AZ | Primary + standby |
 | `postgres-haystack-sync` | 0 RDS | Worker on `asg-haystack` (branch 3) |
 
-**Guest count:** 8 ASG instances + 1 NAT = **9** EC2 (Vocareum default cap).
+**Guest count:** 8 ASG instances + **0** NAT EC2 = **8** EC2 (Vocareum default cap is 9).
 
 ## Traffic
 
 Browser → public portal ALB → portal → internal REST ALB → REST → SoR RDS.  
 REST → internal Haystack ALB → Haystack → Haystack RDS + Bolt NLB → Neo4j.  
-Private outbound HTTPS → the **single NAT** in public AZ-0 (cross-AZ). S3 via gateway endpoint (no NAT). If that NAT or AZ-0 dies, all private outbound fails.
+Private outbound HTTPS → the **NAT Gateway in the same AZ**. S3 via gateway endpoint (no NAT). If AZ-0 dies, AZ-1 guests keep outbound. NAT Gateways bill until `action=destroy`; session end and `action=stop` do not pause them.

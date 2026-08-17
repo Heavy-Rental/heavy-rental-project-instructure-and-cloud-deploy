@@ -27,4 +27,4 @@ Recorded **2026-08-16**. Terraform CLI is the live pin. Ansible and compose imag
 | Haystack runtime | study §4.3 | Python **3.12** + uv + uvicorn (branch 3 compose) |
 | pgvector fallback | study §6.1 | `pgvector/pgvector:pg17` (branch 3, only if RDS cannot `CREATE EXTENSION vector`) |
 | Portal | study §6.4a | nginx (no numeric tag in the study; branch 3 compose) |
-| Instance types | study §6.4 | NAT `t3.nano` **x1**; portal `t3.micro` **x2**; rest/haystack `t3.small` **x2**; neo4j `t3.large` **x2** (9 EC2) |
+| Instance types | study §6.4 | NAT Gateway **x2** (not EC2); portal `t3.micro` **x2**; rest/haystack `t3.small` **x2**; neo4j `t3.large` **x2** (8 EC2) |

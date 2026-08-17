@@ -1,5 +1,7 @@
 # No key_name. No tls_private_key. LabInstanceProfile (LabRole) only.
 # health_check_type = EC2 until branch 3 compose (ADR 0008).
+# Portal (React/nginx), REST (Spring Boot), Haystack: one guest per app AZ.
+# ALBs already span both app (or public) subnets.
 
 resource "aws_launch_template" "portal" {
   name_prefix   = "lt-portal-"
@@ -46,6 +48,10 @@ resource "aws_autoscaling_group" "portal" {
   health_check_grace_period = 300
   force_delete              = true
   wait_for_capacity_timeout = "10m"
+
+  availability_zone_distribution {
+    capacity_distribution_strategy = local.asg_az_distribution
+  }
 
   launch_template {
     id      = aws_launch_template.portal.id
@@ -107,6 +113,10 @@ resource "aws_autoscaling_group" "rest" {
   force_delete              = true
   wait_for_capacity_timeout = "10m"
 
+  availability_zone_distribution {
+    capacity_distribution_strategy = local.asg_az_distribution
+  }
+
   launch_template {
     id      = aws_launch_template.rest.id
     version = "$Latest"
@@ -166,6 +176,10 @@ resource "aws_autoscaling_group" "haystack" {
   health_check_grace_period = 300
   force_delete              = true
   wait_for_capacity_timeout = "10m"
+
+  availability_zone_distribution {
+    capacity_distribution_strategy = local.asg_az_distribution
+  }
 
   launch_template {
     id      = aws_launch_template.haystack.id
@@ -237,6 +251,10 @@ resource "aws_autoscaling_group" "neo4j" {
   health_check_grace_period = 300
   force_delete              = true
   wait_for_capacity_timeout = "10m"
+
+  availability_zone_distribution {
+    capacity_distribution_strategy = local.asg_az_distribution
+  }
 
   launch_template {
     id      = aws_launch_template.neo4j.id

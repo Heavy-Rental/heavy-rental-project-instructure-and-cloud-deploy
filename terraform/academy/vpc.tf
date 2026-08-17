@@ -76,54 +76,60 @@ resource "aws_route_table_association" "public" {
 }
 
 resource "aws_route_table" "app" {
+  count  = 2
   vpc_id = aws_vpc.academy.id
 
   tags = {
-    Name = "rt-app"
+    Name = "rt-app-${local.azs[count.index]}"
+    Tier = "private-app"
   }
 }
 
 resource "aws_route" "app_nat" {
-  route_table_id         = aws_route_table.app.id
+  count                  = 2
+  route_table_id         = aws_route_table.app[count.index].id
   destination_cidr_block = "0.0.0.0/0"
-  network_interface_id   = aws_instance.nat.primary_network_interface_id
+  nat_gateway_id         = aws_nat_gateway.this[count.index].id
 }
 
 resource "aws_route_table_association" "app" {
   count          = 2
   subnet_id      = aws_subnet.app[count.index].id
-  route_table_id = aws_route_table.app.id
+  route_table_id = aws_route_table.app[count.index].id
 }
 
 resource "aws_route_table" "data" {
+  count  = 2
   vpc_id = aws_vpc.academy.id
 
   tags = {
-    Name = "rt-data"
+    Name = "rt-data-${local.azs[count.index]}"
+    Tier = "private-data"
   }
 }
 
 resource "aws_route" "data_nat" {
-  route_table_id         = aws_route_table.data.id
+  count                  = 2
+  route_table_id         = aws_route_table.data[count.index].id
   destination_cidr_block = "0.0.0.0/0"
-  network_interface_id   = aws_instance.nat.primary_network_interface_id
+  nat_gateway_id         = aws_nat_gateway.this[count.index].id
 }
 
 resource "aws_route_table_association" "data" {
   count          = 2
   subnet_id      = aws_subnet.data[count.index].id
-  route_table_id = aws_route_table.data.id
+  route_table_id = aws_route_table.data[count.index].id
 }
 
-# Free. Reduces NAT traffic for ECR/S3 layers.
+# Free. Reduces NAT Gateway traffic for ECR/S3 layers.
 resource "aws_vpc_endpoint" "s3" {
   vpc_id            = aws_vpc.academy.id
   service_name      = "com.amazonaws.${data.aws_region.current.name}.s3"
   vpc_endpoint_type = "Gateway"
-  route_table_ids = [
-    aws_route_table.app.id,
-    aws_route_table.data.id,
-  ]
+  route_table_ids = concat(
+    aws_route_table.app[*].id,
+    aws_route_table.data[*].id,
+  )
 
   tags = {
     Name = "vpce-s3-academy"

@@ -72,9 +72,14 @@ output "asg_names" {
   }
 }
 
-output "nat_instance_id" {
-  value       = aws_instance.nat.id
-  description = "Single NAT instance in public AZ-0 (not a NAT Gateway). Both private AZs share it."
+output "nat_gateway_ids" {
+  value       = aws_nat_gateway.this[*].id
+  description = "One NAT Gateway per public AZ. Private subnets use the Gateway in the same AZ."
+}
+
+output "nat_gateway_ips" {
+  value       = aws_eip.nat[*].public_ip
+  description = "Elastic IPs on the two NAT Gateways."
 }
 
 output "vpc_id" {
@@ -87,7 +92,7 @@ output "lab" {
 
 output "lab_instance_profile" {
   value       = data.aws_iam_instance_profile.lab.name
-  description = "Instance profile on NAT + four ASGs. Must be LabInstanceProfile."
+  description = "Instance profile on the four ASGs. Must be LabInstanceProfile."
 }
 
 output "lab_role" {

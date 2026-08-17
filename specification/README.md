@@ -6,7 +6,7 @@ Conflict order: **OpenSpec scenarios → OpenSPDD Safeguards → ADR → YAML / 
 | --- | --- | --- |
 | **OpenSpec** | [`../openspec/`](../openspec/) | Observable behavior (SHALL + GIVEN/WHEN/THEN) |
 | **OpenSPDD** | [`../spdd/`](../spdd/) | REASONS Canvas + analysis (how to implement, what not to invent) |
-| **ADR** | [`../docs/adr/`](../docs/adr/) | Why Vocareum-only, Environment secrets (not Run-form keys), remote state, NAT instance, empty SM shells |
+| **ADR** | [`../docs/adr/`](../docs/adr/) | Why Vocareum-only, Environment secrets (not Run-form keys), remote state, two NAT Gateways, empty SM shells |
 | **Operator** | [`../BOOTSTRAP.md`](../BOOTSTRAP.md) | Environment `academy`, every Start Lab, `action=apply` |
 | **Program plan** | [`../IMPLEMENTATION-PLAN.md`](../IMPLEMENTATION-PLAN.md) | Three-branch delivery |
 

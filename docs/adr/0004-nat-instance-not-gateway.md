@@ -1,6 +1,6 @@
 # ADR 0004: NAT instance, not NAT Gateway
 
-- **Status:** Accepted
+- **Status:** Superseded by [0010](0010-two-nat-gateways.md)
 - **Date:** 2026-08-16
 - **Branch:** `feat/infra-academy-estate` (`HR-161`)
 
