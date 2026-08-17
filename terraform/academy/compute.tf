@@ -246,7 +246,9 @@ resource "aws_autoscaling_group" "neo4j" {
   min_size                  = 1
   max_size                  = 1
   desired_capacity          = 1
-  # Launch template binds a network_interface_id. ASG must not also set a subnet.
+  # LT binds a network_interface_id: ASG must not set vpc_zone_identifier,
+  # but must still name the ENI's AZ.
+  availability_zones        = [aws_subnet.data[0].availability_zone]
   health_check_type         = "EC2"
   health_check_grace_period = 300
   protect_from_scale_in     = true
