@@ -22,7 +22,7 @@
 ## Decisions
 
 1. PEMs generated on the runner after InService (ADR 0011).
-2. Ansible uses `community.aws.aws_ssm` (ADR 0012). Everyday path is not SSH.
+2. Ansible uses `amazon.aws.aws_ssm` (ADR 0012). Everyday path is not SSH.
 3. Portal and Neo4j may use public `nginx` / `neo4j:5`. REST and Haystack fail without an operator image (`image_http_url` / `IMAGE_HTTP_URL` / `image_ref` / ECR).
 4. `stop` keeps `max=2` so the next configure can scale desired back to 2 without Terraform.
 5. Conflict order: OpenSpec → OpenSPDD → ADR → YAML / scripts / Ansible.

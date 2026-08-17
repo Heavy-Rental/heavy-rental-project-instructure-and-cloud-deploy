@@ -10,7 +10,7 @@ Portal, REST, Haystack, and Neo4j guests have no public IPs. Opening `:22` from 
 
 ## Decision
 
-Ansible uses `community.aws.aws_ssm`. Inventory hosts are instance ids. The runner installs the Session Manager plugin. SSH PEMs (ADR 0011) are break-glass only and are never the everyday connection.
+Ansible uses `amazon.aws.aws_ssm` (plugin moved out of `community.aws`). Collection **11.3.0+** imports `ansible.module_utils.common.text.converters`, not deprecated `_text`. Inventory hosts are instance ids. The runner installs the Session Manager plugin. SSH PEMs (ADR 0011) are break-glass only and are never the everyday connection.
 
 ## Consequences
 

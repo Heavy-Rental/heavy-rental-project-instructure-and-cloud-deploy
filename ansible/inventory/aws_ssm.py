@@ -50,7 +50,7 @@ def build() -> dict:
             inv[group]["hosts"].append(iid)
             inv["_meta"]["hostvars"][iid] = {
                 "ansible_host": iid,
-                "ansible_connection": "community.aws.aws_ssm",
+                "ansible_connection": "amazon.aws.aws_ssm",
                 "ansible_aws_ssm_region": "us-east-1",
                 "ansible_user": "ssm-user",
                 "asg_name": asg,
