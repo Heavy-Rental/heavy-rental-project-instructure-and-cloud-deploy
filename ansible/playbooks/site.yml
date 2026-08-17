@@ -1,0 +1,38 @@
+---
+- name: Shared guest bootstrap
+  hosts: portal:rest:haystack:neo4j
+  become: true
+  gather_facts: true
+  roles:
+    - guest_base
+
+- name: Portal (React / nginx)
+  hosts: portal
+  become: true
+  roles:
+    - portal
+
+- name: Neo4j
+  hosts: neo4j
+  become: true
+  roles:
+    - neo4j
+
+- name: REST (Spring Boot / Tomcat)
+  hosts: rest
+  become: true
+  roles:
+    - rest
+
+- name: Haystack (no Neo4j container)
+  hosts: haystack
+  become: true
+  roles:
+    - haystack
+
+- name: RDS logical (Haystack vector extension)
+  hosts: haystack
+  become: true
+  run_once: true
+  roles:
+    - rds_logical

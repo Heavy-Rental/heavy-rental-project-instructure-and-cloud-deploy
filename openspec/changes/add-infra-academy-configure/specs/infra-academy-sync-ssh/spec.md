@@ -1,0 +1,24 @@
+# Delta for infra-academy-sync-ssh
+
+## Purpose
+
+Break-glass PEMs exist only after ASG guests are InService. Everyday operate is SSM.
+
+## ADDED Requirements
+
+### Requirement: PEMs after InService
+`sync-ssh-keys` SHALL wait until each of `asg-portal`, `asg-rest`, `asg-haystack`, and `asg-neo4j` has InService instances, then write `heavy-rental/ssh/{portal,rest,haystack,neo4j}` and install only the public key via SSM.
+
+#### Scenario: Private key stays off the guest
+- GIVEN four ASGs are InService
+- WHEN `sync-ssh-keys` completes
+- THEN each SSH secret contains `key_name` and `private_key_pem`
+- AND the instance `authorized_keys` contains the matching public key
+- AND the private PEM is not written to the guest disk
+- AND Terraform contains no `tls_private_key`
+
+#### Scenario: Desired zero skips
+- GIVEN an ASG desired capacity is 0
+- WHEN `sync-ssh-keys` runs
+- THEN that role’s PEM is not generated as a new apply-time key for missing guests
+- AND the job fails closed asking the operator to apply or wait

@@ -1,0 +1,49 @@
+---
+- name: Haystack image is required
+  ansible.builtin.assert:
+    that:
+      - haystack_image | default('') | length > 0
+    fail_msg: >-
+      Set extra-var haystack_image (ECR/GHCR tag or name loaded from image_http_url).
+      Do not docker build. Do not start Neo4j on this host.
+
+- name: Haystack compose (no neo4j service)
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ compose_dir }}/compose.yml"
+    mode: "0644"
+
+- name: Compose file must not start Neo4j
+  ansible.builtin.command:
+    argv: [grep, -E, "^[[:space:]]+neo4j:[[:space:]]*$", "{{ compose_dir }}/compose.yml"]
+  register: neo4j_svc
+  changed_when: false
+  failed_when: neo4j_svc.rc == 0
+
+- name: Compose Haystack
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --env-file
+      - "{{ env_path }}"
+      - -f
+      - "{{ compose_dir }}/compose.yml"
+      - up
+      - -d
+      - --remove-orphans
+    chdir: "{{ compose_dir }}"
+
+- name: Haystack health
+  ansible.builtin.uri:
+    url: "{{ item }}"
+    status_code: [200, 301, 302]
+  loop:
+    - http://127.0.0.1:8000/docs
+    - http://127.0.0.1:8000/health
+    - http://127.0.0.1:8000/
+  register: hay_health
+  retries: 15
+  delay: 5
+  until: hay_health is succeeded
+  failed_when: false

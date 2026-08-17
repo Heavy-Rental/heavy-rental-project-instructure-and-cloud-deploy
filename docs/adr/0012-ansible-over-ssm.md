@@ -1,0 +1,19 @@
+# ADR 0012: Ansible over SSM, not SSH
+
+- **Status:** Accepted
+- **Date:** 2026-08-17
+- **Branch:** `HR-162-implement-aws-infrastructure-configuration-using-ansible-compose`
+
+## Context
+
+Portal, REST, Haystack, and Neo4j guests have no public IPs. Opening `:22` from `0.0.0.0/0` is forbidden. Vocareum documents LabRole + Session Manager.
+
+## Decision
+
+Ansible uses `community.aws.aws_ssm`. Inventory hosts are instance ids. The runner installs the Session Manager plugin. SSH PEMs (ADR 0011) are break-glass only and are never the everyday connection.
+
+## Consequences
+
+- Guests need outbound to SSM (`ssm` / `ssmmessages` / `ec2messages`) via the same-AZ NAT Gateway.
+- RDS is not in inventory (no guest OS).
+- App CD later uses the same connection for one group.

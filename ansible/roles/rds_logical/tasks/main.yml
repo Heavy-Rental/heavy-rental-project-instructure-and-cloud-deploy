@@ -1,0 +1,32 @@
+---
+- name: Install a Postgres client
+  ansible.builtin.dnf:
+    name:
+      - postgresql15
+      - postgresql
+    state: present
+  register: pg_client
+  failed_when: false
+
+- name: CREATE EXTENSION vector on Haystack RDS
+  ansible.builtin.shell: |
+    set -euo pipefail
+    set +x
+    # shellcheck disable=SC1091
+    source "{{ env_path }}"
+    if [ -z "${POSTGRES_HOST:-}" ] || [ -z "${POSTGRES_PASSWORD:-}" ]; then
+      echo "No POSTGRES_* on this host; skip."
+      exit 0
+    fi
+    if [ "${POSTGRES_DATABASE:-}" != "haystack" ]; then
+      echo "Not the Haystack RDS guest secret; skip."
+      exit 0
+    fi
+    export PGPASSWORD="${POSTGRES_PASSWORD}"
+    psql -h "${POSTGRES_HOST}" -p "${POSTGRES_PORT:-5432}" -U "${POSTGRES_USERNAME}" -d "${POSTGRES_DATABASE}" \
+      -v ON_ERROR_STOP=1 \
+      -c "CREATE EXTENSION IF NOT EXISTS vector;"
+  args:
+    executable: /bin/bash
+  no_log: true
+  when: app_role == "haystack"

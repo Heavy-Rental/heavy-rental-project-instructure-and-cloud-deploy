@@ -1,12 +1,12 @@
-# AWS Academy (Vocareum) infrastructure — branch 2 estate.
-# Not paid. Not OIDC. Not app CI. Not Ansible / sync-secrets.
+# AWS Academy (Vocareum) infrastructure — HR-162 configure.
+# Not paid. Not OIDC. Not app CI.
 #
 # Operator:
 #   1. Start Lab → AWS Details
 #   2. Paste the three Vocareum keys on the Run form, or leave empty and use
 #      Environment academy AWS_* secrets
-#   3. Environment academy secret SPRING_DATASOURCE_PASSWORD (required for apply)
-#   4. action=plan | action=apply | action=destroy (confirm_destroy=destroy)
+#   3. Environment academy: SPRING_DATASOURCE_PASSWORD, NEO4J_PASSWORD, Stripe trio
+#   4. action=plan | apply | configure-only | stop | destroy (confirm_destroy=destroy)
 #
 # Do not point aws_environment at paid. Do not write keys to Secrets Manager.
 # Form keys are read from $GITHUB_EVENT_PATH (not env: / ${{ inputs.* }}) so
@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: plan, apply, or destroy the estate. configure/stop wait for branch 3.
+        description: plan, apply, configure-only, stop, or destroy. destroy also needs confirm_destroy=destroy.
         required: true
         type: choice
         default: plan
@@ -54,6 +54,16 @@ on:
         default: ""
       aws_session_token:
         description: Vocareum session token. Empty = Environment academy.
+        required: false
+        type: string
+        default: ""
+      image_ref:
+        description: Registry tag for REST/Haystack (or Environment REST_IMAGE / HAYSTACK_IMAGE). Empty = those groups fail.
+        required: false
+        type: string
+        default: ""
+      image_http_url:
+        description: HTTPS tar.gz to docker load on guests. Empty = Environment IMAGE_HTTP_URL.
         required: false
         type: string
         default: ""
@@ -397,8 +407,8 @@ jobs:
             echo "- instance profile: \`$(terraform output -raw lab_instance_profile)\`"
             echo "- IAM role: \`$(terraform output -raw lab_role)\`"
             echo ""
-            echo "Guests have **no containers** yet. Public portal ALB may 502 until branch 3."
-            echo "Session end does **not** stop RDS or ALB billing."
+            echo "Configure jobs (\`sync-secrets\` / SSH / Ansible) run next on apply."
+            echo "Session end does **not** stop RDS, ALB, or NAT Gateway billing."
           } >> "$GITHUB_STEP_SUMMARY"
 
   destroy:
@@ -567,15 +577,169 @@ jobs:
           echo "::error::terraform destroy failed. See job summary."
           exit 1
 
-  not-in-branch-2:
-    name: Not implemented on branch 2
-    if: inputs.action == 'configure-only' || inputs.action == 'stop'
+  sync-secrets:
+    name: Sync GitHub secrets to AWS Secrets Manager
+    needs: [assert-lab, terraform]
+    if: always() && needs.assert-lab.result == 'success' && (inputs.action == 'apply' || inputs.action == 'configure-only') && (needs.terraform.result == 'success' || needs.terraform.result == 'skipped')
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    environment: ${{ inputs.aws_environment }}
+    timeout-minutes: 10
     steps:
-      - name: Fail closed
+      - uses: actions/checkout@v7.0.1
+
+      - uses: ./.github/actions/resolve-vocareum-aws
+        with:
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws_session_token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - uses: hashicorp/setup-terraform@v4.0.1
+        with:
+          terraform_version: "1.15.8"
+          terraform_wrapper: false
+
+      - name: Init estate state and put-secret-value
         env:
-          ACTION: ${{ inputs.action }}
+          BUCKET: ${{ needs.assert-lab.outputs.bucket }}
+          SPRING_DATASOURCE_PASSWORD: ${{ secrets.SPRING_DATASOURCE_PASSWORD }}
+          NEO4J_PASSWORD: ${{ secrets.NEO4J_PASSWORD }}
+          STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          TF_VAR_db_master_password: ${{ secrets.SPRING_DATASOURCE_PASSWORD || 'PlanOnlyNotApplied1!' }}
         run: |
-          echo "::error::action=${ACTION} is feat/infra-academy-configure (branch 3). This branch supports plan/bootstrap/apply/destroy."
-          exit 1
+          set +x
+          chmod +x scripts/estate-tf-init.sh scripts/sync-secrets.sh
+          scripts/estate-tf-init.sh "${BUCKET}"
+          scripts/sync-secrets.sh
+          {
+            echo "### sync-secrets"
+            echo ""
+            echo "Wrote \`heavy-rental/{portal,rest,haystack,neo4j}\`. SecretString not printed."
+            echo "Vocareum AWS keys were not written."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  sync-ssh-keys:
+    name: SSH PEMs after EC2 InService
+    needs: [assert-lab, terraform]
+    if: always() && needs.assert-lab.result == 'success' && (inputs.action == 'apply' || inputs.action == 'configure-only') && (needs.terraform.result == 'success' || needs.terraform.result == 'skipped')
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.aws_environment }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: ./.github/actions/resolve-vocareum-aws
+        with:
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws_session_token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Wait InService and install public keys
+        run: |
+          set +x
+          chmod +x scripts/sync-ssh-keys.sh
+          scripts/sync-ssh-keys.sh
+          {
+            echo "### sync-ssh-keys"
+            echo ""
+            echo "PEMs in \`heavy-rental/ssh/*\`. Public keys via SSM. PEM not printed or left on guests."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  ansible:
+    name: Ansible compose (SSM)
+    needs: [assert-lab, terraform, sync-secrets, sync-ssh-keys]
+    if: always() && needs.assert-lab.result == 'success' && needs.sync-secrets.result == 'success' && needs.sync-ssh-keys.result == 'success' && (inputs.action == 'apply' || inputs.action == 'configure-only') && (needs.terraform.result == 'success' || needs.terraform.result == 'skipped')
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.aws_environment }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: ./.github/actions/resolve-vocareum-aws
+        with:
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws_session_token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Session Manager plugin
+        run: |
+          set -euo pipefail
+          curl -fsSL "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" -o /tmp/ssm.deb
+          sudo dpkg -i /tmp/ssm.deb
+
+      - name: Install Ansible 14.3.1
+        run: |
+          set -euo pipefail
+          python3 -m pip install --user "ansible==14.3.1"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.local/bin:$PATH"
+          ansible-galaxy collection install -r ansible/requirements.yml
+
+      - name: ansible-playbook
+        env:
+          IMAGE_REF: ${{ inputs.image_ref }}
+          IMAGE_HTTP_INPUT: ${{ inputs.image_http_url }}
+          IMAGE_HTTP_VAR: ${{ vars.IMAGE_HTTP_URL }}
+          REST_IMAGE: ${{ vars.REST_IMAGE }}
+          HAYSTACK_IMAGE: ${{ vars.HAYSTACK_IMAGE }}
+          AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+          BUCKET: ${{ needs.assert-lab.outputs.bucket }}
+        working-directory: ansible
+        run: |
+          set -euo pipefail
+          chmod +x inventory/aws_ssm.py
+          HTTP_URL="${IMAGE_HTTP_INPUT:-}"
+          if [ -z "${HTTP_URL}" ]; then
+            HTTP_URL="${IMAGE_HTTP_VAR:-}"
+          fi
+          REST="${REST_IMAGE:-}"
+          HAY="${HAYSTACK_IMAGE:-}"
+          if [ -z "${REST}" ]; then REST="${IMAGE_REF:-}"; fi
+          if [ -z "${HAY}" ]; then HAY="${IMAGE_REF:-}"; fi
+          ansible-playbook playbooks/site.yml \
+            -e "portal_image=nginx" \
+            -e "neo4j_image=neo4j:5" \
+            -e "rest_image=${REST}" \
+            -e "haystack_image=${HAY}" \
+            -e "image_http_url=${HTTP_URL}" \
+            -e "image_ref=${IMAGE_REF:-}" \
+            -e "aws_region=${AWS_REGION}" \
+            -e "ansible_aws_ssm_bucket_name=${BUCKET}"
+          {
+            echo "### Ansible"
+            echo ""
+            echo "Compose via SSM. Portal/Neo4j use public images. REST/Haystack need \`image_ref\` or Environment \`REST_IMAGE\` / \`HAYSTACK_IMAGE\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  stop:
+    name: Stop lab resources
+    needs: [assert-lab]
+    if: needs.assert-lab.result == 'success' && inputs.action == 'stop'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.aws_environment }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: ./.github/actions/resolve-vocareum-aws
+        with:
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws_session_token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Pause ASGs and both RDS
+        run: |
+          set -euo pipefail
+          chmod +x scripts/stop-estate.sh
+          scripts/stop-estate.sh
+          {
+            echo "### stop (pause)"
+            echo ""
+            echo "ASGs desired=0. Both RDS stop requested. **NAT Gateways, ALBs, NLB still bill.** This is not destroy."
+          } >> "$GITHUB_STEP_SUMMARY"
