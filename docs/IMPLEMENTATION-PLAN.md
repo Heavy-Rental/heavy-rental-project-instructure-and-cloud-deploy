@@ -3,7 +3,7 @@
 **Repo:** this tree (`heavy-rental-project-instructure-and-cloud-deploy`).  
 **Contract:** `heavy-rental-project-pipeline-development/cloud-deployment-feasibility-studies/` — especially `AWS-INFRASTRUCTURE-FEASIBILITY.md` §8, `TERRAFORM-PROCESS.md`, `ANSIBLE-PROCESS.md`, `aws-infra-pipeline.example.yml`.
 
-**Status:** Branch 1 and 2 merged. Branch 3 configure is on `HR-162-implement-aws-infrastructure-configuration-using-ansible-compose`. Layout: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+**Status:** Branches 1–3 are on `HR-162` (estate + configure). Layout: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). App CD and paid are later.
 
 Each feature branch SHALL add or extend **OpenSpec + OpenSPDD + ADR** before expanding YAML or Terraform. Conflict order: OpenSpec scenarios → OpenSPDD Safeguards → ADR → code. See [`specification/README.md`](specification/README.md).
 
@@ -129,7 +129,7 @@ Terraform in `terraform/academy/` (see [`docs/ARCHITECTURE.md`](docs/ARCHITECTUR
    | Secret id | Required fields |
    | --- | --- |
    | `heavy-rental/portal` | `REST_BASE_URL`, `STRIPE_PUBLISHABLE_KEY`, `VITE_STRIPE_PUBLISHABLE_KEY` (same `pk_`) |
-   | `heavy-rental/rest` | `POSTGRES_*` / `SPRING_DATASOURCE_*`, `HAYSTACK_URL`, Stripe trio |
+   | `heavy-rental/rest` | `POSTGRES_*` / `SPRING_DATASOURCE_*`, `HAYSTACK_URL`, `STRIPE_API_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PUBLISHABLE_KEY` |
    | `heavy-rental/haystack` | Postgres fields, `NEO4J_URI` / user / password |
    | `heavy-rental/neo4j` | `NEO4J_USER`, `NEO4J_PASSWORD` |
 
@@ -145,7 +145,7 @@ Terraform in `terraform/academy/` (see [`docs/ARCHITECTURE.md`](docs/ARCHITECTUR
 
 ### Done when
 
-`configure-only` starts containers. Portal ALB serves `:80`. `stop` pauses compute/RDS. `destroy` empties the estate state.
+`configure-only` starts containers (portal = `PORTAL_IMAGE` or nginx). Portal ALB serves `:80`. `stop` pauses compute/RDS (Gateways still bill). `destroy` empties the estate state.
 
 ---
 

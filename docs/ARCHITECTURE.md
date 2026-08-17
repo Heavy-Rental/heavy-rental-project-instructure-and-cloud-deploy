@@ -84,7 +84,7 @@ flowchart TB
 | NAT | **2 Gateways** (one per public AZ) + EIP each | Same-AZ outbound for portal / REST / Haystack / Neo4j. Not an EC2 instance |
 | RDS `heavy_rental` | 1 Multi-AZ | Primary + standby |
 | RDS `haystack` | 1 Multi-AZ | Primary + standby |
-| `postgres-haystack-sync` | 0 RDS | Worker on `asg-haystack` (branch 3) |
+| `postgres-haystack-sync` | 0 RDS | Worker on `asg-haystack` (compose profile/command) |
 
 **Guest count:** 8 ASG instances + **0** NAT EC2 = **8** EC2 (Vocareum default cap is 9).
 
@@ -93,3 +93,15 @@ flowchart TB
 Browser → public portal ALB → portal → internal REST ALB → REST → SoR RDS.  
 REST → internal Haystack ALB → Haystack → Haystack RDS + Bolt NLB → Neo4j.  
 Private outbound HTTPS → the **NAT Gateway in the same AZ**. S3 via gateway endpoint (no NAT). If AZ-0 dies, AZ-1 guests keep outbound. NAT Gateways bill until `action=destroy`; session end and `action=stop` do not pause them.
+
+## Configure (Ansible)
+
+`action=apply` and `action=configure-only` run `sync-secrets` → `sync-ssh-keys` → Ansible over **`amazon.aws.aws_ssm`**.
+
+| Role | Image | Notes |
+| --- | --- | --- |
+| Portal | Env `PORTAL_IMAGE` or stock `nginx` | `/api` → `REST_BASE_URL`. ECR tags get `docker login` on the guest. Public GHCR pulls with no login. |
+| REST / Haystack | Env `REST_IMAGE` / `HAYSTACK_IMAGE` or Run `image_ref` | Fail if empty. Haystack compose has **no** `neo4j` service. |
+| Neo4j | `neo4j:5` | `/data` on extra EBS |
+
+Portal SM JSON includes `STRIPE_PUBLISHABLE_KEY` and `VITE_STRIPE_PUBLISHABLE_KEY` (same `pk_`). REST has `STRIPE_API_KEY` + webhook. Prefer a **new tag** on each redeploy (`compose up` does not `--pull always`).
