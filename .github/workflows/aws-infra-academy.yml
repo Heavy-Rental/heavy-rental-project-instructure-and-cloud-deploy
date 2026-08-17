@@ -58,7 +58,7 @@ on:
         type: string
         default: ""
       image_ref:
-        description: Registry tag for REST/Haystack (or Environment REST_IMAGE / HAYSTACK_IMAGE). Empty = those groups fail.
+        description: Fallback registry tag for REST/Haystack if REST_IMAGE / HAYSTACK_IMAGE are empty. Does not set the portal image.
         required: false
         type: string
         default: ""
@@ -685,6 +685,7 @@ jobs:
           IMAGE_REF: ${{ inputs.image_ref }}
           IMAGE_HTTP_INPUT: ${{ inputs.image_http_url }}
           IMAGE_HTTP_VAR: ${{ vars.IMAGE_HTTP_URL }}
+          PORTAL_IMAGE: ${{ vars.PORTAL_IMAGE }}
           REST_IMAGE: ${{ vars.REST_IMAGE }}
           HAYSTACK_IMAGE: ${{ vars.HAYSTACK_IMAGE }}
           AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
@@ -697,12 +698,14 @@ jobs:
           if [ -z "${HTTP_URL}" ]; then
             HTTP_URL="${IMAGE_HTTP_VAR:-}"
           fi
+          PORTAL="${PORTAL_IMAGE:-}"
           REST="${REST_IMAGE:-}"
           HAY="${HAYSTACK_IMAGE:-}"
+          if [ -z "${PORTAL}" ]; then PORTAL="nginx"; fi
           if [ -z "${REST}" ]; then REST="${IMAGE_REF:-}"; fi
           if [ -z "${HAY}" ]; then HAY="${IMAGE_REF:-}"; fi
           ansible-playbook playbooks/site.yml \
-            -e "portal_image=nginx" \
+            -e "portal_image=${PORTAL}" \
             -e "neo4j_image=neo4j:5" \
             -e "rest_image=${REST}" \
             -e "haystack_image=${HAY}" \
@@ -713,7 +716,7 @@ jobs:
           {
             echo "### Ansible"
             echo ""
-            echo "Compose via SSM. Portal/Neo4j use public images. REST/Haystack need \`image_ref\` or Environment \`REST_IMAGE\` / \`HAYSTACK_IMAGE\`."
+            echo "Compose via SSM. Portal image: \`${PORTAL}\` (Environment \`PORTAL_IMAGE\`, else stock nginx). REST/Haystack need \`REST_IMAGE\` / \`HAYSTACK_IMAGE\` or \`image_ref\`."
           } >> "$GITHUB_STEP_SUMMARY"
 
   stop:
