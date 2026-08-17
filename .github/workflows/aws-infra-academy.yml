@@ -605,7 +605,7 @@ jobs:
           SPRING_DATASOURCE_PASSWORD: ${{ secrets.SPRING_DATASOURCE_PASSWORD }}
           NEO4J_PASSWORD: ${{ secrets.NEO4J_PASSWORD }}
           STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
-          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_API_KEY: ${{ secrets.STRIPE_API_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           TF_VAR_db_master_password: ${{ secrets.SPRING_DATASOURCE_PASSWORD || 'PlanOnlyNotApplied1!' }}
