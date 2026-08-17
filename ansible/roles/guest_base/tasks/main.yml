@@ -69,7 +69,7 @@
 
 - name: Refuse Stripe secret or PEM on portal
   ansible.builtin.command:
-    argv: [grep, -E, "STRIPE_SECRET_KEY|STRIPE_WEBHOOK_SECRET|private_key_pem|BEGIN OPENSSH", "{{ env_path }}"]
+    argv: [grep, -E, "STRIPE_API_KEY|STRIPE_SECRET_KEY|STRIPE_WEBHOOK_SECRET|private_key_pem|BEGIN OPENSSH", "{{ env_path }}"]
   register: portal_leak
   failed_when: portal_leak.rc == 0
   changed_when: false

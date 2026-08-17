@@ -14,7 +14,7 @@ On `action=apply` and `action=configure-only`, after Terraform has created the s
 - WHEN `sync-secrets` runs
 - THEN `heavy-rental/portal` contains `REST_BASE_URL`, `STRIPE_PUBLISHABLE_KEY`, and `VITE_STRIPE_PUBLISHABLE_KEY` (same `pk_` value)
 - AND `heavy-rental/rest` contains `POSTGRES_*`, `SPRING_DATASOURCE_*`, `HAYSTACK_URL`, and the Stripe trio
-- AND `heavy-rental/portal` does not contain `STRIPE_SECRET_KEY` or `STRIPE_WEBHOOK_SECRET`
+- AND `heavy-rental/portal` does not contain `STRIPE_API_KEY` or `STRIPE_WEBHOOK_SECRET`
 
 #### Scenario: Missing host fails closed
 - GIVEN RDS hostname, database, password, or port is empty
