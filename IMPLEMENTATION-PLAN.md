@@ -101,7 +101,7 @@ Terraform in `terraform/academy/` (see AWS study §8.1 / `TERRAFORM-PROCESS.md`)
 - Four launch templates + ASGs with **`LabInstanceProfile`** only — **no** `aws_iam_role`
 - Public portal ALB + `tg-portal` :80
 - Internal REST ALB + `tg-rest` :8080; internal Haystack ALB + `tg-haystack` :8000
-- RDS in the **data** subnet group (`publicly_accessible=false`, `multi_az=false`, `deletion_protection=false`)
+- Two RDS instances in the **same** data subnet (`heavy_rental` SoR + `haystack`; both pin `availability_zone` to `data[0]`; `publicly_accessible=false`, `multi_az=false`, `deletion_protection=false`)
 - `asg-neo4j` `max=1`, data subnets, EC2 health, scale-in protection
 - Secrets Manager **shells**: `heavy-rental/{portal,rest,haystack,neo4j}` and `heavy-rental/ssh/*` (`recovery_window_in_days=0`)
 - Optional ECR repos

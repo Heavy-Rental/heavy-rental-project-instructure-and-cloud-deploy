@@ -2,7 +2,7 @@
 
 ## Context
 
-AWS study §6 / §8.1 and `TERRAFORM-PROCESS.md` define a three-tier VPC on Vocareum: public portal ALB only, internal REST and Haystack ALBs, one RDS, one Neo4j ASG (`max=1`), `LabInstanceProfile` on every guest, NAT **instance** (not Gateway). Branch 1 left `terraform/academy/` as a placeholder so `plan` could succeed without spending credits.
+AWS study §6 / §8.1 and `TERRAFORM-PROCESS.md` define a three-tier VPC on Vocareum: public portal ALB only, internal REST and Haystack ALBs, two RDS (`heavy_rental` + `haystack`), one Neo4j ASG (`max=1`), `LabInstanceProfile` on every guest, NAT **instance** (not Gateway). Branch 1 left `terraform/academy/` as a placeholder so `plan` could succeed without spending credits.
 
 ## Goals / Non-Goals
 

@@ -18,7 +18,13 @@ variable "db_master_username" {
 variable "db_name" {
   type        = string
   default     = "heavy_rental"
-  description = "Initial REST SoR database name."
+  description = "REST SoR database name on the primary RDS instance."
+}
+
+variable "db_haystack_name" {
+  type        = string
+  default     = "haystack"
+  description = "Haystack database name on the second RDS instance."
 }
 
 # Workflow uses this for plan when SPRING_DATASOURCE_PASSWORD is unset.
