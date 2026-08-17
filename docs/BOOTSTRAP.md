@@ -24,7 +24,7 @@ Vocareum tokens **expire when the session ends**.
 5. Choose `action`:
    - **`plan`** — show the estate (no apply). Works without `SPRING_DATASOURCE_PASSWORD` (uses a plan-only placeholder).
    - **`apply`** — create the VPC, one NAT, four ASGs (desired=2), three ALBs + Bolt NLB, two Multi-AZ RDS, SM shells, ECR. Needs `SPRING_DATASOURCE_PASSWORD`. Guest count is **9 EC2**.
-   - **`destroy`** — wipe the estate (set `confirm_destroy` to `destroy`). Terminates EC2 first so eth0 can be deleted. **Keeps** the state bucket. Then `apply` to recreate.
+   - **`destroy`** — wipe the estate. Set **both** `action=destroy` **and** `confirm_destroy=destroy` (dropdown; `action` alone is not enough). Terminates EC2 first so eth0 can be deleted. **Keeps** the state bucket. Then `apply` to recreate.
    - **`bootstrap`** — state bucket only (S3 native lockfile).
 
 Expect **15–20 minutes** on apply (RDS + ALBs). This spends lab credits. **Ending the Vocareum session does not stop RDS or ALB billing.**
@@ -56,7 +56,7 @@ To wipe the whole half-applied estate instead: `action=destroy` with `confirm_de
 | `plan` | assert-lab → ensure backend → `terraform plan` (estate) |
 | `bootstrap` | assert-lab → ensure backend only |
 | `apply` | assert-lab → ensure backend → `init` + `plan` + `apply` |
-| `destroy` | assert-lab → ensure backend → terminate estate EC2 → `terraform destroy` (needs `confirm_destroy=destroy`) |
+| `destroy` | assert-lab → terminate estate EC2 → `terraform destroy` (needs `confirm_destroy=destroy`). Does **not** create a backend or run estate plan/apply. |
 | `configure-only` / `stop` | **Fails** — `feat/infra-academy-configure` |
 
 ## What this must not do

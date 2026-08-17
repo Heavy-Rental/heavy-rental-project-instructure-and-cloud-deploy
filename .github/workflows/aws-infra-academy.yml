@@ -35,10 +35,13 @@ on:
         type: environment
         default: academy
       confirm_destroy:
-        description: Type destroy (exactly) to allow action=destroy. Leaves the state bucket.
-        required: false
-        type: string
-        default: ""
+        description: For action=destroy, pick destroy here too. action=destroy alone is not enough. Leaves the state bucket.
+        required: true
+        type: choice
+        default: "no"
+        options:
+          - "no"
+          - destroy
       aws_access_key_id:
         description: Vocareum AWS Details access key (changes every Start Lab). Empty = Environment academy.
         required: false
@@ -149,7 +152,7 @@ jobs:
   ensure-backend:
     name: Ensure S3 + DynamoDB state backend
     needs: [assert-lab]
-    if: inputs.action == 'plan' || inputs.action == 'bootstrap' || inputs.action == 'apply' || inputs.action == 'destroy'
+    if: inputs.action == 'plan' || inputs.action == 'bootstrap' || inputs.action == 'apply'
     runs-on: ubuntu-latest
     environment: ${{ inputs.aws_environment }}
     timeout-minutes: 15
@@ -399,19 +402,21 @@ jobs:
 
   destroy:
     name: Destroy Academy estate
-    needs: [assert-lab, ensure-backend]
-    if: always() && needs.assert-lab.result == 'success' && needs.ensure-backend.result == 'success' && inputs.action == 'destroy'
+    needs: [assert-lab]
+    if: needs.assert-lab.result == 'success' && inputs.action == 'destroy'
     runs-on: ubuntu-latest
     environment: ${{ inputs.aws_environment }}
     timeout-minutes: 60
     steps:
       - name: Require confirm_destroy
-        env:
-          CONFIRM: ${{ inputs.confirm_destroy }}
         run: |
           set -euo pipefail
+          CONFIRM="$(jq -r '.inputs.confirm_destroy // empty' "$GITHUB_EVENT_PATH" | tr -d '[:space:]')"
+          if [ -z "${CONFIRM}" ]; then
+            CONFIRM="$(echo '${{ inputs.confirm_destroy }}' | tr -d '[:space:]')"
+          fi
           if [ "${CONFIRM}" != "destroy" ]; then
-            echo "::error::action=destroy requires confirm_destroy=destroy (got '${CONFIRM}'). State bucket is kept."
+            echo "::error::Pick confirm_destroy=destroy on the Run form (got '${CONFIRM:-empty}'). Choosing action=destroy is not enough. State bucket is kept."
             exit 1
           fi
 
@@ -480,6 +485,10 @@ jobs:
         working-directory: terraform/academy
         run: |
           set -euo pipefail
+          if ! aws s3api head-bucket --bucket "${BUCKET}" 2>/dev/null; then
+            echo "::error::State bucket ${BUCKET} is missing. Nothing to destroy. Do not create a backend on action=destroy."
+            exit 1
+          fi
           if ! terraform init -input=false -reconfigure \
             -backend-config="bucket=${BUCKET}" \
             -backend-config="key=estate/terraform.tfstate" \
