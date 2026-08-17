@@ -675,7 +675,7 @@ jobs:
       - name: Install Ansible 14.3.1
         run: |
           set -euo pipefail
-          python3 -m pip install --user "ansible==14.3.1"
+          python3 -m pip install --user "ansible==14.3.1" "boto3>=1.35.0" "botocore>=1.35.0"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           export PATH="$HOME/.local/bin:$PATH"
           ansible-galaxy collection install -r ansible/requirements.yml
