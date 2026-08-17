@@ -6,7 +6,7 @@
 #   2. Paste the three Vocareum keys on the Run form, or leave empty and use
 #      Environment academy AWS_* secrets
 #   3. Environment academy secret SPRING_DATASOURCE_PASSWORD (required for apply)
-#   4. action=plan | action=apply
+#   4. action=plan | action=apply | action=destroy (confirm_destroy=destroy)
 #
 # Do not point aws_environment at paid. Do not write keys to Secrets Manager.
 # Form keys are read from $GITHUB_EVENT_PATH (not env: / ${{ inputs.* }}) so
@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: plan or apply the estate. configure/stop/destroy wait for branch 3.
+        description: plan, apply, or destroy the estate. configure/stop wait for branch 3.
         required: true
         type: choice
         default: plan
@@ -35,7 +35,7 @@ on:
         type: environment
         default: academy
       confirm_destroy:
-        description: Unused until branch 3
+        description: Type destroy (exactly) to allow action=destroy. Leaves the state bucket.
         required: false
         type: string
         default: ""
@@ -149,7 +149,7 @@ jobs:
   ensure-backend:
     name: Ensure S3 + DynamoDB state backend
     needs: [assert-lab]
-    if: inputs.action == 'plan' || inputs.action == 'bootstrap' || inputs.action == 'apply'
+    if: inputs.action == 'plan' || inputs.action == 'bootstrap' || inputs.action == 'apply' || inputs.action == 'destroy'
     runs-on: ubuntu-latest
     environment: ${{ inputs.aws_environment }}
     timeout-minutes: 15
@@ -397,9 +397,169 @@ jobs:
             echo "Session end does **not** stop RDS or ALB billing."
           } >> "$GITHUB_STEP_SUMMARY"
 
+  destroy:
+    name: Destroy Academy estate
+    needs: [assert-lab, ensure-backend]
+    if: always() && needs.assert-lab.result == 'success' && needs.ensure-backend.result == 'success' && inputs.action == 'destroy'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.aws_environment }}
+    timeout-minutes: 60
+    steps:
+      - name: Require confirm_destroy
+        env:
+          CONFIRM: ${{ inputs.confirm_destroy }}
+        run: |
+          set -euo pipefail
+          if [ "${CONFIRM}" != "destroy" ]; then
+            echo "::error::action=destroy requires confirm_destroy=destroy (got '${CONFIRM}'). State bucket is kept."
+            exit 1
+          fi
+
+      - name: Resolve Vocareum credentials
+        env:
+          ENV_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          ENV_SECRET: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          ENV_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+        run: |
+          set +x
+          KEY="$(jq -r '.inputs.aws_access_key_id // empty' "$GITHUB_EVENT_PATH")"
+          SECRET="$(jq -r '.inputs.aws_secret_access_key // empty' "$GITHUB_EVENT_PATH")"
+          TOKEN="$(jq -r '.inputs.aws_session_token // empty' "$GITHUB_EVENT_PATH")"
+          [ -n "${KEY}" ] && echo "::add-mask::${KEY}"
+          [ -n "${SECRET}" ] && echo "::add-mask::${SECRET}"
+          [ -n "${TOKEN}" ] && echo "::add-mask::${TOKEN}"
+          if [ -z "${KEY}" ] || [ -z "${SECRET}" ] || [ -z "${TOKEN}" ]; then
+            KEY="${ENV_KEY}"
+            SECRET="${ENV_SECRET}"
+            TOKEN="${ENV_TOKEN}"
+          fi
+          if [ -z "${KEY}" ] || [ -z "${SECRET}" ] || [ -z "${TOKEN}" ]; then
+            echo "::error::Start Lab. Paste AWS Details on the form or set Environment academy secrets."
+            exit 1
+          fi
+          echo "::add-mask::${KEY}"
+          echo "::add-mask::${SECRET}"
+          echo "::add-mask::${TOKEN}"
+          {
+            echo "AWS_ACCESS_KEY_ID=${KEY}"
+            echo "AWS_SECRET_ACCESS_KEY=${SECRET}"
+            echo "AWS_SESSION_TOKEN=${TOKEN}"
+          } >> "$GITHUB_ENV"
+
+      - uses: aws-actions/configure-aws-credentials@v6.2.3
+        with:
+          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ env.AWS_SESSION_TOKEN }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - uses: actions/checkout@v7.0.1
+
+      - uses: hashicorp/setup-terraform@v4.0.1
+        with:
+          terraform_version: "1.15.8"
+          terraform_wrapper: false
+
+      - name: RDS password for destroy refresh
+        env:
+          DB_PASS: ${{ secrets.SPRING_DATASOURCE_PASSWORD }}
+        run: |
+          set +x
+          PLACEHOLDER="${DB_PASSWORD_PLAN_PLACEHOLDER}"
+          if [ -n "${DB_PASS}" ] && [ "${DB_PASS}" != "${PLACEHOLDER}" ] && [ "${#DB_PASS}" -ge 8 ]; then
+            PASS="${DB_PASS}"
+          else
+            PASS="${PLACEHOLDER}"
+          fi
+          echo "::add-mask::${PASS}"
+          echo "TF_VAR_db_master_password=${PASS}" >> "$GITHUB_ENV"
+
+      - name: terraform init
+        env:
+          BUCKET: ${{ needs.assert-lab.outputs.bucket }}
+        working-directory: terraform/academy
+        run: |
+          set -euo pipefail
+          if ! terraform init -input=false -reconfigure \
+            -backend-config="bucket=${BUCKET}" \
+            -backend-config="key=estate/terraform.tfstate" \
+            -backend-config="region=${AWS_DEFAULT_REGION}" \
+            -backend-config="encrypt=true" \
+            -backend-config="use_lockfile=true"; then
+            echo "::error::terraform init failed. Check S3 bucket ${BUCKET}."
+            exit 1
+          fi
+
+      - name: Terminate estate EC2 so primary ENIs can be deleted
+        run: |
+          set -euo pipefail
+          for asg in asg-portal asg-rest asg-haystack asg-neo4j; do
+            aws autoscaling update-auto-scaling-group \
+              --auto-scaling-group-name "${asg}" \
+              --min-size 0 --desired-capacity 0 --max-size 0 \
+              || echo "ASG ${asg} missing or already gone."
+          done
+          mapfile -t IDS < <(aws ec2 describe-instances \
+            --filters \
+              Name=tag:Stack,Values=estate \
+              Name=instance-state-name,Values=pending,running,stopping,stopped \
+            --query 'Reservations[].Instances[].InstanceId' \
+            --output text | tr '\t' '\n' | awk 'NF')
+          if [ "${#IDS[@]}" -eq 0 ]; then
+            echo "No estate EC2 left to terminate."
+            exit 0
+          fi
+          echo "Terminating ${#IDS[@]} estate instance(s) so eth0 is released: ${IDS[*]}"
+          aws ec2 terminate-instances --instance-ids "${IDS[@]}"
+          aws ec2 wait instance-terminated --instance-ids "${IDS[@]}"
+          echo "Estate EC2 terminated."
+
+      - name: terraform destroy
+        working-directory: terraform/academy
+        run: |
+          set -euo pipefail
+          set +e
+          terraform destroy -input=false -auto-approve -no-color > /tmp/tfdestroy.out 2>&1
+          rc=$?
+          cat /tmp/tfdestroy.out
+          if [ "${rc}" -eq 0 ]; then
+            set -euo pipefail
+            {
+              echo "### Terraform destroy"
+              echo ""
+              echo "Estate state emptied. S3 backend bucket **kept**."
+              echo "Re-run \`action=apply\` to recreate (9 EC2, two Multi-AZ RDS, Bolt NLB)."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if grep -q 'device index 0' /tmp/tfdestroy.out; then
+            echo "Destroy hit a primary ENI. Dropping leftover ENI addresses from state and retrying."
+            while read -r addr; do
+              [ -n "${addr}" ] || continue
+              terraform state rm "${addr}" || true
+            done < <(terraform state list | grep -E 'aws_network_interface|aws_network_interface_attachment' || true)
+            terraform destroy -input=false -auto-approve -no-color
+            {
+              echo "### Terraform destroy"
+              echo ""
+              echo "Retried after \`state rm\` of leftover ENI addresses. Backend bucket **kept**."
+              echo "Re-run \`action=apply\` to recreate."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          {
+            echo "### Terraform destroy failed"
+            echo ""
+            echo '```'
+            grep -E '^Error:|  on |AccessDenied|UnauthorizedOperation|device index' /tmp/tfdestroy.out | head -n 40 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::error::terraform destroy failed. See job summary."
+          exit 1
+
   not-in-branch-2:
     name: Not implemented on branch 2
-    if: inputs.action == 'configure-only' || inputs.action == 'stop' || inputs.action == 'destroy'
+    if: inputs.action == 'configure-only' || inputs.action == 'stop'
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -407,5 +567,5 @@ jobs:
         env:
           ACTION: ${{ inputs.action }}
         run: |
-          echo "::error::action=${ACTION} is feat/infra-academy-configure (branch 3). This branch supports plan/bootstrap/apply only."
+          echo "::error::action=${ACTION} is feat/infra-academy-configure (branch 3). This branch supports plan/bootstrap/apply/destroy."
           exit 1
