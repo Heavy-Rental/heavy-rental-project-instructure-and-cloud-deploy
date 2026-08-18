@@ -104,7 +104,7 @@ Vocareum AWS keys **expire when the lab session ends**. Start Lab again before y
 4. In this GitHub repo: **Actions** → workflow **AWS infrastructure (Academy)** → **Run workflow**.
 5. Fill the form (next section) and run.
 
-Expect **15–20 minutes** for `apply`. That spends lab credits.
+Expect **20–40 minutes** for `apply` (two Multi-AZ RDS plus NAT and ALBs). That spends lab credits. Start the run at the **beginning** of a lab session — if Vocareum cancels the session mid-apply, state may not save.
 
 **Ending the Vocareum session does not stop AWS billing.** NAT Gateways and ALBs keep billing until you run `destroy`.
 
@@ -208,7 +208,7 @@ It does **not** pull portal, REST, or Haystack images. That is why apply no long
 - Paste the three Vocareum keys
 - Leave `image_ref` and `image_http_url` empty
 
-**Success (about 15–20 minutes):**
+**Success (about 20–40 minutes):**
 
 - Four ASGs exist: `asg-portal`, `asg-rest`, `asg-haystack`, `asg-neo4j`
 - Job summary shows the public portal ALB DNS
@@ -221,6 +221,7 @@ It does **not** pull portal, REST, or Haystack images. That is why apply no long
 | --- | --- |
 | Missing `SPRING_DATASOURCE_PASSWORD` / Stripe / Neo4j password | Add them on Environment `academy`, re-run |
 | `device index 0 … cannot be detached` | See [Apply fails: primary ENI](#apply-fails-device-index-0--cannot-be-detached) |
+| `voc-cancel-cred` / `Failed to persist state to backend` | See [Apply fails: Vocareum cancelled credentials](#apply-fails-vocareum-cancelled-credentials-voc-cancel-cred) |
 | You expected the React portal to load | Run `deploy-projects` next. Apply is not a full deploy |
 
 **Billing:** NAT Gateways and ALBs start billing now. They keep billing after `stop` and after the Vocareum session ends, until `destroy`.
@@ -338,6 +339,25 @@ AWS will not detach an instance’s **primary** network interface (eth0). This u
 4. Re-run **`apply`**. Do not attach a dedicated ENI to Neo4j.
 
 To wipe a half-applied estate instead: `destroy` (with `confirm_destroy=destroy`), then `apply`.
+
+---
+
+## Apply fails: Vocareum cancelled credentials (`voc-cancel-cred`)
+
+Terraform created something in AWS (often RDS after ~15 minutes), then could not write `estate/terraform.tfstate` to S3. The deny is **not** a missing bucket policy. Vocareum attached identity policy `voc-cancel-cred` because the lab session ended, **End Lab** was clicked, credits ran out, or the Environment `AWS_*` secrets are from a previous Start Lab.
+
+The GitHub runner’s `errored.tfstate` is **gone** when the job ends. Do **not** re-run `apply` until you reconcile. A second apply can fork state or hit `DBInstanceAlreadyExists`.
+
+1. **Start Lab** again and paste **new** AWS Details on the Run form.
+2. Check Actions: no other infra run is still in the Terraform job.
+3. List the lock: `aws s3 ls s3://heavy-rental-tfstate-<account>-academy/estate/`. If `terraform.tfstate.tflock` is present, `terraform force-unlock <LOCK_ID>` from `terraform/academy` after `init`. Only if nobody else holds the lock.
+4. Compare AWS to state:
+   - `aws rds describe-db-instances` for `heavy-rental-academy` and `heavy-rental-haystack-academy`
+   - `terraform state list | grep aws_db_instance`
+5. **Keep the estate:** `terraform import aws_db_instance.heavy_rental heavy-rental-academy` (and `aws_db_instance.haystack` / `heavy-rental-haystack-academy` if that instance exists and is missing from state). Import any other `AlreadyExists` address `plan` reports. Run `action=plan`. Only `apply` when the plan is not “create RDS again.”
+6. **Or wipe:** `action=destroy` with `confirm_destroy=destroy`. Delete any RDS destroy cannot see (never written to state). Then `apply` at the **start** of a new lab session.
+
+NAT Gateways and ALBs that already exist **keep billing** after the session ends, until `destroy`.
 
 ---
 

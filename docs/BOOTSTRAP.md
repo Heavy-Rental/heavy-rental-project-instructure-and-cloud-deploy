@@ -33,7 +33,19 @@ Vocareum tokens **expire when the session ends**.
    - **`destroy`** — wipe the estate. Set **both** `action=destroy` **and** `confirm_destroy=destroy`. Terminates EC2 first. **Keeps** the state bucket.
    - **`bootstrap`** — state bucket only (S3 native lockfile).
 
-Expect **15–20 minutes** on apply (RDS + ALBs). This spends lab credits. **Ending the Vocareum session does not stop RDS or ALB billing.**
+Expect **20–40 minutes** on apply (two Multi-AZ RDS + ALBs). This spends lab credits. Start apply at the beginning of a lab session. **Ending the Vocareum session does not stop RDS or ALB billing.**
+
+### Apply fails: `voc-cancel-cred` / failed to persist state
+
+Vocareum cancelled the session (`policy/voc-cancel-cred`) after Terraform created resources (often the first Multi-AZ RDS). S3 `PutObject` on `estate/terraform.tfstate` is an explicit deny. The runner `errored.tfstate` is not kept.
+
+Do **not** re-run `apply` until you reconcile — that forks state.
+
+1. Start Lab. Paste fresh AWS Details (do not reuse cancelled Environment `AWS_*` secrets).
+2. If `estate/terraform.tfstate.tflock` remains and no job holds it: `terraform force-unlock`.
+3. Import `heavy-rental-academy` / `heavy-rental-haystack-academy` if they exist in RDS and are missing from `terraform state list`, **or** `destroy` (then delete any RDS that was never in state) and `apply` again.
+
+See [`../OPERATOR-GUIDE.md`](../OPERATOR-GUIDE.md) — *Apply fails: Vocareum cancelled credentials*.
 
 ### Apply fails: `device index 0 … cannot be detached`
 
