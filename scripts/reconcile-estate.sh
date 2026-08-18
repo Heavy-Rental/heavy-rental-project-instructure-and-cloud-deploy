@@ -15,7 +15,7 @@ IMPORT_STRICT="${ESTATE_IMPORT_STRICT:-true}"
 cd "${TF_DIR}"
 
 in_state() {
-  terraform state list 2>/dev/null | grep -Fxq "$1"
+  terraform state show -no-color -lock-timeout=2m "$1" >/dev/null 2>&1
 }
 
 aws_text() {
@@ -25,6 +25,7 @@ aws_text() {
 import_one() {
   local addr="$1"
   local id="${2:-}"
+  local out rc
   if [ -z "${id}" ] || [ "${id}" = "None" ] || [ "${id}" = "none" ]; then
     return 0
   fi
@@ -33,7 +34,18 @@ import_one() {
     return 0
   fi
   echo "terraform import ${addr}"
-  if terraform import -input=false -no-color "${addr}" "${id}"; then
+  set +e
+  out="$(terraform import -input=false -no-color -lock-timeout=2m "${addr}" "${id}" 2>&1)"
+  rc=$?
+  set -e
+  printf '%s\n' "${out}"
+  if [ "${rc}" -eq 0 ]; then
+    return 0
+  fi
+  # Address already bound (common for name_prefix launch templates: ASG/newest
+  # lt-* id differs from the id already in state). Reconcile must not fail.
+  if printf '%s\n' "${out}" | grep -Fq 'Resource already managed by Terraform'; then
+    echo "state already has ${addr}; leaving existing binding"
     return 0
   fi
   if [ "${IMPORT_STRICT}" = "true" ]; then
