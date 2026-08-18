@@ -237,7 +237,7 @@ jobs:
     if: always() && needs.assert-lab.result == 'success' && needs.ensure-backend.result == 'success' && (inputs.action == 'plan' || inputs.action == 'apply')
     runs-on: ubuntu-latest
     environment: ${{ inputs.aws_environment }}
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - name: Resolve Vocareum credentials
         env:
@@ -370,11 +370,21 @@ jobs:
           rc=$?
           cat /tmp/tfplan.out
           if [ "${rc}" -ne 0 ]; then
+            if grep -q 'voc-cancel-cred' /tmp/tfplan.out; then
+              {
+                echo "### Terraform plan failed — Vocareum session cancelled"
+                echo ""
+                echo "IAM policy \`voc-cancel-cred\` denied S3 or other APIs. Start Lab and paste fresh AWS Details."
+                echo "If a lock file remains, \`force-unlock\` only after no other run is in the Terraform job."
+              } >> "$GITHUB_STEP_SUMMARY"
+              echo "::error::Vocareum cancelled the lab credentials (voc-cancel-cred). Start Lab, paste fresh AWS Details. Do not treat this as a missing S3 bucket policy."
+              exit 1
+            fi
             {
               echo "### Terraform plan failed"
               echo ""
               echo '```'
-              grep -E '^Error:|  on |AccessDenied|UnauthorizedOperation' /tmp/tfplan.out | head -n 40 || true
+              grep -E '^Error:|  on |AccessDenied|UnauthorizedOperation|voc-cancel-cred' /tmp/tfplan.out | head -n 40 || true
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
             echo "::error::terraform plan failed. See job summary and the Error: lines above."
@@ -395,7 +405,33 @@ jobs:
         working-directory: terraform/academy
         run: |
           set -euo pipefail
-          terraform apply -input=false -auto-approve tfplan
+          set +e
+          terraform apply -input=false -auto-approve -no-color tfplan > /tmp/tfapply.out 2>&1
+          rc=$?
+          cat /tmp/tfapply.out
+          if [ "${rc}" -ne 0 ]; then
+            if grep -q 'voc-cancel-cred' /tmp/tfapply.out; then
+              {
+                echo "### Terraform apply failed — Vocareum session cancelled"
+                echo ""
+                echo "IAM policy \`voc-cancel-cred\` denied S3 state persist after resources were created."
+                echo "Do **not** re-run \`apply\` until you Start Lab again and reconcile (import or destroy)."
+                echo "The runner \`errored.tfstate\` is not kept. See OPERATOR-GUIDE: voc-cancel-cred."
+              } >> "$GITHUB_STEP_SUMMARY"
+              echo "::error::Vocareum cancelled the lab credentials (voc-cancel-cred) after Terraform created resources. Start Lab, paste fresh AWS Details, then import or destroy — do not re-apply yet. See OPERATOR-GUIDE."
+              exit 1
+            fi
+            {
+              echo "### Terraform apply failed"
+              echo ""
+              echo '```'
+              grep -E '^Error:|  on |AccessDenied|UnauthorizedOperation|voc-cancel-cred|errored.tfstate' /tmp/tfapply.out | head -n 40 || true
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::terraform apply failed. See job summary."
+            exit 1
+          fi
+          set -euo pipefail
           {
             echo "### Terraform apply"
             echo ""
@@ -554,6 +590,16 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
+          if grep -q 'voc-cancel-cred' /tmp/tfdestroy.out; then
+            {
+              echo "### Terraform destroy failed — Vocareum session cancelled"
+              echo ""
+              echo "IAM policy \`voc-cancel-cred\` denied S3 or destroy APIs. Start Lab and paste fresh AWS Details."
+              echo "Do not assume the estate is gone. Re-run destroy after a live session."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::Vocareum cancelled the lab credentials (voc-cancel-cred) during destroy. Start Lab and re-run destroy. Do not assume resources were deleted."
+            exit 1
+          fi
           if grep -q 'device index 0' /tmp/tfdestroy.out; then
             echo "Destroy hit a primary ENI. Dropping leftover ENI addresses from state and retrying."
             while read -r addr; do
@@ -573,7 +619,7 @@ jobs:
             echo "### Terraform destroy failed"
             echo ""
             echo '```'
-            grep -E '^Error:|  on |AccessDenied|UnauthorizedOperation|device index' /tmp/tfdestroy.out | head -n 40 || true
+            grep -E '^Error:|  on |AccessDenied|UnauthorizedOperation|device index|voc-cancel-cred' /tmp/tfdestroy.out | head -n 40 || true
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
           echo "::error::terraform destroy failed. See job summary."
