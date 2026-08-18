@@ -345,6 +345,7 @@ jobs:
             else
               echo "- instance profiles: \`hr-paid-{portal,rest,haystack,neo4j}\` (AWS_ACTUAL)"
             fi
+            echo "- observability: CloudTrail \`heavy-rental-academy\`, dashboard \`heavy-rental-academy\`, observe S3"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: terraform apply
@@ -417,6 +418,30 @@ jobs:
             echo "Confirm the SNS email if Environment \`ALARM_EMAIL\` is set."
             echo "Configure jobs (\`sync-secrets\` / SSH / Ansible) run next on apply."
             echo "Session end does **not** stop RDS, ALB, NAT Gateway, CloudTrail, or observe-bucket billing."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify observability
+        if: inputs.action == 'apply'
+        working-directory: terraform/academy
+        run: |
+          set -euo pipefail
+          TRAIL="$(terraform output -raw cloudtrail_name)"
+          DASH="$(terraform output -raw cloudwatch_dashboard)"
+          BUCKET="$(terraform output -raw observe_bucket)"
+          aws cloudtrail get-trail --name "${TRAIL}" >/dev/null
+          aws cloudwatch get-dashboard --dashboard-name "${DASH}" >/dev/null
+          aws s3api head-bucket --bucket "${BUCKET}"
+          ALARM_N="$(aws cloudwatch describe-alarms \
+            --alarm-name-prefix hr- \
+            --query 'length(MetricAlarms)' --output text)"
+          if [ "${ALARM_N}" = "0" ]; then
+            echo "::error::No CloudWatch alarms with prefix hr- after apply."
+            exit 1
+          fi
+          {
+            echo "### Observability verify"
+            echo ""
+            echo "Trail \`${TRAIL}\`, dashboard \`${DASH}\`, bucket \`${BUCKET}\`, alarms \`${ALARM_N}\`."
           } >> "$GITHUB_STEP_SUMMARY"
 
   destroy:

@@ -222,7 +222,7 @@ It does **not** pull portal, REST, or Haystack images. That is why apply no long
 - Job summary shows the public portal ALB DNS
 - That URL **502**s on port 80 until `deploy-projects` (or portal app CD)
 - Secret `heavy-rental/portal` exists and has `REST_BASE_URL`
-- CloudWatch dashboard `heavy-rental-academy` and CloudTrail `heavy-rental-academy` exist (S3 observe bucket). Guests still use **LabRole** / `LabInstanceProfile` — no new IAM
+- CloudWatch dashboard `heavy-rental-academy` and CloudTrail `heavy-rental-academy` exist (S3 observe bucket). The apply job **verifies** trail, dashboard, and bucket before it succeeds. Guests still use **LabRole** / `LabInstanceProfile` — no new IAM
 
 **Common problems:**
 
