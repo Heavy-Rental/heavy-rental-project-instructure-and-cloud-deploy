@@ -12,7 +12,7 @@ Reference studies: `heavy-rental-project-pipeline-development/cloud-deployment-f
 | --- | --- |
 | VPC, subnets, NAT Gateways, ASGs, ALBs, RDS, NLB, SM shells | Yes — Terraform |
 | Fill SM JSON, guest Docker / `.env` / compose, PEMs after InService | Yes — scripts + Ansible (configuration) |
-| Redeploy a new portal / REST / Haystack CI image | No — app CD |
+| Redeploy a new portal / REST / Haystack CI image | Day-to-day: app CD. Optional first-compose: `action=deploy-projects` (after apply) |
 | Paid / OIDC | No — later |
 | Operate after go-live (CloudWatch day-to-day) | Knowledge only; `stop` / `destroy` are infra actions |
 
@@ -28,13 +28,14 @@ Conflict order: **OpenSpec scenarios → OpenSPDD Safeguards → ADR → YAML / 
 
 ## Operator docs
 
+- Beginner walkthrough: [`../OPERATOR-GUIDE.md`](../OPERATOR-GUIDE.md)
 - Everyday run: [`../docs/BOOTSTRAP.md`](../docs/BOOTSTRAP.md)
 - Layout: [`../docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md)
 - Program plan: [`../docs/IMPLEMENTATION-PLAN.md`](../docs/IMPLEMENTATION-PLAN.md)
 
 ## Walkthroughs
 
-- [`pipelines/infra-academy.md`](pipelines/infra-academy.md) — `plan` / `apply` / `configure-only` / `stop` / `destroy` / `bootstrap`
+- [`pipelines/infra-academy.md`](pipelines/infra-academy.md) — `plan` / `apply` / `configure-only` / `deploy-projects` / `stop` / `destroy` / `bootstrap`
 - [`pipelines/infra-secrets.md`](pipelines/infra-secrets.md) — Secrets Manager JSON
 
 ## Changes
@@ -44,5 +45,6 @@ Conflict order: **OpenSpec scenarios → OpenSPDD Safeguards → ADR → YAML / 
 | [`../openspec/changes/add-infra-academy-bootstrap/`](../openspec/changes/add-infra-academy-bootstrap/) | Auth + remote state |
 | [`../openspec/changes/add-infra-academy-estate/`](../openspec/changes/add-infra-academy-estate/) | Terraform estate |
 | [`../openspec/changes/add-infra-academy-configure/`](../openspec/changes/add-infra-academy-configure/) | `sync-secrets`, Ansible configure, stop |
+| [`../openspec/changes/add-infra-academy-deploy-projects/`](../openspec/changes/add-infra-academy-deploy-projects/) | `deploy-projects` later run of `site.yml` |
 
-SPDD: [`../spdd/analysis/`](../spdd/analysis/). ADRs 0001–0013: [`../docs/adr/`](../docs/adr/).
+SPDD: [`../spdd/analysis/`](../spdd/analysis/). ADRs 0001–0014: [`../docs/adr/`](../docs/adr/).

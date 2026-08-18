@@ -147,7 +147,7 @@ Terraform in `terraform/academy/` (see [`ARCHITECTURE.md`](ARCHITECTURE.md) and 
 
 ### Done when
 
-`configure-only` refills SM + PEMs, installs Docker + Compose on all guests, and composes Neo4j only. Portal / REST / Haystack images are app CD. `stop` pauses compute/RDS (Gateways still bill). `destroy` empties the estate state.
+`configure-only` refills SM + PEMs, installs Docker + Compose on all guests, and composes Neo4j only. `deploy-projects` is a later run that first-composes portal + REST + Haystack via `site.yml`. Day-to-day image rolls are app CD. `stop` pauses compute/RDS (Gateways still bill). `destroy` empties the estate state.
 
 ---
 
@@ -160,7 +160,7 @@ Terraform in `terraform/academy/` (see [`ARCHITECTURE.md`](ARCHITECTURE.md) and 
 | Haystack app CD | **Shipped** in `haystack-fast-api-pipeline/deploy-pipeline/` (discover + compose) | Reuses this repo’s `guest_base` + `haystack`. No Neo4j container. |
 | Paid infra | later | Separate account, OIDC, **no** Vocareum form keys |
 
-Infra `configure-only` installs Docker + Compose and composes Neo4j. Portal / REST image updates use those app CD pipelines. Haystack image updates use Haystack app CD (or infra `apply` for first compose).
+Infra `configure-only` installs Docker + Compose and composes Neo4j. Infra `deploy-projects` (later run after apply/configure-only) first-composes all three apps. Portal / REST / Haystack image updates after that use those app CD pipelines.
 
 ---
 

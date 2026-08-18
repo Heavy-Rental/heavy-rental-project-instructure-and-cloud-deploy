@@ -25,9 +25,9 @@ Recorded **2026-08-17**. Terraform CLI **1.15.8** and Ansible **14.3.1** are liv
 | RDS PostgreSQL | study §6.1 / `rds.tf` | Two instances: SoR `heavy_rental` + Haystack `haystack`. Prefer engine **12.22**, then 11.22. |
 | RDS class | study §6.4 | `db.t3.micro` (both) |
 | Neo4j | study §6.1 / ANSIBLE §4.4 | `neo4j:5` (compose; not an Environment image var) |
-| REST image | study §4.3 | Environment `REST_IMAGE` or Run `image_ref`. Fail if empty. REST-only redeploy: `heavy-rental-rest-api/deploy-pipeline/` (same compose contract). |
-| Haystack image | study §4.3 | Environment `HAYSTACK_IMAGE` or Run `image_ref`. Fail if empty. |
+| REST image | study §4.3 | Infra `group_vars` looks up Environment `REST_IMAGE` or Run `image_ref`. `deploy-projects` fails if empty. REST-only redeploy: `heavy-rental-rest-api/deploy-pipeline/` (same compose contract). |
+| Haystack image | study §4.3 | Infra `group_vars` looks up Environment `HAYSTACK_IMAGE` or Run `image_ref`. `deploy-projects` fails if empty. |
 | pgvector fallback | study §6.1 | `CREATE EXTENSION vector` on Haystack RDS; container only if that fails |
-| Portal | study §6.4a | Environment `PORTAL_IMAGE` (nginx-based CI tag) or stock `nginx`. Portal-only redeploy: `heavy-rental-web-portal-pipeline/deploy-pipeline/` (same compose contract). |
+| Portal | study §6.4a | Infra `group_vars` looks up Environment `PORTAL_IMAGE`. `deploy-projects` forbids stock `nginx`. Portal-only redeploy: `heavy-rental-web-portal-pipeline/deploy-pipeline/` (same compose contract). |
 | Docker Compose | AL2023 | Try `docker-compose-plugin` RPM; else GitHub **v2.39.2** CLI plugin |
 | Instance types | study §6.4 | NAT Gateway **x2** (not EC2); portal `t3.micro` **x2**; rest/haystack `t3.small` **x2**; neo4j `t3.large` **x2** (8 EC2) |

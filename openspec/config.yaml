@@ -6,6 +6,7 @@ context: |
   Terraform creates architecture and resources (VPC, two NAT Gateways,
   four ASGs, ALBs, two Multi-AZ RDS, Bolt NLB, empty SM shells).
   Ansible only configures existing guests (Docker, .env, compose).
-  Three delivered changes: add-infra-academy-bootstrap, add-infra-academy-estate,
-  add-infra-academy-configure.
-  Not paid/OIDC. Not portal/REST/Haystack app CD (other repo).
+  Four delivered changes: add-infra-academy-bootstrap, add-infra-academy-estate,
+  add-infra-academy-configure, add-infra-academy-deploy-projects.
+  Not paid/OIDC. Day-to-day portal/REST/Haystack rolls are app CD (other repo).
+  Infra action=deploy-projects is a later first-compose of site.yml after apply.

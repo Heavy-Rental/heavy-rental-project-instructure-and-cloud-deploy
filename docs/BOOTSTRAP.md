@@ -2,7 +2,7 @@
 
 This repo’s pipeline is **AWS Academy Learner Lab (Vocareum) only**. There is no paid / OIDC workflow on this branch.
 
-**Terraform** creates the estate. **Ansible** only configures guests that already exist (Docker, `.env`, compose). It does not create VPCs or ASGs. Spec index: [`../specification/README.md`](../specification/README.md).
+**Terraform** creates the estate. **Ansible** only configures guests that already exist (Docker, `.env`, compose). It does not create VPCs or ASGs. Beginner walkthrough (every `action`): [`../OPERATOR-GUIDE.md`](../OPERATOR-GUIDE.md). Spec index: [`../specification/README.md`](../specification/README.md).
 
 ## One-time GitHub setup
 
@@ -13,7 +13,7 @@ This repo’s pipeline is **AWS Academy Learner Lab (Vocareum) only**. There is 
    - `AWS_SESSION_TOKEN`
 3. **Required secrets for `apply` / `configure-only`:** `SPRING_DATASOURCE_PASSWORD` (≥ 8), `NEO4J_PASSWORD`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_API_KEY` (`sk_…`), `STRIPE_WEBHOOK_SECRET`. **Not** workflow inputs. Do not add `VITE_STRIPE_PUBLISHABLE_KEY` (copied from the publishable key).
 4. Variable: `AWS_REGION` = `us-east-1`.
-5. Image **variables** (not secrets): `PORTAL_IMAGE` (ECR or public GHCR tag; empty = stock `nginx`), `REST_IMAGE`, `HAYSTACK_IMAGE`. Optional `IMAGE_HTTP_URL` only for a `docker load` tar. `image_ref` on the Run form is REST/Haystack fallback only.
+5. Image **variables** (not secrets) on this repo’s Environment `academy` — not the app-repo Environments: `PORTAL_IMAGE` (ECR or public GHCR tag; **required** for `deploy-projects`, stock `nginx` forbidden on that action), `REST_IMAGE`, `HAYSTACK_IMAGE`. Do **not** set `IMAGE_HTTP_URL` for `deploy-projects` (one tar cannot satisfy three images). `image_ref` on the Run form is REST/Haystack fallback only. `ansible/inventory/group_vars/all.yml` looks these up from the runner env. `apply` / `configure-only` still do **not** compose portal/REST/Haystack (`configure.yml`).
 6. GitHub cannot create this Environment from git. Do **not** point this workflow at a `paid` Environment.
 
 ## Every lab session
@@ -26,8 +26,9 @@ Vocareum tokens **expire when the session ends**.
 4. Set `aws_environment` = `academy`.
 5. Choose `action`:
    - **`plan`** — show the estate (no apply). Works without `SPRING_DATASOURCE_PASSWORD` (uses a plan-only placeholder).
-   - **`apply`** — create the estate, then `sync-secrets` → `sync-ssh-keys` → Ansible. Needs `SPRING_DATASOURCE_PASSWORD`, `NEO4J_PASSWORD`, Stripe trio. Portal uses Environment `PORTAL_IMAGE` or stock `nginx`. REST/Haystack need `REST_IMAGE` / `HAYSTACK_IMAGE` or `image_ref`. Guest count is **8 EC2**. NAT Gateways bill until `destroy`.
-   - **`configure-only`** — **no Terraform apply** (no new architecture). Refill secrets + PEMs. Ansible installs **Docker + Compose** on all guests and composes **Neo4j only**. Portal / REST / Haystack **images** are app CD (`deploy-pipeline/` in the pipeline-development repo). First Haystack/REST/portal compose is still infra **`apply`**.
+   - **`apply`** — create the estate (Terraform), then `sync-secrets` → `sync-ssh-keys` → Ansible **`configure.yml`** (Docker + Compose on all guests; **Neo4j only**). Does **not** pull portal/REST/Haystack images. Needs `SPRING_DATASOURCE_PASSWORD`, `NEO4J_PASSWORD`, Stripe trio. Guest count is **8 EC2**. NAT Gateways bill until `destroy`.
+   - **`configure-only`** — **no Terraform apply**. Same Ansible as apply: Docker + Compose on all guests; Neo4j compose only. Portal / REST / Haystack **images** are not pulled.
+   - **`deploy-projects`** — **later run** after a successful `apply` or `configure-only` (new workflow run; not chained). Preflights public GHCR or ECR tags, then `site.yml` (portal + REST + Haystack + Neo4j + `rds_logical`). Needs `PORTAL_IMAGE` / `REST_IMAGE` / `HAYSTACK_IMAGE`. Day-to-day single-image rolls stay app CD.
    - **`stop`** — ASG desired=0 + stop both RDS. **NAT Gateways and ALBs still bill.**
    - **`destroy`** — wipe the estate. Set **both** `action=destroy` **and** `confirm_destroy=destroy`. Terminates EC2 first. **Keeps** the state bucket.
    - **`bootstrap`** — state bucket only (S3 native lockfile).
@@ -50,9 +51,10 @@ To wipe the whole half-applied estate instead: `action=destroy` with `confirm_de
 | Check | Expect |
 | --- | --- |
 | `describe-auto-scaling-groups --auto-scaling-group-names asg-portal asg-rest asg-haystack asg-neo4j` | All four exist |
-| Public portal ALB DNS (job summary) | Resolves; `:80` after configure (stock nginx until a portal CI image) |
+| Public portal ALB DNS (job summary) | Resolves; **502** on `:80` until `deploy-projects` or portal app CD |
 | `describe-secret --secret-id heavy-rental/portal` | Has `REST_BASE_URL` after `sync-secrets` |
-| `configure-only` | Fills SM + PEMs. Docker + Compose on all guests. Composes **Neo4j only**. App images are app CD. |
+| `configure-only` | Fills SM + PEMs. Docker + Compose on all guests. Composes **Neo4j only**. |
+| `deploy-projects` | After apply/configure-only. Composes portal + REST + Haystack. |
 | `stop` | ASGs desired=0; both RDS stopped; Gateways still bill |
 
 ## Actions
@@ -61,9 +63,10 @@ To wipe the whole half-applied estate instead: `action=destroy` with `confirm_de
 | --- | --- |
 | `plan` | assert-lab → ensure backend → `terraform plan` (estate) |
 | `bootstrap` | assert-lab → ensure backend only |
-| `apply` | assert-lab → ensure backend → terraform apply → sync-secrets → sync-ssh-keys → Ansible |
+| `apply` | assert-lab → ensure backend → terraform apply → sync-secrets → sync-ssh-keys → Ansible `configure.yml` |
 | `destroy` | assert-lab → terminate estate EC2 → `terraform destroy` (needs `confirm_destroy=destroy`). Does **not** create a backend or run estate plan/apply. |
 | `configure-only` | assert-lab → sync-secrets → sync-ssh-keys → Ansible `configure.yml` (Docker + Compose on all guests; Neo4j compose; no app images) |
+| `deploy-projects` | assert-lab → sync-secrets → sync-ssh-keys → image preflight → Ansible `site.yml`. Separate run after apply or configure-only. |
 | `stop` | assert-lab → ASG desired=0 + stop both RDS |
 
 ## What this must not do

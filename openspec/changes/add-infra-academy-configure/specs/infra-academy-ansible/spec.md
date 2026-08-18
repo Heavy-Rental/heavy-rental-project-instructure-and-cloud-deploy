@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Guest **configuration** only (Docker, `.env`, compose) on ASGs Terraform already created. Ansible SHALL NOT create or destroy VPC, ASGs, ALBs, or RDS. App CD reuses the same playbook, one group, and also SHALL NOT run Terraform.
+Guest **configuration** only on ASGs Terraform already created. Infra CD (`apply` and `configure-only`) SHALL run `playbooks/configure.yml`: Docker + Compose plugin on all groups and Neo4j compose only. It SHALL NOT invoke `site.yml` (full portal/REST/Haystack compose). Ansible SHALL NOT create or destroy VPC, ASGs, ALBs, or RDS. App CD composes portal/REST/Haystack and SHALL NOT run Terraform.
 
 ## ADDED Requirements
 
@@ -22,6 +22,29 @@ Ansible playbooks SHALL NOT invoke Terraform or create Auto Scaling groups, load
 - GIVEN Ansible runs on `apply` or `configure-only`
 - WHEN the playbook job list is evaluated
 - THEN no task runs `terraform apply` or `terraform destroy`
+
+#### Scenario: Infra CD does not compose app images
+- GIVEN `action` is `apply` or `configure-only`
+- WHEN the Ansible step runs
+- THEN it invokes `playbooks/configure.yml`
+- AND it does not invoke `playbooks/site.yml`
+- AND portal / rest / haystack compose roles do not run
+
+### Requirement: Image tags from GitHub Environment variables
+`inventory/group_vars/all.yml` SHALL set `portal_image`, `rest_image`, and `haystack_image` from the Ansible controller environment (`PORTAL_IMAGE`, `REST_IMAGE`, `HAYSTACK_IMAGE`). Those names SHALL match GitHub Environment **variables** on `academy` (not secrets, not hardcoded `ghcr.io` paths). Empty `PORTAL_IMAGE` SHALL default to stock `nginx`. Empty `REST_IMAGE` / `HAYSTACK_IMAGE` SHALL fall back to Run-form `IMAGE_REF`, else empty. Infra CD SHALL still not compose portal / REST / Haystack (`configure.yml` only). Manual `site.yml` MAY use the resolved tags.
+
+#### Scenario: group_vars has no baked GHCR path
+- GIVEN `ansible/inventory/group_vars/all.yml`
+- WHEN the file is read
+- THEN it contains no literal `ghcr.io` image tag
+- AND `portal_image` looks up `PORTAL_IMAGE`
+- AND `rest_image` looks up `REST_IMAGE`
+- AND `haystack_image` looks up `HAYSTACK_IMAGE`
+
+#### Scenario: empty portal variable stays stock nginx
+- GIVEN controller env `PORTAL_IMAGE` is empty
+- WHEN group_vars is evaluated
+- THEN `portal_image` is `nginx`
 
 ### Requirement: Per-role compose
 Playbooks SHALL start Docker compose with study §6.4a limits on **existing** guests. Portal SHALL proxy `/api` to `REST_BASE_URL`. Haystack SHALL NOT start a Neo4j container. Neo4j SHALL start only `neo4j:5`.

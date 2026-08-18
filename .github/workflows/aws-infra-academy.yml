@@ -6,7 +6,8 @@
 #   2. Paste the three Vocareum keys on the Run form, or leave empty and use
 #      Environment academy AWS_* secrets
 #   3. Environment academy: SPRING_DATASOURCE_PASSWORD, NEO4J_PASSWORD, Stripe trio
-#   4. action=plan | apply | configure-only | stop | destroy (confirm_destroy=destroy)
+#   4. action=plan | apply | configure-only | deploy-projects | stop | destroy
+#      deploy-projects is a later run after apply or configure-only (not chained).
 #
 # Do not point aws_environment at paid. Do not write keys to Secrets Manager.
 # Form keys are read from $GITHUB_EVENT_PATH (not env: / ${{ inputs.* }}) so
@@ -18,7 +19,7 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: plan, apply, configure-only, stop, or destroy. destroy also needs confirm_destroy=destroy.
+        description: plan, apply, configure-only, deploy-projects (after apply), stop, or destroy. destroy also needs confirm_destroy=destroy.
         required: true
         type: choice
         default: plan
@@ -27,6 +28,7 @@ on:
           - bootstrap
           - apply
           - configure-only
+          - deploy-projects
           - stop
           - destroy
       aws_environment:
@@ -580,7 +582,7 @@ jobs:
   sync-secrets:
     name: Sync GitHub secrets to AWS Secrets Manager
     needs: [assert-lab, terraform]
-    if: always() && needs.assert-lab.result == 'success' && (inputs.action == 'apply' || inputs.action == 'configure-only') && (needs.terraform.result == 'success' || needs.terraform.result == 'skipped')
+    if: always() && needs.assert-lab.result == 'success' && (inputs.action == 'apply' || inputs.action == 'configure-only' || inputs.action == 'deploy-projects') && (needs.terraform.result == 'success' || needs.terraform.result == 'skipped')
     runs-on: ubuntu-latest
     environment: ${{ inputs.aws_environment }}
     timeout-minutes: 10
@@ -624,7 +626,7 @@ jobs:
   sync-ssh-keys:
     name: SSH PEMs after EC2 InService
     needs: [assert-lab, terraform]
-    if: always() && needs.assert-lab.result == 'success' && (inputs.action == 'apply' || inputs.action == 'configure-only') && (needs.terraform.result == 'success' || needs.terraform.result == 'skipped')
+    if: always() && needs.assert-lab.result == 'success' && (inputs.action == 'apply' || inputs.action == 'configure-only' || inputs.action == 'deploy-projects') && (needs.terraform.result == 'success' || needs.terraform.result == 'skipped')
     runs-on: ubuntu-latest
     environment: ${{ inputs.aws_environment }}
     timeout-minutes: 20
@@ -685,7 +687,7 @@ jobs:
           ACTION: ${{ inputs.action }}
           IMAGE_REF: ${{ inputs.image_ref }}
           IMAGE_HTTP_INPUT: ${{ inputs.image_http_url }}
-          IMAGE_HTTP_VAR: ${{ vars.IMAGE_HTTP_URL }}
+          IMAGE_HTTP_URL: ${{ inputs.image_http_url || vars.IMAGE_HTTP_URL }}
           PORTAL_IMAGE: ${{ vars.PORTAL_IMAGE }}
           REST_IMAGE: ${{ vars.REST_IMAGE }}
           HAYSTACK_IMAGE: ${{ vars.HAYSTACK_IMAGE }}
@@ -695,43 +697,155 @@ jobs:
         run: |
           set -euo pipefail
           chmod +x inventory/aws_ssm.py
-          HTTP_URL="${IMAGE_HTTP_INPUT:-}"
-          if [ -z "${HTTP_URL}" ]; then
-            HTTP_URL="${IMAGE_HTTP_VAR:-}"
-          fi
-          PORTAL="${PORTAL_IMAGE:-}"
-          REST="${REST_IMAGE:-}"
-          HAY="${HAYSTACK_IMAGE:-}"
-          if [ -z "${PORTAL}" ]; then PORTAL="nginx"; fi
-          if [ -z "${REST}" ]; then REST="${IMAGE_REF:-}"; fi
-          if [ -z "${HAY}" ]; then HAY="${IMAGE_REF:-}"; fi
-          if [ "${ACTION}" = "configure-only" ]; then
-            # Docker + Compose on all guests. No portal/REST/Haystack compose (app CD).
-            ansible-playbook playbooks/configure.yml \
-              -e "neo4j_image=neo4j:5" \
-              -e "image_http_url=" \
-              -e "aws_region=${AWS_REGION}" \
-              -e "ansible_aws_ssm_bucket_name=${BUCKET}"
-            {
-              echo "### Ansible"
-              echo ""
-              echo "\`configure-only\`: Docker + Compose plugin on all guests; Neo4j compose only. Portal / REST / Haystack images are app CD."
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          ansible-playbook playbooks/site.yml \
-            -e "portal_image=${PORTAL}" \
+          # apply and configure-only: same playbook. Docker + Compose on all
+          # guests; Neo4j compose only. Do not pull portal/REST/Haystack images
+          # (private GHCR fails without a token). App compose is app CD.
+          ansible-playbook playbooks/configure.yml \
             -e "neo4j_image=neo4j:5" \
-            -e "rest_image=${REST}" \
-            -e "haystack_image=${HAY}" \
-            -e "image_http_url=${HTTP_URL}" \
-            -e "image_ref=${IMAGE_REF:-}" \
+            -e "image_http_url=" \
             -e "aws_region=${AWS_REGION}" \
             -e "ansible_aws_ssm_bucket_name=${BUCKET}"
           {
             echo "### Ansible"
             echo ""
-            echo "Compose via SSM (apply). Portal image: \`${PORTAL}\` (Environment \`PORTAL_IMAGE\`, else stock nginx). REST/Haystack need \`REST_IMAGE\` / \`HAYSTACK_IMAGE\` or \`image_ref\`."
+            echo "\`apply\` / \`configure-only\`: Docker + Compose plugin on all guests; Neo4j compose only (\`configure.yml\`). Portal / REST / Haystack images are app CD. \`site.yml\` is not invoked."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy-projects:
+    name: Deploy projects (site.yml)
+    needs: [assert-lab, sync-secrets, sync-ssh-keys]
+    if: always() && needs.assert-lab.result == 'success' && needs.sync-secrets.result == 'success' && needs.sync-ssh-keys.result == 'success' && inputs.action == 'deploy-projects'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.aws_environment }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: ./.github/actions/resolve-vocareum-aws
+        with:
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws_session_token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Resolve images and require estate
+        env:
+          IMAGE_REF: ${{ inputs.image_ref }}
+          IMAGE_HTTP_INPUT: ${{ inputs.image_http_url }}
+          IMAGE_HTTP_URL: ${{ inputs.image_http_url || vars.IMAGE_HTTP_URL }}
+          PORTAL_IMAGE: ${{ vars.PORTAL_IMAGE }}
+          REST_IMAGE: ${{ vars.REST_IMAGE }}
+          HAYSTACK_IMAGE: ${{ vars.HAYSTACK_IMAGE }}
+        run: |
+          set -euo pipefail
+          if [ -n "${IMAGE_HTTP_INPUT:-}" ] || [ -n "${IMAGE_HTTP_URL:-}" ]; then
+            echo "::error::action=deploy-projects does not accept image_http_url / IMAGE_HTTP_URL. One tar cannot satisfy portal + REST + Haystack. Use public GHCR or ECR tags."
+            exit 1
+          fi
+          PORTAL="${PORTAL_IMAGE:-}"
+          REST="${REST_IMAGE:-}"
+          HAY="${HAYSTACK_IMAGE:-}"
+          if [ -z "${REST}" ]; then REST="${IMAGE_REF:-}"; fi
+          if [ -z "${HAY}" ]; then HAY="${IMAGE_REF:-}"; fi
+          if [ -z "${PORTAL}" ] || [ "${PORTAL}" = "nginx" ]; then
+            echo "::error::action=deploy-projects needs Environment PORTAL_IMAGE (public GHCR or ECR). Stock nginx is forbidden."
+            exit 1
+          fi
+          if [ -z "${REST}" ]; then
+            echo "::error::action=deploy-projects needs Environment REST_IMAGE or Run image_ref. There is no stock Tomcat."
+            exit 1
+          fi
+          if [ -z "${HAY}" ]; then
+            echo "::error::action=deploy-projects needs Environment HAYSTACK_IMAGE or Run image_ref. There is no stock uvicorn."
+            exit 1
+          fi
+          check_ghcr() {
+            local tag="$1"
+            [[ "${tag}" == ghcr.io/* ]] || return 0
+            local owner_repo_tag="${tag#ghcr.io/}"
+            local repo="${owner_repo_tag%:*}"
+            local ref="${owner_repo_tag##*:}"
+            if [ "${ref}" = "${owner_repo_tag}" ]; then
+              ref=latest
+            fi
+            local token code
+            token="$(curl -fsSL "https://ghcr.io/token?service=ghcr.io&scope=repository:${repo}:pull" | jq -r '.token // empty' || true)"
+            code="$(curl -sS -o /dev/null -w '%{http_code}' \
+              -H "Authorization: Bearer ${token}" \
+              -H 'Accept: application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json' \
+              "https://ghcr.io/v2/${repo}/manifests/${ref}" || echo 000)"
+            if [ "${code}" = "401" ] || [ "${code}" = "403" ]; then
+              echo "::error::${tag} is not pullable without a token (private GHCR). Copy to ECR. Do not put a PAT on the guest."
+              exit 1
+            fi
+            if [ "${code}" != "200" ]; then
+              echo "::error::Cannot read ${tag} from GHCR (HTTP ${code}). Use a public tag or ECR."
+              exit 1
+            fi
+          }
+          check_ghcr "${PORTAL}"
+          check_ghcr "${REST}"
+          check_ghcr "${HAY}"
+          for asg in asg-portal asg-rest asg-haystack asg-neo4j; do
+            name="$(aws autoscaling describe-auto-scaling-groups \
+              --auto-scaling-group-names "${asg}" \
+              --query 'AutoScalingGroups[0].AutoScalingGroupName' \
+              --output text 2>/dev/null || true)"
+            if [ -z "${name}" ] || [ "${name}" = "None" ]; then
+              echo "::error::${asg} is missing. Run action=apply (then this action) first."
+              exit 1
+            fi
+          done
+          {
+            echo "PORTAL_IMAGE=${PORTAL}"
+            echo "REST_IMAGE=${REST}"
+            echo "HAYSTACK_IMAGE=${HAY}"
+          } >> "$GITHUB_ENV"
+          {
+            echo "### Resolve images"
+            echo ""
+            echo "portal: \`${PORTAL}\`"
+            echo "rest: \`${REST}\`"
+            echo "haystack: \`${HAY}\`"
+            echo ""
+            echo "Estate ASGs present. This run is after apply / configure-only; it is not chained onto those actions."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Session Manager plugin
+        run: |
+          set -euo pipefail
+          curl -fsSL "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" -o /tmp/ssm.deb
+          sudo dpkg -i /tmp/ssm.deb
+
+      - name: Install Ansible 14.3.1
+        run: |
+          set -euo pipefail
+          python3 -m pip install --user "ansible==14.3.1" "boto3>=1.35.0" "botocore>=1.35.0"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.local/bin:$PATH"
+          ansible-galaxy collection install -r ansible/requirements.yml
+
+      - name: ansible-playbook site.yml
+        env:
+          IMAGE_REF: ${{ inputs.image_ref }}
+          PORTAL_IMAGE: ${{ env.PORTAL_IMAGE }}
+          REST_IMAGE: ${{ env.REST_IMAGE }}
+          HAYSTACK_IMAGE: ${{ env.HAYSTACK_IMAGE }}
+          AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+          BUCKET: ${{ needs.assert-lab.outputs.bucket }}
+        working-directory: ansible
+        run: |
+          set -euo pipefail
+          chmod +x inventory/aws_ssm.py
+          ansible-playbook playbooks/site.yml \
+            -e "neo4j_image=neo4j:5" \
+            -e "image_http_url=" \
+            -e "aws_region=${AWS_REGION}" \
+            -e "ansible_aws_ssm_bucket_name=${BUCKET}"
+          {
+            echo "### Ansible site.yml"
+            echo ""
+            echo "\`deploy-projects\`: composed portal + REST + Haystack + Neo4j and ran \`rds_logical\`. Not Terraform. Prefer app CD for a later single-image roll."
           } >> "$GITHUB_STEP_SUMMARY"
 
   stop:

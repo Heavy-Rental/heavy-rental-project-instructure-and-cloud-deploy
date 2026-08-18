@@ -16,7 +16,7 @@ services:
     mem_limit: 256m
     cpus: "0.25"
     restart: on-failure
-    command: ["python", "-m", "postgres_haystack_sync"]
+    command: ["uv", "run", "python", "-m", "postgres_haystack_sync"]
 
   neo4j-populate:
     image: {{ haystack_image }}
@@ -25,4 +25,4 @@ services:
     mem_limit: 256m
     cpus: "0.25"
     restart: on-failure
-    command: ["python", "-m", "neo4j_populate"]
+    command: ["uv", "run", "python", "-m", "neo4j_populate"]
