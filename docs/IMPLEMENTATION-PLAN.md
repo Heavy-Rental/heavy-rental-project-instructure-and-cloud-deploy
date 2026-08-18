@@ -131,8 +131,8 @@ Terraform in `terraform/academy/` (see [`ARCHITECTURE.md`](ARCHITECTURE.md) and 
    | Secret id | Required fields |
    | --- | --- |
    | `heavy-rental/portal` | `REST_BASE_URL`, `STRIPE_PUBLISHABLE_KEY`, `VITE_STRIPE_PUBLISHABLE_KEY` (same `pk_`) |
-   | `heavy-rental/rest` | `POSTGRES_*` / `SPRING_DATASOURCE_*` plus app aliases `POSTGRES_HOSTNAME` / `POSTGRES_DB` / `POSTGRES_USER`, `HAYSTACK_BASE_URL`, Stripe trio |
-   | `heavy-rental/haystack` | Haystack RDS `POSTGRES_*` / aliases / `DATABASE_URL`, `SOURCE_*` (SoR), `TARGET_*` (Haystack RDS), `NEO4J_URI` / user / password, `FLEET_BACKEND=sql`, `NEO4J_BACKEND=bolt`, optional `LLM_API_KEY` |
+   | `heavy-rental/rest` | `POSTGRES_*` / `SPRING_DATASOURCE_*` plus app aliases, `HAYSTACK_BASE_URL`, `APP_CORS_ALLOWED_ORIGINS` (portal ALB), Stripe trio, `APP_JWT_SECRET`, optional OneMap |
+   | `heavy-rental/haystack` | Haystack RDS `POSTGRES_*` / aliases / `DATABASE_URL`, `SOURCE_*` (SoR), `TARGET_*` (Haystack RDS), `NEO4J_URI` / user / password, `NEO4J_POPULATE_URL` (`http://neo4j-populate:8089/v1/populate`), `FLEET_BACKEND=sql`, `NEO4J_BACKEND=bolt`, optional `LLM_API_KEY` |
    | `heavy-rental/neo4j` | `NEO4J_USER`, `NEO4J_PASSWORD` |
 
    Fail if host, database, password, port, or `REST_BASE_URL` is empty. **Never** write Vocareum AWS keys into SM.

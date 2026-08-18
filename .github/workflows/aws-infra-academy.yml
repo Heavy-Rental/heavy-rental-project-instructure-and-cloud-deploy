@@ -636,6 +636,13 @@ jobs:
           STRIPE_API_KEY: ${{ secrets.STRIPE_API_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          APP_JWT_SECRET: ${{ secrets.APP_JWT_SECRET }}
+          ONEMAP_EMAIL: ${{ secrets.ONEMAP_EMAIL }}
+          ONEMAP_PASSWORD: ${{ secrets.ONEMAP_PASSWORD }}
+          DYNAMIC_PRICING_ENABLED: ${{ vars.DYNAMIC_PRICING_ENABLED }}
+          PRICING_DEFAULT_DISTANCE_KM: ${{ vars.PRICING_DEFAULT_DISTANCE_KM }}
+          PRICING_ORIGIN_POSTAL_CODE: ${{ vars.PRICING_ORIGIN_POSTAL_CODE }}
+          PRICING_DISTANCE_LOOKUP_ENABLED: ${{ vars.PRICING_DISTANCE_LOOKUP_ENABLED }}
           TF_VAR_db_master_password: ${{ secrets.SPRING_DATASOURCE_PASSWORD || 'PlanOnlyNotApplied1!' }}
         run: |
           set +x

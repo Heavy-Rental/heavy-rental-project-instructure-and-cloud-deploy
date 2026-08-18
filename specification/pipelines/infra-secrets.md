@@ -9,8 +9,8 @@ Never write Vocareum `AWS_*` into SM. Never put those keys on the EC2.
 | Secret id | Who reads | Required fields |
 | --- | --- | --- |
 | `heavy-rental/portal` | `asg-portal` / portal app CD | `REST_BASE_URL`, `STRIPE_PUBLISHABLE_KEY`, `VITE_STRIPE_PUBLISHABLE_KEY` (same `pk_`). **No** `sk_` or webhook |
-| `heavy-rental/rest` | `asg-rest` / REST app CD | SoR `POSTGRES_*` + aliases + `SPRING_DATASOURCE_*`, `HAYSTACK_BASE_URL`, Stripe trio (`sk_`, webhook, `pk_`) |
-| `heavy-rental/haystack` | `asg-haystack` / Haystack app CD | Haystack RDS `POSTGRES_*` / aliases / `DATABASE_URL`, `SOURCE_HOST` / `SOURCE_PORT` / `SOURCE_DATABASE` (SoR `heavy_rental`), `TARGET_HOST` / `TARGET_PORT` / `TARGET_DATABASE` (Haystack RDS), `FLEET_BACKEND=sql`, `NEO4J_BACKEND=bolt`, `NEO4J_URI` (Bolt NLB) / user / password, optional `LLM_API_KEY`. No Stripe. No `SOURCE_USER` — reuse `POSTGRES_USERNAME` / `POSTGRES_PASSWORD` |
+| `heavy-rental/rest` | `asg-rest` / REST app CD | SoR `POSTGRES_*` + aliases + `SPRING_DATASOURCE_*`, `HAYSTACK_BASE_URL` (Haystack ALB), `APP_CORS_ALLOWED_ORIGINS` (`http://<portal_alb_dns>`), Stripe trio, `APP_JWT_SECRET` (env / reuse SM / generate ≥ 32), optional `ONEMAP_EMAIL` / `ONEMAP_PASSWORD` from Environment secrets |
+| `heavy-rental/haystack` | `asg-haystack` / Haystack app CD | Haystack RDS `POSTGRES_*` / aliases / `DATABASE_URL`, `SOURCE_HOST` / `SOURCE_PORT` / `SOURCE_DATABASE` (SoR `heavy_rental`), `TARGET_HOST` / `TARGET_PORT` / `TARGET_DATABASE` (Haystack RDS), `FLEET_BACKEND=sql`, `NEO4J_BACKEND=bolt`, `NEO4J_URI` (Bolt NLB) / user / password, `NEO4J_POPULATE_URL` (`http://neo4j-populate:8089/v1/populate` — compose worker on `asg-haystack`, not an ALB), optional `LLM_API_KEY`. No Stripe. No `SOURCE_USER` — reuse `POSTGRES_USERNAME` / `POSTGRES_PASSWORD` |
 | `heavy-rental/neo4j` | `asg-neo4j` (infra compose only) | `NEO4J_USER`, `NEO4J_PASSWORD` |
 
 `SOURCE_*` / `TARGET_*` are infra-owned (ADR 0013). Haystack app CD maps SM → `.env` and must not invent hosts or a third RDS.
