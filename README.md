@@ -5,7 +5,7 @@ GitHub Actions, Terraform, and Ansible that create and operate the **AWS Academy
 **Terraform** creates the architecture (VPC, NAT, ASGs, ALBs, RDS, secret shells, NLB).  
 **Ansible** only **configures** guests that Terraform already created (Docker, `.env` from Secrets Manager, compose). It does not create VPCs, ASGs, or RDS.
 
-Start here: [`specification/README.md`](specification/README.md). Everyday operate: [`docs/BOOTSTRAP.md`](docs/BOOTSTRAP.md). Layout: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+**Start here if you are running the lab:** [`OPERATOR-GUIDE.md`](OPERATOR-GUIDE.md) (each GitHub Action `action`, first-time path, form fields). Specs: [`specification/README.md`](specification/README.md). Compact operate notes: [`docs/BOOTSTRAP.md`](docs/BOOTSTRAP.md). Layout: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 | Path | Contents |
 | --- | --- |
@@ -24,12 +24,13 @@ Start here: [`specification/README.md`](specification/README.md). Everyday opera
 | --- | --- | --- |
 | `bootstrap` | State bucket only | No |
 | `plan` | Show estate | No |
-| `apply` | Create/update estate | First compose (all four groups) after `sync-secrets` |
-| `configure-only` | No apply | Docker on all guests; compose **Neo4j only** |
+| `apply` | Create/update estate | Same as configure-only (`configure.yml`) |
+| `configure-only` | No apply | Docker + Compose on all guests; **Neo4j only** |
+| `deploy-projects` | No | Later run after apply/configure-only: `site.yml` (all three apps) |
 | `stop` | No | Pause ASGs + stop both RDS (`scripts/stop-estate.sh`) |
 | `destroy` | Tear down estate | No |
 
-Portal / REST / Haystack **image** redeploys are app CD in `heavy-rental-project-pipeline-development`. Paid / OIDC is later.
+Portal / REST / Haystack **first compose** on the estate: `action=deploy-projects` after apply. **Later** image redeploys are app CD in `heavy-rental-project-pipeline-development`. Paid / OIDC is later.
 
 ## Out of scope
 

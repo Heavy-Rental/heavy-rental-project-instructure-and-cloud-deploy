@@ -17,3 +17,4 @@ ADRs for this CD repo (Nygard format). Conflict order: **OpenSpec → OpenSPDD S
 | [0011](0011-pems-after-inservice.md) | SSH PEMs after InService, not in Terraform |
 | [0012](0012-ansible-over-ssm.md) | Ansible over SSM, not SSH (configuration only; Terraform owns architecture) |
 | [0013](0013-haystack-source-target-in-sync-secrets.md) | SoR → Haystack sync endpoints in infra `sync-secrets` |
+| [0014](0014-deploy-projects-after-configure.md) | `deploy-projects` is a later run of `site.yml`, not part of apply |

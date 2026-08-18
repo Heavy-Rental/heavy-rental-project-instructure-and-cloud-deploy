@@ -42,8 +42,8 @@ The estate exists. Shells are empty. Guests have no Docker compose. Operators ca
 
 ## Success
 
-- `apply` runs Terraform (architecture) then `sync-secrets` (including Haystack `SOURCE_*` / `TARGET_*`) then Ansible first-compose.
-- `configure-only` fills SM, installs Docker on all guests, and composes **Neo4j only** (no Terraform apply; no portal/REST/Haystack image roll).
+- `apply` runs Terraform (architecture) then `sync-secrets` (including Haystack `SOURCE_*` / `TARGET_*`) then the **same** Ansible as configure-only (`configure.yml`).
+- `apply` and `configure-only` install Docker on all guests and compose **Neo4j only**. They do not pull portal/REST/Haystack images.
 - `stop` pauses ASGs + both RDS; Gateways remain.
 - `destroy` still requires `confirm_destroy=destroy`.
 - Ansible never creates VPC/ASG/RDS.

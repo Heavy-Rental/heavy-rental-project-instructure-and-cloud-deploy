@@ -101,7 +101,11 @@ Private outbound HTTPS → the **NAT Gateway in the same AZ**. S3 via gateway en
 
 ## Configure (Ansible)
 
-`action=apply` runs Terraform first, then `sync-secrets` → `sync-ssh-keys` → Ansible over **`amazon.aws.aws_ssm`** (all four groups, first compose). `action=configure-only` does **not** run Terraform apply. It refills SM + PEMs, installs **Docker + Compose** on all guests, and composes **Neo4j only**. Portal / REST / Haystack **images** are those projects’ app CD (env-driven / static SPA — not baked in CI).
+`action=apply` runs Terraform first, then `sync-secrets` → `sync-ssh-keys` → Ansible **`configure.yml`** (Docker + Compose on all guests; compose **Neo4j only**). `action=configure-only` does **not** run Terraform apply; Ansible is the **same** playbook. Neither action pulls portal / REST / Haystack images.
+
+`action=deploy-projects` is a **later** workflow run after apply or configure-only (ADR 0014). It is not a job at the end of apply. Preflight requires public GHCR or ECR tags, then Ansible **`site.yml`**. Day-to-day single-image rolls stay app CD.
+
+`group_vars` does **not** hardcode GHCR paths. It looks up GitHub Environment variables `PORTAL_IMAGE` / `REST_IMAGE` / `HAYSTACK_IMAGE` on the Ansible controller (infra repo Environment `academy`).
 
 | Role | Image | Notes |
 | --- | --- | --- |

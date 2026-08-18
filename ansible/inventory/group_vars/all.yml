@@ -1,12 +1,16 @@
 ---
 # Loaded because this sits next to inventory/aws_ssm.py (ansible/group_vars is not).
+# Image tags come from the Ansible controller environment. Infra CD exports
+# GitHub Environment variables (academy: PORTAL_IMAGE, REST_IMAGE,
+# HAYSTACK_IMAGE, IMAGE_HTTP_URL) plus Run-form IMAGE_REF / IMAGE_HTTP_INPUT.
+# These are variables, not secrets. Do not bake ghcr.io paths into git.
 compose_dir: /opt/heavy-rental
 secret_json_path: /run/heavy-rental/app.json
 env_path: /opt/heavy-rental/.env
 aws_region: us-east-1
-portal_image: nginx
+portal_image: "{{ lookup('ansible.builtin.env', 'PORTAL_IMAGE') | default('nginx', true) }}"
 neo4j_image: neo4j:5
-rest_image: ""
-haystack_image: ""
-image_http_url: ""
-image_ref: ""
+rest_image: "{{ lookup('ansible.builtin.env', 'REST_IMAGE') | default(lookup('ansible.builtin.env', 'IMAGE_REF') | default('', true), true) }}"
+haystack_image: "{{ lookup('ansible.builtin.env', 'HAYSTACK_IMAGE') | default(lookup('ansible.builtin.env', 'IMAGE_REF') | default('', true), true) }}"
+image_http_url: "{{ lookup('ansible.builtin.env', 'IMAGE_HTTP_URL') | default(lookup('ansible.builtin.env', 'IMAGE_HTTP_INPUT') | default('', true), true) }}"
+image_ref: "{{ lookup('ansible.builtin.env', 'IMAGE_REF') | default('', true) }}"

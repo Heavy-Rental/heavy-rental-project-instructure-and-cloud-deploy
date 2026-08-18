@@ -1,4 +1,10 @@
 ---
+# Full first-compose of portal + REST + Haystack + Neo4j + rds_logical.
+# Invoked only by action=deploy-projects (a later workflow run after apply
+# or configure-only). apply / configure-only use configure.yml and never
+# call this file. Image tags come from group_vars (PORTAL_IMAGE / REST_IMAGE /
+# HAYSTACK_IMAGE). Preflight forbids stock nginx, empty REST/Haystack, private
+# GHCR, and image_http_url.
 - name: Shared guest bootstrap
   hosts: portal:rest:haystack:neo4j
   become: true
