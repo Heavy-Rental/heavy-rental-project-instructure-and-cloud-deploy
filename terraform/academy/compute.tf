@@ -9,7 +9,7 @@ resource "aws_launch_template" "portal" {
   instance_type = "t3.micro"
 
   iam_instance_profile {
-    name = data.aws_iam_instance_profile.lab.name
+    name = local.instance_profile_name["portal"]
   }
 
   vpc_security_group_ids = [aws_security_group.portal.id]
@@ -48,6 +48,7 @@ resource "aws_autoscaling_group" "portal" {
   health_check_grace_period = 300
   force_delete              = true
   wait_for_capacity_timeout = "10m"
+  enabled_metrics           = local.asg_group_metrics
 
   availability_zone_distribution {
     capacity_distribution_strategy = local.asg_az_distribution
@@ -73,7 +74,7 @@ resource "aws_launch_template" "rest" {
   instance_type = "t3.small"
 
   iam_instance_profile {
-    name = data.aws_iam_instance_profile.lab.name
+    name = local.instance_profile_name["rest"]
   }
 
   vpc_security_group_ids = [aws_security_group.rest.id]
@@ -112,6 +113,7 @@ resource "aws_autoscaling_group" "rest" {
   health_check_grace_period = 300
   force_delete              = true
   wait_for_capacity_timeout = "10m"
+  enabled_metrics           = local.asg_group_metrics
 
   availability_zone_distribution {
     capacity_distribution_strategy = local.asg_az_distribution
@@ -137,7 +139,7 @@ resource "aws_launch_template" "haystack" {
   instance_type = "t3.small"
 
   iam_instance_profile {
-    name = data.aws_iam_instance_profile.lab.name
+    name = local.instance_profile_name["haystack"]
   }
 
   vpc_security_group_ids = [aws_security_group.haystack.id]
@@ -176,6 +178,7 @@ resource "aws_autoscaling_group" "haystack" {
   health_check_grace_period = 300
   force_delete              = true
   wait_for_capacity_timeout = "10m"
+  enabled_metrics           = local.asg_group_metrics
 
   availability_zone_distribution {
     capacity_distribution_strategy = local.asg_az_distribution
@@ -202,7 +205,7 @@ resource "aws_launch_template" "neo4j" {
   instance_type = "t3.large"
 
   iam_instance_profile {
-    name = data.aws_iam_instance_profile.lab.name
+    name = local.instance_profile_name["neo4j"]
   }
 
   vpc_security_group_ids = [aws_security_group.neo4j.id]
@@ -251,6 +254,7 @@ resource "aws_autoscaling_group" "neo4j" {
   health_check_grace_period = 300
   force_delete              = true
   wait_for_capacity_timeout = "10m"
+  enabled_metrics           = local.asg_group_metrics
 
   availability_zone_distribution {
     capacity_distribution_strategy = local.asg_az_distribution

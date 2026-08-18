@@ -1,19 +1,17 @@
-# AWS Academy (Vocareum) infrastructure — HR-162 configure.
-# Not paid. Not OIDC. Not app CI.
+# AWS infrastructure — Vocareum (academy) or public paid AWS.
+# Not app CI.
 #
 # Operator:
-#   1. Start Lab → AWS Details
-#   2. Paste the three Vocareum keys on the Run form, or leave empty and use
-#      Environment academy AWS_* secrets
-#   3. Environment academy: SPRING_DATASOURCE_PASSWORD, NEO4J_PASSWORD, Stripe trio
+#   1. Pick aws_environment = academy | AWS_ACTUAL
+#   2. Academy: Start Lab → paste Vocareum keys (or Environment academy AWS_*)
+#      AWS_ACTUAL: Environment AWS_ACTUAL AWS_ROLE_TO_ASSUME (OIDC). Leave form keys empty.
+#   3. Environment secrets: SPRING_DATASOURCE_PASSWORD, NEO4J_PASSWORD, Stripe trio
 #   4. action=plan | apply | configure-only | deploy-projects | stop | destroy
-#      deploy-projects is a later run after apply or configure-only (not chained).
 #
-# Do not point aws_environment at paid. Do not write keys to Secrets Manager.
-# Form keys are read from $GITHUB_EVENT_PATH (not env: / ${{ inputs.* }}) so
-# job logs can mask them. The run Inputs page may still show the strings.
+# Do not put AWS_ACCESS_KEY_ID on Environment AWS_ACTUAL. Do not write keys to SM.
+# Form keys are read from $GITHUB_EVENT_PATH so job logs can mask them.
 
-name: AWS infrastructure (Academy)
+name: AWS infrastructure
 
 on:
   workflow_dispatch:
@@ -32,7 +30,7 @@ on:
           - stop
           - destroy
       aws_environment:
-        description: Must be academy (Vocareum Learner Lab)
+        description: academy = AWS Vocareum Learner Lab. AWS_ACTUAL = public billed AWS (OIDC).
         required: true
         type: environment
         default: academy
@@ -71,94 +69,65 @@ on:
         default: ""
 
 concurrency:
-  group: aws-infra-academy-${{ github.repository }}
+  group: aws-infra-${{ inputs.aws_environment }}-${{ github.repository }}
   cancel-in-progress: false
 
 permissions:
   contents: read
+  id-token: write
 
 env:
   TF_IN_AUTOMATION: "true"
   TF_INPUT: "false"
   AWS_DEFAULT_REGION: us-east-1
   DB_PASSWORD_PLAN_PLACEHOLDER: "PlanOnlyNotApplied1!"
+  # S3 bucket names cannot contain uppercase. AWS_ACTUAL → actual.
+  TF_VAR_deployment: ${{ inputs.aws_environment == 'AWS_ACTUAL' && 'actual' || inputs.aws_environment }}
+  DEPLOYMENT: ${{ inputs.aws_environment == 'AWS_ACTUAL' && 'actual' || inputs.aws_environment }}
 
 jobs:
   assert-lab:
-    name: Assert Vocareum session
+    name: Assert AWS profile
     runs-on: ubuntu-latest
     environment: ${{ inputs.aws_environment }}
     timeout-minutes: 5
     outputs:
       account_id: ${{ steps.sts.outputs.account_id }}
       bucket: ${{ steps.sts.outputs.bucket }}
+      deployment: ${{ steps.sts.outputs.deployment }}
     steps:
-      - name: Refuse paid Environment
-        env:
-          ENV_NAME: ${{ inputs.aws_environment }}
-        run: |
-          set -euo pipefail
-          if [ "${ENV_NAME}" != "academy" ]; then
-            echo "::error::This workflow is AWS Academy / Vocareum only. Use Environment academy (got '${ENV_NAME}')."
-            exit 1
-          fi
+      - uses: actions/checkout@v7.0.1
 
-      - name: Resolve Vocareum credentials
-        env:
-          ENV_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          ENV_SECRET: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          ENV_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
-        run: |
-          set +x
-          KEY="$(jq -r '.inputs.aws_access_key_id // empty' "$GITHUB_EVENT_PATH")"
-          SECRET="$(jq -r '.inputs.aws_secret_access_key // empty' "$GITHUB_EVENT_PATH")"
-          TOKEN="$(jq -r '.inputs.aws_session_token // empty' "$GITHUB_EVENT_PATH")"
-          [ -n "${KEY}" ] && echo "::add-mask::${KEY}"
-          [ -n "${SECRET}" ] && echo "::add-mask::${SECRET}"
-          [ -n "${TOKEN}" ] && echo "::add-mask::${TOKEN}"
-          if [ -z "${KEY}" ] || [ -z "${SECRET}" ] || [ -z "${TOKEN}" ]; then
-            KEY="${ENV_KEY}"
-            SECRET="${ENV_SECRET}"
-            TOKEN="${ENV_TOKEN}"
-          fi
-          if [ -z "${KEY}" ] || [ -z "${SECRET}" ] || [ -z "${TOKEN}" ]; then
-            echo "::error::Start Lab. Paste AWS Details on the form or set Environment academy secrets."
-            exit 1
-          fi
-          echo "::add-mask::${KEY}"
-          echo "::add-mask::${SECRET}"
-          echo "::add-mask::${TOKEN}"
-          {
-            echo "AWS_ACCESS_KEY_ID=${KEY}"
-            echo "AWS_SECRET_ACCESS_KEY=${SECRET}"
-            echo "AWS_SESSION_TOKEN=${TOKEN}"
-          } >> "$GITHUB_ENV"
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v6.2.3
+      - uses: ./.github/actions/resolve-aws-profile
         with:
-          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ env.AWS_SESSION_TOKEN }}
-          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+          profile: ${{ inputs.aws_environment }}
+          aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws_session_token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws_role_to_assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
 
-      - name: Prove the Vocareum session is live
+      - name: Prove the AWS session
         id: sts
+        env:
+          PROFILE: ${{ inputs.aws_environment }}
         run: |
           set -euo pipefail
           if ! ARN=$(aws sts get-caller-identity --query Arn --output text); then
-            echo "::error::sts failed. Start Lab and paste a fresh session token (or refresh Environment academy AWS_* secrets)."
+            echo "::error::sts failed. Academy: Start Lab and paste fresh AWS Details. Paid: check AWS_ROLE_TO_ASSUME / OIDC."
             exit 1
           fi
           ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
           echo "account_id=${ACCOUNT}" >> "$GITHUB_OUTPUT"
-          echo "bucket=heavy-rental-tfstate-${ACCOUNT}-academy" >> "$GITHUB_OUTPUT"
+          echo "bucket=heavy-rental-tfstate-${ACCOUNT}-${DEPLOYMENT}" >> "$GITHUB_OUTPUT"
+          echo "deployment=${DEPLOYMENT}" >> "$GITHUB_OUTPUT"
           {
-            echo "### Vocareum / Academy"
+            echo "### AWS profile \`${PROFILE}\` (deployment \`${DEPLOYMENT}\`)"
             echo ""
             echo "Caller: \`${ARN}\`"
             echo "Account: \`${ACCOUNT}\`"
             echo "Action: \`${{ inputs.action }}\`"
+            echo "State: \`s3://heavy-rental-tfstate-${ACCOUNT}-${DEPLOYMENT}/estate/terraform.tfstate\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
   ensure-backend:
@@ -169,45 +138,16 @@ jobs:
     environment: ${{ inputs.aws_environment }}
     timeout-minutes: 15
     steps:
-      - name: Resolve Vocareum credentials
-        env:
-          ENV_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          ENV_SECRET: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          ENV_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
-        run: |
-          set +x
-          KEY="$(jq -r '.inputs.aws_access_key_id // empty' "$GITHUB_EVENT_PATH")"
-          SECRET="$(jq -r '.inputs.aws_secret_access_key // empty' "$GITHUB_EVENT_PATH")"
-          TOKEN="$(jq -r '.inputs.aws_session_token // empty' "$GITHUB_EVENT_PATH")"
-          [ -n "${KEY}" ] && echo "::add-mask::${KEY}"
-          [ -n "${SECRET}" ] && echo "::add-mask::${SECRET}"
-          [ -n "${TOKEN}" ] && echo "::add-mask::${TOKEN}"
-          if [ -z "${KEY}" ] || [ -z "${SECRET}" ] || [ -z "${TOKEN}" ]; then
-            KEY="${ENV_KEY}"
-            SECRET="${ENV_SECRET}"
-            TOKEN="${ENV_TOKEN}"
-          fi
-          if [ -z "${KEY}" ] || [ -z "${SECRET}" ] || [ -z "${TOKEN}" ]; then
-            echo "::error::Start Lab. Paste AWS Details on the form or set Environment academy secrets."
-            exit 1
-          fi
-          echo "::add-mask::${KEY}"
-          echo "::add-mask::${SECRET}"
-          echo "::add-mask::${TOKEN}"
-          {
-            echo "AWS_ACCESS_KEY_ID=${KEY}"
-            echo "AWS_SECRET_ACCESS_KEY=${SECRET}"
-            echo "AWS_SESSION_TOKEN=${TOKEN}"
-          } >> "$GITHUB_ENV"
-
-      - uses: aws-actions/configure-aws-credentials@v6.2.3
-        with:
-          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ env.AWS_SESSION_TOKEN }}
-          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
-
       - uses: actions/checkout@v7.0.1
+
+      - uses: ./.github/actions/resolve-aws-profile
+        with:
+          profile: ${{ inputs.aws_environment }}
+          aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws_session_token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws_role_to_assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
 
       - uses: hashicorp/setup-terraform@v4.0.1
         with:
@@ -224,7 +164,7 @@ jobs:
             echo "State bucket ${BUCKET} already exists (S3 native lockfile; no DynamoDB)."
             exit 0
           fi
-          echo "Creating Vocareum Academy state backend (bucket=${BUCKET})."
+          echo "Creating state backend (bucket=${BUCKET} profile=${DEPLOYMENT})."
           terraform init -input=false
           terraform apply -auto-approve -input=false
           if [ -f terraform.tfstate ]; then
@@ -232,52 +172,23 @@ jobs:
           fi
 
   terraform:
-    name: Terraform estate (Academy)
+    name: Terraform estate
     needs: [assert-lab, ensure-backend]
     if: always() && needs.assert-lab.result == 'success' && needs.ensure-backend.result == 'success' && (inputs.action == 'plan' || inputs.action == 'apply')
     runs-on: ubuntu-latest
     environment: ${{ inputs.aws_environment }}
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
-      - name: Resolve Vocareum credentials
-        env:
-          ENV_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          ENV_SECRET: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          ENV_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
-        run: |
-          set +x
-          KEY="$(jq -r '.inputs.aws_access_key_id // empty' "$GITHUB_EVENT_PATH")"
-          SECRET="$(jq -r '.inputs.aws_secret_access_key // empty' "$GITHUB_EVENT_PATH")"
-          TOKEN="$(jq -r '.inputs.aws_session_token // empty' "$GITHUB_EVENT_PATH")"
-          [ -n "${KEY}" ] && echo "::add-mask::${KEY}"
-          [ -n "${SECRET}" ] && echo "::add-mask::${SECRET}"
-          [ -n "${TOKEN}" ] && echo "::add-mask::${TOKEN}"
-          if [ -z "${KEY}" ] || [ -z "${SECRET}" ] || [ -z "${TOKEN}" ]; then
-            KEY="${ENV_KEY}"
-            SECRET="${ENV_SECRET}"
-            TOKEN="${ENV_TOKEN}"
-          fi
-          if [ -z "${KEY}" ] || [ -z "${SECRET}" ] || [ -z "${TOKEN}" ]; then
-            echo "::error::Start Lab. Paste AWS Details on the form or set Environment academy secrets."
-            exit 1
-          fi
-          echo "::add-mask::${KEY}"
-          echo "::add-mask::${SECRET}"
-          echo "::add-mask::${TOKEN}"
-          {
-            echo "AWS_ACCESS_KEY_ID=${KEY}"
-            echo "AWS_SECRET_ACCESS_KEY=${SECRET}"
-            echo "AWS_SESSION_TOKEN=${TOKEN}"
-          } >> "$GITHUB_ENV"
-
-      - uses: aws-actions/configure-aws-credentials@v6.2.3
-        with:
-          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ env.AWS_SESSION_TOKEN }}
-          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
-
       - uses: actions/checkout@v7.0.1
+
+      - uses: ./.github/actions/resolve-aws-profile
+        with:
+          profile: ${{ inputs.aws_environment }}
+          aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws_session_token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws_role_to_assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
 
       - uses: hashicorp/setup-terraform@v4.0.1
         with:
@@ -293,7 +204,7 @@ jobs:
           PLACEHOLDER="${DB_PASSWORD_PLAN_PLACEHOLDER}"
           if [ "${ACTION}" = "apply" ]; then
             if [ -z "${DB_PASS}" ] || [ "${DB_PASS}" = "${PLACEHOLDER}" ] || [ "${#DB_PASS}" -lt 8 ]; then
-              echo "::error::Set Environment academy secret SPRING_DATASOURCE_PASSWORD (>= 8 chars) before action=apply. Do not put it on the Run form."
+              echo "::error::Set Environment secret SPRING_DATASOURCE_PASSWORD (>= 8 chars) before action=apply. Do not put it on the Run form."
               exit 1
             fi
             PASS="${DB_PASS}"
@@ -308,7 +219,15 @@ jobs:
           echo "::add-mask::${PASS}"
           echo "TF_VAR_db_master_password=${PASS}" >> "$GITHUB_ENV"
 
+      - name: Resolve optional alarm email
+        env:
+          ALARM_EMAIL: ${{ vars.ALARM_EMAIL }}
+        run: |
+          set -euo pipefail
+          echo "TF_VAR_alarm_email=${ALARM_EMAIL}" >> "$GITHUB_ENV"
+
       - name: Preflight Vocareum data sources
+        if: inputs.aws_environment == 'academy'
         run: |
           set -euo pipefail
           if ! aws iam get-instance-profile --instance-profile-name LabInstanceProfile >/dev/null; then
@@ -349,6 +268,8 @@ jobs:
         working-directory: terraform/academy
         run: |
           set -euo pipefail
+          chmod +x ../../scripts/estate-unlock.sh ../../scripts/reconcile-estate.sh
+          ../../scripts/estate-unlock.sh "${BUCKET}"
           if ! terraform init -input=false -reconfigure \
             -backend-config="bucket=${BUCKET}" \
             -backend-config="key=estate/terraform.tfstate" \
@@ -358,6 +279,21 @@ jobs:
             echo "::error::terraform init failed. Check S3 bucket ${BUCKET} (S3 native lockfile)."
             exit 1
           fi
+
+      - name: Reconcile leftover AWS into state
+        env:
+          ESTATE_ON_VPC_FORK: fail
+        working-directory: terraform/academy
+        run: |
+          set -euo pipefail
+          chmod +x ../../scripts/reconcile-estate.sh
+          ../../scripts/reconcile-estate.sh
+          {
+            echo "### Reconcile"
+            echo ""
+            echo "Imported any named leftovers (ASG / ECR / secrets / RDS / VPC) that were missing from state."
+            echo "A second apply after a failed persist is safe when a single estate VPC remains."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: terraform plan
         env:
@@ -391,13 +327,24 @@ jobs:
             exit 1
           fi
           set -euo pipefail
+          if [ "${DEPLOYMENT}" = "academy" ] && terraform show -json tfplan | jq -e '
+              .resource_changes[]?
+              | select(.type == "aws_iam_role" and (.change.actions | index("create")))
+            ' >/dev/null; then
+            echo "::error::Academy plan would create aws_iam_role. Vocareum forbids that. Use deployment=academy data-source LabRole only."
+            exit 1
+          fi
           {
-            echo "### Terraform plan (Academy estate)"
+            echo "### Terraform plan"
             echo ""
+            echo "Profile: \`${DEPLOYMENT}\`"
             echo "Backend: \`s3://${BUCKET}/estate/terraform.tfstate\`"
             echo "Action: \`${{ inputs.action }}\`"
-            echo "- instance profile: \`LabInstanceProfile\`"
-            echo "- IAM role: \`LabRole\`"
+            if [ "${DEPLOYMENT}" = "academy" ]; then
+              echo "- instance profile: \`LabInstanceProfile\` / \`LabRole\`"
+            else
+              echo "- instance profiles: \`hr-paid-{portal,rest,haystack,neo4j}\` (AWS_ACTUAL)"
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: terraform apply
@@ -415,10 +362,27 @@ jobs:
                 echo "### Terraform apply failed — Vocareum session cancelled"
                 echo ""
                 echo "IAM policy \`voc-cancel-cred\` denied S3 state persist after resources were created."
-                echo "Do **not** re-run \`apply\` until you Start Lab again and reconcile (import or destroy)."
+                echo "Start Lab, paste **fresh** AWS Details, then re-run \`apply\`."
+                echo "The next run imports leftovers into state (or \`destroy\` if two estate VPCs exist)."
                 echo "The runner \`errored.tfstate\` is not kept. See OPERATOR-GUIDE: voc-cancel-cred."
               } >> "$GITHUB_STEP_SUMMARY"
-              echo "::error::Vocareum cancelled the lab credentials (voc-cancel-cred) after Terraform created resources. Start Lab, paste fresh AWS Details, then import or destroy — do not re-apply yet. See OPERATOR-GUIDE."
+              echo "::error::Vocareum cancelled the lab credentials (voc-cancel-cred) after Terraform created resources. Start Lab, paste fresh AWS Details, then re-run apply (reconcile imports leftovers). See OPERATOR-GUIDE."
+              exit 1
+            fi
+            if grep -qE 'AlreadyExists|RepositoryAlreadyExistsException|ResourceExistsException|DBSubnetGroupAlreadyExists|DBInstanceAlreadyExists|DuplicateLoadBalancerName|InvalidGroup.Duplicate' /tmp/tfapply.out; then
+              {
+                echo "### Terraform apply failed — named AWS object already exists"
+                echo ""
+                echo "Reconcile did not bind every leftover into state, or two estate VPCs exist."
+                echo "1. Start Lab and paste fresh AWS Details."
+                echo "2. If the job reported two \`heavy-rental-academy\` VPCs: \`action=destroy\` then \`apply\`."
+                echo "3. Otherwise re-run \`action=plan\` (reconcile runs again) then \`apply\`."
+                echo ""
+                echo '```'
+                grep -E '^Error:|  on |AlreadyExists|RepositoryAlreadyExists|ResourceExists|DBSubnetGroupAlreadyExists|DBInstanceAlreadyExists' /tmp/tfapply.out | head -n 40 || true
+                echo '```'
+              } >> "$GITHUB_STEP_SUMMARY"
+              echo "::error::Named AWS objects already exist and are not fully in state. Re-run plan/apply after Start Lab, or destroy if two estate VPCs exist. See OPERATOR-GUIDE."
               exit 1
             fi
             {
@@ -435,6 +399,7 @@ jobs:
           {
             echo "### Terraform apply"
             echo ""
+            echo "- profile: \`$(terraform output -raw deployment)\`"
             echo "- portal ALB: \`$(terraform output -raw portal_alb_dns)\`"
             echo "- REST ALB (internal): \`$(terraform output -raw rest_alb_dns)\`"
             echo "- Haystack ALB (internal): \`$(terraform output -raw haystack_alb_dns)\`"
@@ -443,10 +408,15 @@ jobs:
             echo "- Neo4j Bolt NLB: \`$(terraform output -raw neo4j_uri)\`"
             echo "- NAT Gateways: \`$(terraform output -json nat_gateway_ids)\`"
             echo "- instance profile: \`$(terraform output -raw lab_instance_profile)\`"
-            echo "- IAM role: \`$(terraform output -raw lab_role)\`"
+            echo "- IAM role: \`$(terraform output -raw lab_role)\` (Vocareum LabRole only; no new IAM)"
+            echo "- CloudTrail: \`$(terraform output -raw cloudtrail_name)\` (S3 only)"
+            echo "- observe bucket: \`$(terraform output -raw observe_bucket)\`"
+            echo "- CloudWatch dashboard: \`$(terraform output -raw cloudwatch_dashboard)\`"
+            echo "- SNS alarms: \`$(terraform output -raw sns_alarm_topic)\`"
             echo ""
+            echo "Confirm the SNS email if Environment \`ALARM_EMAIL\` is set."
             echo "Configure jobs (\`sync-secrets\` / SSH / Ansible) run next on apply."
-            echo "Session end does **not** stop RDS, ALB, or NAT Gateway billing."
+            echo "Session end does **not** stop RDS, ALB, NAT Gateway, CloudTrail, or observe-bucket billing."
           } >> "$GITHUB_STEP_SUMMARY"
 
   destroy:
@@ -455,7 +425,7 @@ jobs:
     if: needs.assert-lab.result == 'success' && inputs.action == 'destroy'
     runs-on: ubuntu-latest
     environment: ${{ inputs.aws_environment }}
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - name: Require confirm_destroy
         run: |
@@ -469,45 +439,16 @@ jobs:
             exit 1
           fi
 
-      - name: Resolve Vocareum credentials
-        env:
-          ENV_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          ENV_SECRET: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          ENV_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
-        run: |
-          set +x
-          KEY="$(jq -r '.inputs.aws_access_key_id // empty' "$GITHUB_EVENT_PATH")"
-          SECRET="$(jq -r '.inputs.aws_secret_access_key // empty' "$GITHUB_EVENT_PATH")"
-          TOKEN="$(jq -r '.inputs.aws_session_token // empty' "$GITHUB_EVENT_PATH")"
-          [ -n "${KEY}" ] && echo "::add-mask::${KEY}"
-          [ -n "${SECRET}" ] && echo "::add-mask::${SECRET}"
-          [ -n "${TOKEN}" ] && echo "::add-mask::${TOKEN}"
-          if [ -z "${KEY}" ] || [ -z "${SECRET}" ] || [ -z "${TOKEN}" ]; then
-            KEY="${ENV_KEY}"
-            SECRET="${ENV_SECRET}"
-            TOKEN="${ENV_TOKEN}"
-          fi
-          if [ -z "${KEY}" ] || [ -z "${SECRET}" ] || [ -z "${TOKEN}" ]; then
-            echo "::error::Start Lab. Paste AWS Details on the form or set Environment academy secrets."
-            exit 1
-          fi
-          echo "::add-mask::${KEY}"
-          echo "::add-mask::${SECRET}"
-          echo "::add-mask::${TOKEN}"
-          {
-            echo "AWS_ACCESS_KEY_ID=${KEY}"
-            echo "AWS_SECRET_ACCESS_KEY=${SECRET}"
-            echo "AWS_SESSION_TOKEN=${TOKEN}"
-          } >> "$GITHUB_ENV"
-
-      - uses: aws-actions/configure-aws-credentials@v6.2.3
-        with:
-          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ env.AWS_SESSION_TOKEN }}
-          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
-
       - uses: actions/checkout@v7.0.1
+
+      - uses: ./.github/actions/resolve-aws-profile
+        with:
+          profile: ${{ inputs.aws_environment }}
+          aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws_session_token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws_role_to_assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
 
       - uses: hashicorp/setup-terraform@v4.0.1
         with:
@@ -527,6 +468,7 @@ jobs:
           fi
           echo "::add-mask::${PASS}"
           echo "TF_VAR_db_master_password=${PASS}" >> "$GITHUB_ENV"
+          echo "TF_VAR_alarm_email=${{ vars.ALARM_EMAIL }}" >> "$GITHUB_ENV"
 
       - name: terraform init
         env:
@@ -538,6 +480,8 @@ jobs:
             echo "::error::State bucket ${BUCKET} is missing. Nothing to destroy. Do not create a backend on action=destroy."
             exit 1
           fi
+          chmod +x ../../scripts/estate-unlock.sh ../../scripts/reconcile-estate.sh ../../scripts/sweep-estate-orphans.sh
+          ../../scripts/estate-unlock.sh "${BUCKET}"
           if ! terraform init -input=false -reconfigure \
             -backend-config="bucket=${BUCKET}" \
             -backend-config="key=estate/terraform.tfstate" \
@@ -547,6 +491,16 @@ jobs:
             echo "::error::terraform init failed. Check S3 bucket ${BUCKET}."
             exit 1
           fi
+
+      - name: Reconcile leftovers into state
+        env:
+          ESTATE_ON_VPC_FORK: continue
+          ESTATE_IMPORT_STRICT: "false"
+        working-directory: terraform/academy
+        run: |
+          set -euo pipefail
+          chmod +x ../../scripts/reconcile-estate.sh
+          ../../scripts/reconcile-estate.sh
 
       - name: Terminate estate EC2 so primary ENIs can be deleted
         run: |
@@ -580,16 +534,6 @@ jobs:
           terraform destroy -input=false -auto-approve -no-color > /tmp/tfdestroy.out 2>&1
           rc=$?
           cat /tmp/tfdestroy.out
-          if [ "${rc}" -eq 0 ]; then
-            set -euo pipefail
-            {
-              echo "### Terraform destroy"
-              echo ""
-              echo "Estate state emptied. S3 backend bucket **kept**."
-              echo "Re-run \`action=apply\` to recreate (8 EC2, two NAT Gateways, two Multi-AZ RDS, Bolt NLB)."
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
           if grep -q 'voc-cancel-cred' /tmp/tfdestroy.out; then
             {
               echo "### Terraform destroy failed — Vocareum session cancelled"
@@ -600,18 +544,27 @@ jobs:
             echo "::error::Vocareum cancelled the lab credentials (voc-cancel-cred) during destroy. Start Lab and re-run destroy. Do not assume resources were deleted."
             exit 1
           fi
-          if grep -q 'device index 0' /tmp/tfdestroy.out; then
+          if [ "${rc}" -ne 0 ] && grep -q 'device index 0' /tmp/tfdestroy.out; then
             echo "Destroy hit a primary ENI. Dropping leftover ENI addresses from state and retrying."
             while read -r addr; do
               [ -n "${addr}" ] || continue
               terraform state rm "${addr}" || true
             done < <(terraform state list | grep -E 'aws_network_interface|aws_network_interface_attachment' || true)
             terraform destroy -input=false -auto-approve -no-color
+            rc=$?
+          fi
+          chmod +x ../../scripts/sweep-estate-orphans.sh
+          echo "Sweeping leftovers that were never in state (or survived destroy)."
+          ../../scripts/sweep-estate-orphans.sh
+          sweep_rc=$?
+          set -euo pipefail
+          if [ "${rc}" -eq 0 ] && [ "${sweep_rc}" -eq 0 ]; then
             {
               echo "### Terraform destroy"
               echo ""
-              echo "Retried after \`state rm\` of leftover ENI addresses. Backend bucket **kept**."
-              echo "Re-run \`action=apply\` to recreate."
+              echo "Estate state emptied. Named leftovers (ASGs, extra VPCs, RDS, secrets) swept."
+              echo "S3 backend bucket **kept**."
+              echo "Re-run \`action=apply\` to recreate (8 EC2, two NAT Gateways, two Multi-AZ RDS, Bolt NLB)."
             } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
@@ -622,7 +575,7 @@ jobs:
             grep -E '^Error:|  on |AccessDenied|UnauthorizedOperation|device index|voc-cancel-cred' /tmp/tfdestroy.out | head -n 40 || true
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-          echo "::error::terraform destroy failed. See job summary."
+          echo "::error::terraform destroy or leftover sweep failed. See job summary."
           exit 1
 
   sync-secrets:
@@ -635,12 +588,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
 
-      - uses: ./.github/actions/resolve-vocareum-aws
+      - uses: ./.github/actions/resolve-aws-profile
         with:
+          profile: ${{ inputs.aws_environment }}
+          aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws_session_token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+          aws_role_to_assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
 
       - uses: hashicorp/setup-terraform@v4.0.1
         with:
@@ -679,12 +634,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
 
-      - uses: ./.github/actions/resolve-vocareum-aws
+      - uses: ./.github/actions/resolve-aws-profile
         with:
+          profile: ${{ inputs.aws_environment }}
+          aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws_session_token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+          aws_role_to_assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
 
       - name: Wait InService and install public keys
         run: |
@@ -707,12 +664,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
 
-      - uses: ./.github/actions/resolve-vocareum-aws
+      - uses: ./.github/actions/resolve-aws-profile
         with:
+          profile: ${{ inputs.aws_environment }}
+          aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws_session_token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+          aws_role_to_assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
 
       - name: Session Manager plugin
         run: |
@@ -767,12 +726,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
 
-      - uses: ./.github/actions/resolve-vocareum-aws
+      - uses: ./.github/actions/resolve-aws-profile
         with:
+          profile: ${{ inputs.aws_environment }}
+          aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws_session_token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+          aws_role_to_assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
 
       - name: Resolve images and require estate
         env:
@@ -904,12 +865,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
 
-      - uses: ./.github/actions/resolve-vocareum-aws
+      - uses: ./.github/actions/resolve-aws-profile
         with:
+          profile: ${{ inputs.aws_environment }}
+          aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws_session_token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+          aws_role_to_assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
 
       - name: Pause ASGs and both RDS
         run: |

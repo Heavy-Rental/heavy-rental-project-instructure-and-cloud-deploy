@@ -1,8 +1,19 @@
+variable "deployment" {
+  type        = string
+  default     = "academy"
+  description = "academy or actual. Suffix on the state bucket (lowercase; Environment AWS_ACTUAL maps to actual)."
+
+  validation {
+    condition     = contains(["academy", "actual"], var.deployment)
+    error_message = "deployment must be academy or actual."
+  }
+}
+
 data "aws_caller_identity" "current" {}
 
 locals {
   account_id  = data.aws_caller_identity.current.account_id
-  bucket_name = "heavy-rental-tfstate-${local.account_id}-academy"
+  bucket_name = "heavy-rental-tfstate-${local.account_id}-${var.deployment}"
 }
 
 # No aws_iam_role. Vocareum LabRole / federated user creates these.

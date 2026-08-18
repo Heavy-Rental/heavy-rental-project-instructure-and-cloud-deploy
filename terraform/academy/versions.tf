@@ -24,7 +24,7 @@ provider "aws" {
   default_tags {
     tags = {
       Project     = "heavy-rental"
-      Environment = "academy"
+      Environment = var.deployment
       Lab         = "aws-academy-vocareum"
       Stack       = "estate"
     }

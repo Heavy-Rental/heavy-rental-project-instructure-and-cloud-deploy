@@ -1,6 +1,6 @@
 # ADR 0001: Academy / Vocareum only on the first pipeline
 
-- **Status:** Accepted
+- **Status:** Partially superseded by [0016](0016-dual-profile-academy-paid.md) (paid may be selected on this workflow; Vocareum keys still must not target paid)
 - **Date:** 2026-08-16
 - **Branch:** `feat/infra-academy-bootstrap`
 

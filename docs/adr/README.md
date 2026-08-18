@@ -18,3 +18,5 @@ ADRs for this CD repo (Nygard format). Conflict order: **OpenSpec → OpenSPDD S
 | [0012](0012-ansible-over-ssm.md) | Ansible over SSM, not SSH (configuration only; Terraform owns architecture) |
 | [0013](0013-haystack-source-target-in-sync-secrets.md) | SoR → Haystack sync endpoints in infra `sync-secrets` |
 | [0014](0014-deploy-projects-after-configure.md) | `deploy-projects` is a later run of `site.yml`, not part of apply |
+| [0015](0015-academy-observe-no-iam.md) | Observe uses LabRole + S3; no CloudTrail → CloudWatch Logs |
+| [0016](0016-dual-profile-academy-paid.md) | One Action: academy (Vocareum) or AWS_ACTUAL (OIDC) |

@@ -2,17 +2,19 @@ data "aws_availability_zones" "available" {
   state = "available"
 }
 
+# Vocareum only. Paid must not look up LabRole (it will not exist).
 data "aws_iam_role" "lab" {
-  name = var.lab_role_name
+  count = var.deployment == "academy" ? 1 : 0
+  name  = var.lab_role_name
 }
 
-# Vocareum pre-creates this pair. Do not create aws_iam_role or aws_iam_instance_profile.
 data "aws_iam_instance_profile" "lab" {
-  name = var.lab_instance_profile_name
+  count = var.deployment == "academy" ? 1 : 0
+  name  = var.lab_instance_profile_name
 
   lifecycle {
     postcondition {
-      condition     = self.role_name == data.aws_iam_role.lab.name
+      condition     = self.role_name == data.aws_iam_role.lab[0].name
       error_message = "LabInstanceProfile must use IAM role LabRole. Vocareum pre-creates this pairing; do not create IAM."
     }
   }
@@ -93,4 +95,20 @@ locals {
     "heavy-rental-haystack",
     "heavy-rental-neo4j",
   ])
+
+  observe_bucket = "heavy-rental-observe-${data.aws_caller_identity.current.account_id}-${var.deployment}"
+
+  is_academy = var.deployment == "academy"
+  is_actual  = var.deployment == "actual"
+
+  guest_apps = toset(["portal", "rest", "haystack", "neo4j"])
+
+  asg_group_metrics = [
+    "GroupDesiredCapacity",
+    "GroupInServiceInstances",
+    "GroupMinSize",
+    "GroupMaxSize",
+  ]
+
+  log_group_apps = toset(["portal", "rest", "haystack", "neo4j"])
 }

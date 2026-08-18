@@ -13,8 +13,9 @@ Reference studies: `heavy-rental-project-pipeline-development/cloud-deployment-f
 | VPC, subnets, NAT Gateways, ASGs, ALBs, RDS, NLB, SM shells | Yes — Terraform |
 | Fill SM JSON, guest Docker / `.env` / compose, PEMs after InService | Yes — scripts + Ansible (configuration) |
 | Redeploy a new portal / REST / Haystack CI image | Day-to-day: app CD. Optional first-compose: `action=deploy-projects` (after apply) |
-| Paid / OIDC | No — later |
-| Operate after go-live (CloudWatch day-to-day) | Knowledge only; `stop` / `destroy` are infra actions |
+| Public AWS | Yes — same Action, Environment `AWS_ACTUAL`, OIDC (ADR 0016) |
+| Operate after go-live | SSM, `stop`, `destroy` |
+| Monitor (CloudWatch / CloudTrail) | Yes — Terraform on `apply` (ADR 0015). Trail and flow logs are S3-only. LabRole only. |
 
 ## How to read the three frameworks
 
@@ -46,5 +47,7 @@ Conflict order: **OpenSpec scenarios → OpenSPDD Safeguards → ADR → YAML / 
 | [`../openspec/changes/add-infra-academy-estate/`](../openspec/changes/add-infra-academy-estate/) | Terraform estate |
 | [`../openspec/changes/add-infra-academy-configure/`](../openspec/changes/add-infra-academy-configure/) | `sync-secrets`, Ansible configure, stop |
 | [`../openspec/changes/add-infra-academy-deploy-projects/`](../openspec/changes/add-infra-academy-deploy-projects/) | `deploy-projects` later run of `site.yml` |
+| [`../openspec/changes/add-infra-academy-observe/`](../openspec/changes/add-infra-academy-observe/) | CloudWatch + CloudTrail on apply (LabRole, S3 trail) |
+| [`../openspec/changes/add-infra-paid-profile/`](../openspec/changes/add-infra-paid-profile/) | Select academy (Vocareum) or AWS_ACTUAL (OIDC) |
 
-SPDD: [`../spdd/analysis/`](../spdd/analysis/). ADRs 0001–0014: [`../docs/adr/`](../docs/adr/).
+SPDD: [`../spdd/analysis/`](../spdd/analysis/). ADRs 0001–0016: [`../docs/adr/`](../docs/adr/).
