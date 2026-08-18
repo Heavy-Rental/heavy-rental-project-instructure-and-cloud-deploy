@@ -41,8 +41,25 @@ variable "lab_instance_profile_name" {
   description = "Pre-created Vocareum instance profile. Must contain LabRole. Do not create IAM."
 }
 
+variable "deployment" {
+  type        = string
+  default     = "academy"
+  description = "academy = Vocareum LabRole. actual = public AWS (Environment AWS_ACTUAL). S3 suffix is lowercase."
+
+  validation {
+    condition     = contains(["academy", "actual"], var.deployment)
+    error_message = "deployment must be academy or actual."
+  }
+}
+
 variable "lab_role_name" {
   type        = string
   default     = "LabRole"
   description = "Pre-created Vocareum IAM role. LabInstanceProfile must use this role. Do not create IAM."
+}
+
+variable "alarm_email" {
+  type        = string
+  default     = ""
+  description = "Optional SNS email for CloudWatch alarms. Empty = topic only, no subscription. From Environment ALARM_EMAIL."
 }

@@ -7,7 +7,7 @@
 
 | Tool | Owns |
 | --- | --- |
-| **Terraform** | Architecture and cloud **resources**: VPC, subnets, IGW, two NAT Gateways, four ASGs + LTs, public portal ALB, internal REST/Haystack ALBs, Bolt NLB, two Multi-AZ RDS, SM **shells**, S3 state |
+| **Terraform** | Architecture and cloud **resources**: VPC, subnets, IGW, two NAT Gateways, four ASGs + LTs, public portal ALB, internal REST/Haystack ALBs, Bolt NLB, two Multi-AZ RDS, SM **shells**, S3 state, CloudTrail (S3), VPC flow logs (S3), ALB access logs, CloudWatch alarms + dashboard. Guests use **LabRole** / `LabInstanceProfile` only |
 | **Ansible** | Guest **configuration** only: Docker/Compose, map SM → `.env`, pull/load a CI image, compose, portal nginx `/api`, RDS *logical* grants/extensions. **No** `terraform apply`, no create-ASG, no create-RDS |
 
 `sync-secrets` and `sync-ssh-keys` are shell wrappers (not Terraform). They write JSON / PEMs into shells Terraform already created.
@@ -18,12 +18,12 @@
 workflow_dispatch (Environment academy)
       │
       ├── bootstrap         Terraform: state bucket only
-      ├── plan              Terraform: show estate (no apply)
-      ├── apply             Terraform estate → sync-secrets → sync-ssh-keys → Ansible configure.yml
+      ├── plan              Import leftovers → Terraform show estate (no apply)
+      ├── apply             Import leftovers → Terraform estate → sync-secrets → sync-ssh-keys → Ansible configure.yml
       ├── configure-only    No Terraform apply. sync-secrets + PEMs → same Ansible configure.yml
       ├── deploy-projects   Later run after apply or configure-only. Preflight images → site.yml
       ├── stop              ASG desired=0 + stop both RDS. NAT Gateways still bill
-      └── destroy           Terraform destroy (confirm_destroy=destroy). Keeps state bucket
+      └── destroy           Import leftovers → terraform destroy → sweep orphans. Keeps state bucket
 ```
 
 | Action | Creates AWS architecture? | Configures guests? |

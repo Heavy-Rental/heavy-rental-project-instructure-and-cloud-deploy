@@ -6,9 +6,17 @@ resource "aws_lb" "portal" {
   subnets            = aws_subnet.public[*].id
   idle_timeout       = 60
 
+  access_logs {
+    bucket  = aws_s3_bucket.observe.id
+    prefix  = "alb/portal"
+    enabled = true
+  }
+
   tags = {
     Name = "alb-portal"
   }
+
+  depends_on = [aws_s3_bucket_policy.observe]
 }
 
 resource "aws_lb_target_group" "portal" {
@@ -52,9 +60,17 @@ resource "aws_lb" "rest" {
   subnets            = aws_subnet.app[*].id
   idle_timeout       = 60
 
+  access_logs {
+    bucket  = aws_s3_bucket.observe.id
+    prefix  = "alb/rest"
+    enabled = true
+  }
+
   tags = {
     Name = "alb-rest"
   }
+
+  depends_on = [aws_s3_bucket_policy.observe]
 }
 
 resource "aws_lb_target_group" "rest" {
@@ -98,9 +114,17 @@ resource "aws_lb" "haystack" {
   subnets            = aws_subnet.app[*].id
   idle_timeout       = 60
 
+  access_logs {
+    bucket  = aws_s3_bucket.observe.id
+    prefix  = "alb/haystack"
+    enabled = true
+  }
+
   tags = {
     Name = "alb-haystack"
   }
+
+  depends_on = [aws_s3_bucket_policy.observe]
 }
 
 resource "aws_lb_target_group" "haystack" {

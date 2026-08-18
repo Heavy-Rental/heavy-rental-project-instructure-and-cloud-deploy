@@ -1,7 +1,8 @@
 # Academy estate architecture
 
 **Region:** `us-east-1` (first two available AZs, usually `us-east-1a` + `us-east-1b`).  
-**IAM:** every EC2 uses **`LabInstanceProfile`** → **`LabRole`**. No IAM create.
+**IAM (academy):** every EC2 uses **`LabInstanceProfile`** → **`LabRole`**. No IAM create.  
+**IAM (AWS_ACTUAL):** Terraform creates `hr-paid-{portal,rest,haystack,neo4j}` instance profiles. Auth is GitHub OIDC (`AWS_ROLE_TO_ASSUME`). Separate state bucket suffix `-actual` (S3 cannot use uppercase `AWS_ACTUAL`).
 
 This is the live target for `terraform/academy/`. `postgres-haystack-sync` is a **container**, not a third RDS.
 
@@ -96,8 +97,20 @@ Private outbound HTTPS → the **NAT Gateway in the same AZ**. S3 via gateway en
 
 ## Terraform vs Ansible
 
-**Terraform** (`terraform/academy/`) creates the architecture: VPC, two NAT Gateways, four ASGs, ALBs, two Multi-AZ RDS, Bolt NLB, empty SM shells.  
+**Terraform** (`terraform/academy/`) creates the architecture: VPC, two NAT Gateways, four ASGs, ALBs, two Multi-AZ RDS, Bolt NLB, empty SM shells, and Monitor (CloudTrail + CloudWatch + S3 logs). Every guest uses **`LabInstanceProfile` → `LabRole`**. Terraform does not create IAM.  
 **Ansible** only configures guests that already exist: Docker, SM → `.env`, compose, portal `/api`. It does not create or destroy VPC/ASG/RDS.
+
+## Monitor (apply)
+
+| Signal | Where |
+| --- | --- |
+| API audit | CloudTrail `heavy-rental-academy` → observe S3 (`cloudtrail/`). **No** trail → CloudWatch Logs (Vocareum). |
+| VPC accept/reject | Flow logs → same bucket (`vpc-flow/`). S3 destination — **not** LabRole (wrong trust). |
+| ALB requests | Access logs on portal / REST / Haystack ALBs → `alb/` |
+| Health | Dashboard `heavy-rental-academy`; alarms on ALB 5xx / unhealthy, RDS CPU / storage, ASG InService |
+| Guest logs | `docker logs` over SSM. Log group shells `/heavy-rental/{app}` exist; no CloudWatch Agent. |
+
+Optional Environment variable `ALARM_EMAIL` subscribes SNS topic `hr-academy-alarms` (confirm the AWS mail). Cost Explorer stays the Vocareum budget UI — not Terraform.
 
 ## Configure (Ansible)
 

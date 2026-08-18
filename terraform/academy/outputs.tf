@@ -91,11 +91,46 @@ output "lab" {
 }
 
 output "lab_instance_profile" {
-  value       = data.aws_iam_instance_profile.lab.name
-  description = "Instance profile on the four ASGs. Must be LabInstanceProfile."
+  value       = local.is_academy ? data.aws_iam_instance_profile.lab[0].name : "hr-paid-*"
+  description = "Academy: LabInstanceProfile. AWS_ACTUAL: hr-paid-{app} profiles."
 }
 
 output "lab_role" {
-  value       = data.aws_iam_role.lab.name
-  description = "IAM role inside LabInstanceProfile. Must be LabRole."
+  value       = local.is_academy ? data.aws_iam_role.lab[0].name : "hr-paid-*"
+  description = "Academy: LabRole. AWS_ACTUAL: Terraform-created hr-paid-* roles."
+}
+
+output "deployment" {
+  value       = var.deployment
+  description = "academy (Vocareum) or actual (Environment AWS_ACTUAL)."
+}
+
+output "guest_instance_profiles" {
+  value       = local.instance_profile_name
+  description = "Instance profile name per app ASG."
+}
+
+output "observe_bucket" {
+  value       = aws_s3_bucket.observe.id
+  description = "S3 bucket for CloudTrail, ALB access logs, and VPC flow logs."
+}
+
+output "cloudtrail_name" {
+  value       = aws_cloudtrail.academy.name
+  description = "Management-event trail. S3 only; no CloudWatch Logs on the trail."
+}
+
+output "cloudtrail_arn" {
+  value       = aws_cloudtrail.academy.arn
+  description = "CloudTrail ARN."
+}
+
+output "cloudwatch_dashboard" {
+  value       = aws_cloudwatch_dashboard.estate.dashboard_name
+  description = "CloudWatch dashboard name (heavy-rental-academy)."
+}
+
+output "sns_alarm_topic" {
+  value       = aws_sns_topic.alarms.arn
+  description = "SNS topic for observe alarms. Email subscription only if alarm_email is set."
 }

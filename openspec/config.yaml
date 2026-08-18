@@ -4,9 +4,13 @@ context: |
   This repository specifies GitHub Actions that create and operate the
   Academy Learner Lab (Vocareum) estate.
   Terraform creates architecture and resources (VPC, two NAT Gateways,
-  four ASGs, ALBs, two Multi-AZ RDS, Bolt NLB, empty SM shells).
+  four ASGs, ALBs, two Multi-AZ RDS, Bolt NLB, empty SM shells,
+  CloudWatch alarms/dashboard, CloudTrail to S3).
   Ansible only configures existing guests (Docker, .env, compose).
-  Four delivered changes: add-infra-academy-bootstrap, add-infra-academy-estate,
-  add-infra-academy-configure, add-infra-academy-deploy-projects.
+  Six changes including add-infra-paid-profile (academy Vocareum or paid OIDC
+  on the same Action). add-infra-academy-bootstrap, add-infra-academy-estate,
+  add-infra-academy-configure, add-infra-academy-deploy-projects,
+  add-infra-academy-observe.
+  Observe uses Vocareum LabRole only (no aws_iam_role). Trail is S3-only.
   Not paid/OIDC. Day-to-day portal/REST/Haystack rolls are app CD (other repo).
   Infra action=deploy-projects is a later first-compose of site.yml after apply.

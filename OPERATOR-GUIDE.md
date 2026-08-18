@@ -1,6 +1,6 @@
 # Operator guide — set up AWS and deploy the projects
 
-This is a beginner walkthrough for the GitHub Action **AWS infrastructure (Academy)** in this repo.
+This is a beginner walkthrough for the GitHub Action **AWS infrastructure** in this repo.
 
 You will:
 
@@ -8,7 +8,14 @@ You will:
 2. Deploy the portal, REST API, and Haystack onto that estate (`deploy-projects`)
 3. Pause or wipe the lab when you are done (`stop` / `destroy`)
 
-This workflow is **AWS Academy / Vocareum only**. Do not point it at a paid AWS account.
+This workflow has two **profiles**. On Run workflow pick **`aws_environment`**:
+
+| Profile | When | How you authenticate |
+| --- | --- | --- |
+| **`academy`** | AWS Academy Learner Lab (Vocareum) | Start Lab keys on the form, or Environment `academy` `AWS_*` |
+| **`AWS_ACTUAL`** | Billed public AWS account | Environment `AWS_ACTUAL` variable `AWS_ROLE_TO_ASSUME` (GitHub OIDC). **Leave Vocareum form keys empty.** |
+
+Do **not** put `AWS_ACCESS_KEY_ID` on Environment `AWS_ACTUAL`. Do **not** paste lab keys when `AWS_ACTUAL` is selected.
 
 Related reference (more compact): [`docs/BOOTSTRAP.md`](docs/BOOTSTRAP.md). Specs: [`specification/pipelines/infra-academy.md`](specification/pipelines/infra-academy.md).
 
@@ -56,7 +63,7 @@ Do this once on **this** repository (the infra repo), not on the portal / REST /
 
 1. GitHub → this repo → **Settings** → **Environments** → **New environment**
 2. Name it exactly `academy`
-3. GitHub cannot create this from git. Do not use an Environment named `paid`.
+3. GitHub cannot create this from git. Vocareum uses Environment `academy`. Public AWS uses Environment `AWS_ACTUAL`.
 
 ### 2. Add secrets (Settings → Environments → academy → Environment secrets)
 
@@ -80,6 +87,7 @@ Do **not** add `VITE_STRIPE_PUBLISHABLE_KEY` (the pipeline copies it from the pu
 | Variable | Value | When you need it |
 | --- | --- | --- |
 | `AWS_REGION` | `us-east-1` | Always |
+| `ALARM_EMAIL` | Your email | Optional. SNS confirms before alarm mail. Apply works if empty |
 | `PORTAL_IMAGE` | Public GHCR or ECR tag | **Required** before `deploy-projects` |
 | `REST_IMAGE` | Public GHCR or ECR tag | **Required** before `deploy-projects` |
 | `HAYSTACK_IMAGE` | Public GHCR or ECR tag | **Required** before `deploy-projects` |
@@ -214,6 +222,7 @@ It does **not** pull portal, REST, or Haystack images. That is why apply no long
 - Job summary shows the public portal ALB DNS
 - That URL **502**s on port 80 until `deploy-projects` (or portal app CD)
 - Secret `heavy-rental/portal` exists and has `REST_BASE_URL`
+- CloudWatch dashboard `heavy-rental-academy` and CloudTrail `heavy-rental-academy` exist (S3 observe bucket). The apply job **verifies** trail, dashboard, and bucket before it succeeds. Guests still use **LabRole** / `LabInstanceProfile` — no new IAM
 
 **Common problems:**
 
@@ -222,9 +231,15 @@ It does **not** pull portal, REST, or Haystack images. That is why apply no long
 | Missing `SPRING_DATASOURCE_PASSWORD` / Stripe / Neo4j password | Add them on Environment `academy`, re-run |
 | `device index 0 … cannot be detached` | See [Apply fails: primary ENI](#apply-fails-device-index-0--cannot-be-detached) |
 | `voc-cancel-cred` / `Failed to persist state to backend` | See [Apply fails: Vocareum cancelled credentials](#apply-fails-vocareum-cancelled-credentials-voc-cancel-cred) |
+| `AlreadyExists` / `RepositoryAlreadyExists` / secret already exists | See [Apply fails: named object already exists](#apply-fails-named-object-already-exists) |
+| Two VPCs named `heavy-rental-academy` | `destroy` (sweeps extras), then `apply`. Do not apply again until destroy finishes |
 | You expected the React portal to load | Run `deploy-projects` next. Apply is not a full deploy |
 
-**Billing:** NAT Gateways and ALBs start billing now. They keep billing after `stop` and after the Vocareum session ends, until `destroy`.
+**Re-run:** `apply` is safe to run again on the same lab. Before plan it **imports** named leftovers (ASGs, ECR, secrets, RDS, the estate VPC) that AWS still has but state lost. A healthy second apply is a no-op or a small update (for example scaling ASGs back to 2 after `stop`).
+
+**Billing:** NAT Gateways and ALBs start billing now. CloudTrail, VPC flow logs, and the observe bucket are small next to NAT. They keep billing after `stop` and after the Vocareum session ends, until `destroy`.
+
+**Watch the lab:** Console → CloudWatch → Dashboards → `heavy-rental-academy`. Trail files are in the observe bucket prefix `cloudtrail/`. If you set `ALARM_EMAIL`, confirm the AWS SNS mail. Guest app logs stay `docker logs` over SSM (ADR 0015).
 
 ---
 
@@ -304,7 +319,7 @@ It does **not** pull portal, REST, or Haystack images. That is why apply no long
 
 **Success:** ASGs show desired 0. RDS status is stopped.
 
-**To resume:** Start Lab, then `configure-only` (ASGs scale back as designed). Run `deploy-projects` again if the apps are gone after new instances launch.
+**To resume:** Start Lab, then `apply` (imports the paused estate and sets ASG desired back to 2) or scale the ASGs yourself and run `configure-only`. Run `deploy-projects` again if the apps are gone after new instances launch.
 
 ---
 
@@ -312,7 +327,7 @@ It does **not** pull portal, REST, or Haystack images. That is why apply no long
 
 **When:** You are finished with the lab or apply is half-broken and you want a clean slate. This is the only action that **stops NAT Gateway billing**.
 
-**What it does:** Terminates estate EC2 first, then `terraform destroy`. **Keeps** the S3 state bucket (so the next `apply` can run).
+**What it does:** Imports leftovers into state, terminates estate EC2, `terraform destroy`, then **sweeps** named objects and extra `heavy-rental-academy` VPCs that were never in state. **Keeps** the S3 state bucket (so the next `apply` can run).
 
 **Form (both required):**
 
@@ -346,18 +361,27 @@ To wipe a half-applied estate instead: `destroy` (with `confirm_destroy=destroy`
 
 Terraform created something in AWS (often RDS after ~15 minutes), then could not write `estate/terraform.tfstate` to S3. The deny is **not** a missing bucket policy. Vocareum attached identity policy `voc-cancel-cred` because the lab session ended, **End Lab** was clicked, credits ran out, or the Environment `AWS_*` secrets are from a previous Start Lab.
 
-The GitHub runner’s `errored.tfstate` is **gone** when the job ends. Do **not** re-run `apply` until you reconcile. A second apply can fork state or hit `DBInstanceAlreadyExists`.
+The GitHub runner’s `errored.tfstate` is **gone** when the job ends. Leftovers stay in AWS.
 
-1. **Start Lab** again and paste **new** AWS Details on the Run form.
-2. Check Actions: no other infra run is still in the Terraform job.
-3. List the lock: `aws s3 ls s3://heavy-rental-tfstate-<account>-academy/estate/`. If `terraform.tfstate.tflock` is present, `terraform force-unlock <LOCK_ID>` from `terraform/academy` after `init`. Only if nobody else holds the lock.
-4. Compare AWS to state:
-   - `aws rds describe-db-instances` for `heavy-rental-academy` and `heavy-rental-haystack-academy`
-   - `terraform state list | grep aws_db_instance`
-5. **Keep the estate:** `terraform import aws_db_instance.heavy_rental heavy-rental-academy` (and `aws_db_instance.haystack` / `heavy-rental-haystack-academy` if that instance exists and is missing from state). Import any other `AlreadyExists` address `plan` reports. Run `action=plan`. Only `apply` when the plan is not “create RDS again.”
-6. **Or wipe:** `action=destroy` with `confirm_destroy=destroy`. Delete any RDS destroy cannot see (never written to state). Then `apply` at the **start** of a new lab session.
+1. **Start Lab** again and paste **new** AWS Details on the Run form (do not reuse cancelled Environment `AWS_*` secrets).
+2. Check Actions: no other infra run is still in the Terraform job. The next run deletes a leftover `estate/terraform.tfstate.tflock` automatically.
+3. **Re-run `action=apply`.** Before plan, the job imports named leftovers (ASGs, ECR, secrets, RDS, the estate VPC) so apply does not try to create them again.
+4. If reconcile reports **two** VPCs named `heavy-rental-academy`, do **not** apply. Run `action=destroy` with `confirm_destroy=destroy` (that sweep deletes extra VPCs), then `apply` at the start of a long lab session.
 
 NAT Gateways and ALBs that already exist **keep billing** after the session ends, until `destroy`.
+
+---
+
+## Apply fails: named object already exists
+
+AWS rejected a create because the name is already taken (`asg-portal`, `heavy-rental-web-portal`, `heavy-rental/portal`, `heavy-rental-data`, and the same pattern for the other apps). That means state did not yet know about an object AWS still has.
+
+1. Start Lab and paste fresh AWS Details.
+2. Re-run **`action=plan`** (reconcile imports first). If the plan is no longer “create `asg-portal` / create ECR / create secret”, run **`apply`**.
+3. If the job says there are **two** `heavy-rental-academy` VPCs: **`destroy`** then **`apply`**. A second apply without destroy can create another NAT/VPC pair and keep billing.
+4. Manual `terraform import` is only needed if you are debugging on a laptop; the workflow does the same imports.
+
+`action=destroy` also deletes leftovers that were never in state, so the next apply is a clean create.
 
 ---
 
@@ -379,7 +403,9 @@ App CD workflows must **not** run Terraform. This repo owns the estate.
 ## What this workflow must never do
 
 - Create IAM roles or OIDC (guests use Vocareum `LabRole` / `LabInstanceProfile`)
+- Attach LabRole to CloudTrail or VPC flow-log delivery (wrong trust; use S3)
+- Enable CloudTrail → CloudWatch Logs or RDS enhanced monitoring
 - Write Vocareum `AWS_*` keys into Secrets Manager or onto EC2
 - Put `SPRING_DATASOURCE_PASSWORD` on the Run form
 - Put a GitHub PAT on the guests to pull private GHCR
-- Target a paid AWS account
+- Target a billed account **with Vocareum keys** (select Environment `AWS_ACTUAL` and OIDC instead)

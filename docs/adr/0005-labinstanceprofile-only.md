@@ -17,3 +17,4 @@ Every launch template **data-source** `LabInstanceProfile` by name and **data-so
 - Apply works under the Vocareum federated user.
 - All guests share `LabRole` (Academy accepted risk). Per-secret isolation waits for paid instance profiles.
 - If the profile name differs in a future lab image, apply fails at plan — operators fix the data source, they do not create IAM.
+- Monitor (CloudTrail / flow logs) also stays on this pairing; see [0015](0015-academy-observe-no-iam.md).
