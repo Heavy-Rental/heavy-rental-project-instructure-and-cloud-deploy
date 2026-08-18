@@ -1,0 +1,15 @@
+---
+# configure-only: Docker + Compose on every guest. App images are project CD.
+# Neo4j has no app CD — compose it here.
+- name: Docker and Compose plugin
+  hosts: portal:rest:haystack:neo4j
+  become: true
+  gather_facts: true
+  roles:
+    - guest_base
+
+- name: Neo4j (estate-owned)
+  hosts: neo4j
+  become: true
+  roles:
+    - neo4j

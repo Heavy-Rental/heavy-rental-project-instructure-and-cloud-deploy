@@ -15,4 +15,5 @@ ADRs for this CD repo (Nygard format). Conflict order: **OpenSpec → OpenSPDD S
 | [0008](0008-ec2-health-until-compose.md) | EC2 health on app ASGs until compose |
 | [0009](0009-academy-keys-in-environment-secrets.md) | Vocareum keys on the Run form, masked in logs |
 | [0011](0011-pems-after-inservice.md) | SSH PEMs after InService, not in Terraform |
-| [0012](0012-ansible-over-ssm.md) | Ansible over SSM, not SSH |
+| [0012](0012-ansible-over-ssm.md) | Ansible over SSM, not SSH (configuration only; Terraform owns architecture) |
+| [0013](0013-haystack-source-target-in-sync-secrets.md) | SoR → Haystack sync endpoints in infra `sync-secrets` |

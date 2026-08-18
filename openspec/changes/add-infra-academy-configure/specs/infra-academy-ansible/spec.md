@@ -2,7 +2,7 @@
 
 ## Purpose
 
-First compose on all four ASGs over SSM. App CD later reuses the same playbook, one group.
+Guest **configuration** only (Docker, `.env`, compose) on ASGs Terraform already created. Ansible SHALL NOT create or destroy VPC, ASGs, ALBs, or RDS. App CD reuses the same playbook, one group, and also SHALL NOT run Terraform.
 
 ## ADDED Requirements
 
@@ -15,8 +15,16 @@ Ansible SHALL inventory InService + SSM Online instances for `portal`, `rest`, `
 - THEN each group has two hosts
 - AND `ansible_host` is an instance id, not a public IP
 
+### Requirement: Ansible does not create architecture
+Ansible playbooks SHALL NOT invoke Terraform or create Auto Scaling groups, load balancers, or RDS instances.
+
+#### Scenario: No terraform in the play
+- GIVEN Ansible runs on `apply` or `configure-only`
+- WHEN the playbook job list is evaluated
+- THEN no task runs `terraform apply` or `terraform destroy`
+
 ### Requirement: Per-role compose
-Playbooks SHALL start Docker compose with study §6.4a limits. Portal SHALL proxy `/api` to `REST_BASE_URL`. Haystack SHALL NOT start a Neo4j container. Neo4j SHALL start only `neo4j:5`.
+Playbooks SHALL start Docker compose with study §6.4a limits on **existing** guests. Portal SHALL proxy `/api` to `REST_BASE_URL`. Haystack SHALL NOT start a Neo4j container. Neo4j SHALL start only `neo4j:5`.
 
 #### Scenario: Haystack has no graph container
 - GIVEN the haystack compose file

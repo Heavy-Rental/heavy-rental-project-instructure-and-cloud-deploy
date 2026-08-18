@@ -2,6 +2,8 @@
 
 This repo’s pipeline is **AWS Academy Learner Lab (Vocareum) only**. There is no paid / OIDC workflow on this branch.
 
+**Terraform** creates the estate. **Ansible** only configures guests that already exist (Docker, `.env`, compose). It does not create VPCs or ASGs. Spec index: [`../specification/README.md`](../specification/README.md).
+
 ## One-time GitHub setup
 
 1. Repo **Settings → Environments → New environment** named **`academy`**.
@@ -9,9 +11,9 @@ This repo’s pipeline is **AWS Academy Learner Lab (Vocareum) only**. There is 
    - `AWS_ACCESS_KEY_ID`
    - `AWS_SECRET_ACCESS_KEY`
    - `AWS_SESSION_TOKEN`
-3. **Required for `action=apply`:** secret `SPRING_DATASOURCE_PASSWORD` (RDS master; later copied into `heavy-rental/rest` by branch 3). **Not** a workflow input.
+3. **Required secrets for `apply` / `configure-only`:** `SPRING_DATASOURCE_PASSWORD` (≥ 8), `NEO4J_PASSWORD`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_API_KEY` (`sk_…`), `STRIPE_WEBHOOK_SECRET`. **Not** workflow inputs. Do not add `VITE_STRIPE_PUBLISHABLE_KEY` (copied from the publishable key).
 4. Variable: `AWS_REGION` = `us-east-1`.
-5. Optional image variables (not secrets): `PORTAL_IMAGE` (nginx-based React CI tag; empty = stock `nginx`), `REST_IMAGE`, `HAYSTACK_IMAGE`, `IMAGE_HTTP_URL`.
+5. Image **variables** (not secrets): `PORTAL_IMAGE` (ECR or public GHCR tag; empty = stock `nginx`), `REST_IMAGE`, `HAYSTACK_IMAGE`. Optional `IMAGE_HTTP_URL` only for a `docker load` tar. `image_ref` on the Run form is REST/Haystack fallback only.
 6. GitHub cannot create this Environment from git. Do **not** point this workflow at a `paid` Environment.
 
 ## Every lab session
@@ -25,7 +27,7 @@ Vocareum tokens **expire when the session ends**.
 5. Choose `action`:
    - **`plan`** — show the estate (no apply). Works without `SPRING_DATASOURCE_PASSWORD` (uses a plan-only placeholder).
    - **`apply`** — create the estate, then `sync-secrets` → `sync-ssh-keys` → Ansible. Needs `SPRING_DATASOURCE_PASSWORD`, `NEO4J_PASSWORD`, Stripe trio. Portal uses Environment `PORTAL_IMAGE` or stock `nginx`. REST/Haystack need `REST_IMAGE` / `HAYSTACK_IMAGE` or `image_ref`. Guest count is **8 EC2**. NAT Gateways bill until `destroy`.
-   - **`configure-only`** — no Terraform apply. Refill secrets, PEMs, compose (after Start Lab / image change).
+   - **`configure-only`** — **no Terraform apply** (no new architecture). Refill secrets + PEMs. Ansible installs **Docker + Compose** on all guests and composes **Neo4j only**. Portal / REST / Haystack **images** are app CD (`deploy-pipeline/` in the pipeline-development repo). First Haystack/REST/portal compose is still infra **`apply`**.
    - **`stop`** — ASG desired=0 + stop both RDS. **NAT Gateways and ALBs still bill.**
    - **`destroy`** — wipe the estate. Set **both** `action=destroy` **and** `confirm_destroy=destroy`. Terminates EC2 first. **Keeps** the state bucket.
    - **`bootstrap`** — state bucket only (S3 native lockfile).
@@ -50,7 +52,7 @@ To wipe the whole half-applied estate instead: `action=destroy` with `confirm_de
 | `describe-auto-scaling-groups --auto-scaling-group-names asg-portal asg-rest asg-haystack asg-neo4j` | All four exist |
 | Public portal ALB DNS (job summary) | Resolves; `:80` after configure (stock nginx until a portal CI image) |
 | `describe-secret --secret-id heavy-rental/portal` | Has `REST_BASE_URL` after `sync-secrets` |
-| `configure-only` | Fills SM + compose. Portal uses `PORTAL_IMAGE` or stock nginx. REST/Haystack need images. |
+| `configure-only` | Fills SM + PEMs. Docker + Compose on all guests. Composes **Neo4j only**. App images are app CD. |
 | `stop` | ASGs desired=0; both RDS stopped; Gateways still bill |
 
 ## Actions
@@ -61,7 +63,7 @@ To wipe the whole half-applied estate instead: `action=destroy` with `confirm_de
 | `bootstrap` | assert-lab → ensure backend only |
 | `apply` | assert-lab → ensure backend → terraform apply → sync-secrets → sync-ssh-keys → Ansible |
 | `destroy` | assert-lab → terminate estate EC2 → `terraform destroy` (needs `confirm_destroy=destroy`). Does **not** create a backend or run estate plan/apply. |
-| `configure-only` | assert-lab → sync-secrets → sync-ssh-keys → Ansible (no terraform apply) |
+| `configure-only` | assert-lab → sync-secrets → sync-ssh-keys → Ansible `configure.yml` (Docker + Compose on all guests; Neo4j compose; no app images) |
 | `stop` | assert-lab → ASG desired=0 + stop both RDS |
 
 ## What this must not do

@@ -3,9 +3,11 @@
 **Repo:** this tree (`heavy-rental-project-instructure-and-cloud-deploy`).  
 **Contract:** `heavy-rental-project-pipeline-development/cloud-deployment-feasibility-studies/` — especially `AWS-INFRASTRUCTURE-FEASIBILITY.md` §8, `TERRAFORM-PROCESS.md`, `ANSIBLE-PROCESS.md`, `aws-infra-pipeline.example.yml`.
 
-**Status:** Branch 1 and 2 merged. Branch 3 configure is on `HR-162-implement-aws-infrastructure-configuration-using-ansible-compose`. Layout: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+**Status:** Branches 1–3 are delivered (estate + configure). Layout: [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
-Each feature branch SHALL add or extend **OpenSpec + OpenSPDD + ADR** before expanding YAML or Terraform. Conflict order: OpenSpec scenarios → OpenSPDD Safeguards → ADR → code. See [`specification/README.md`](specification/README.md).
+**Split:** Terraform creates AWS architecture and resources. Ansible only configures existing guests. App CD (portal / REST / Haystack images) is in `heavy-rental-project-pipeline-development` `deploy-pipeline/` trees and must not run Terraform. Paid / OIDC is later.
+
+Each feature branch SHALL add or extend **OpenSpec + OpenSPDD + ADR** before expanding YAML or Terraform. Conflict order: OpenSpec scenarios → OpenSPDD Safeguards → ADR → code. See [`../specification/README.md`](../specification/README.md).
 
 ---
 
@@ -46,7 +48,7 @@ master          (protected default — already exists)
 | **2** | Folding “Actions can call AWS” into “create the whole estate” hides a dead Vocareum session behind a large apply. You want `action=plan` green **before** you spend credits. |
 | **3** | Smallest split that (1) proves auth + remote state, (2) creates the estate, (3) fills secrets and starts containers / stop / destroy. |
 
-Paid and app CD are **later waves**, not extra branches in this minimum.
+Paid infra is a **later wave**, not an extra branch in this minimum. Academy app CD (no Terraform): portal `heavy-rental-web-portal-pipeline/deploy-pipeline/`, REST `heavy-rental-rest-api/deploy-pipeline/`, Haystack `haystack-fast-api-pipeline/deploy-pipeline/`.
 
 ---
 
@@ -94,7 +96,7 @@ Start Lab → Run workflow → paste the three keys (or Environment fallback) �
 
 ### Tasks
 
-Terraform in `terraform/academy/` (see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and AWS study §8.1):
+Terraform in `terraform/academy/` (see [`ARCHITECTURE.md`](ARCHITECTURE.md) and AWS study §8.1):
 
 - VPC, IGW, public / private-app / private-data subnets (**2 AZs**)
 - **Two NAT Gateways** (one per public AZ) + EIP each. Per-AZ private route tables. Guest count **8 EC2**. Gateways bill until `destroy`.
@@ -129,8 +131,8 @@ Terraform in `terraform/academy/` (see [`docs/ARCHITECTURE.md`](docs/ARCHITECTUR
    | Secret id | Required fields |
    | --- | --- |
    | `heavy-rental/portal` | `REST_BASE_URL`, `STRIPE_PUBLISHABLE_KEY`, `VITE_STRIPE_PUBLISHABLE_KEY` (same `pk_`) |
-   | `heavy-rental/rest` | `POSTGRES_*` / `SPRING_DATASOURCE_*`, `HAYSTACK_URL`, Stripe trio |
-   | `heavy-rental/haystack` | Postgres fields, `NEO4J_URI` / user / password |
+   | `heavy-rental/rest` | `POSTGRES_*` / `SPRING_DATASOURCE_*` plus app aliases `POSTGRES_HOSTNAME` / `POSTGRES_DB` / `POSTGRES_USER`, `HAYSTACK_BASE_URL`, Stripe trio |
+   | `heavy-rental/haystack` | Haystack RDS `POSTGRES_*` / aliases / `DATABASE_URL`, `SOURCE_*` (SoR), `TARGET_*` (Haystack RDS), `NEO4J_URI` / user / password, `FLEET_BACKEND=sql`, `NEO4J_BACKEND=bolt`, optional `LLM_API_KEY` |
    | `heavy-rental/neo4j` | `NEO4J_USER`, `NEO4J_PASSWORD` |
 
    Fail if host, database, password, port, or `REST_BASE_URL` is empty. **Never** write Vocareum AWS keys into SM.
@@ -145,20 +147,20 @@ Terraform in `terraform/academy/` (see [`docs/ARCHITECTURE.md`](docs/ARCHITECTUR
 
 ### Done when
 
-`configure-only` starts containers. Portal ALB serves `:80`. `stop` pauses compute/RDS. `destroy` empties the estate state.
+`configure-only` refills SM + PEMs, installs Docker + Compose on all guests, and composes Neo4j only. Portal / REST / Haystack images are app CD. `stop` pauses compute/RDS (Gateways still bill). `destroy` empties the estate state.
 
 ---
 
 ## 7. After the three branches (not in the minimum)
 
-| Next | Branch (later) | Why it waited |
+| Next | Where | Notes |
 | --- | --- | --- |
-| Portal app CD | `feat/cd-portal-academy` | Needs `asg-portal` + `heavy-rental/portal` |
-| REST app CD | `feat/cd-rest-academy` | Needs `asg-rest` + `heavy-rental/rest` |
-| Haystack app CD | `feat/cd-haystack-academy` | Needs `asg-haystack` + `heavy-rental/haystack` |
-| Paid infra | `feat/infra-paid` | Separate account, OIDC, **no** Vocareum form keys |
+| Portal app CD | **Shipped** in `heavy-rental-web-portal-pipeline/deploy-pipeline/` (discover + compose) | Reuses this repo’s `guest_base` + `portal`. Does not create the estate. |
+| REST app CD | **Shipped** in `heavy-rental-rest-api/deploy-pipeline/` (discover + compose) | Reuses this repo’s `guest_base` + `rest`. Does not create the estate. |
+| Haystack app CD | **Shipped** in `haystack-fast-api-pipeline/deploy-pipeline/` (discover + compose) | Reuses this repo’s `guest_base` + `haystack`. No Neo4j container. |
+| Paid infra | later | Separate account, OIDC, **no** Vocareum form keys |
 
-Each app CD is one branch (discover + image + one Ansible group). Do not start them before branch 3.
+Infra `configure-only` installs Docker + Compose and composes Neo4j. Portal / REST image updates use those app CD pipelines. Haystack image updates use Haystack app CD (or infra `apply` for first compose).
 
 ---
 
@@ -189,8 +191,8 @@ Protect `master` (and `develop` if more than one operator). Environment `academy
 
 ## 10. Pointers
 
-- Architecture layout: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
-- Pinned versions: [`docs/VERSIONS.md`](docs/VERSIONS.md)
+- Architecture layout: [`ARCHITECTURE.md`](ARCHITECTURE.md)
+- Pinned versions: [`VERSIONS.md`](VERSIONS.md)
 - Estate + E2E: `../heavy-rental-project-pipeline-development/cloud-deployment-feasibility-studies/AWS-INFRASTRUCTURE-FEASIBILITY.md` §8
 - Terraform jobs: `.../TERRAFORM-PROCESS.md`
 - Ansible jobs: `.../ANSIBLE-PROCESS.md`
