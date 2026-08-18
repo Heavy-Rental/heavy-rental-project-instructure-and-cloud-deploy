@@ -682,6 +682,7 @@ jobs:
 
       - name: ansible-playbook
         env:
+          ACTION: ${{ inputs.action }}
           IMAGE_REF: ${{ inputs.image_ref }}
           IMAGE_HTTP_INPUT: ${{ inputs.image_http_url }}
           IMAGE_HTTP_VAR: ${{ vars.IMAGE_HTTP_URL }}
@@ -704,6 +705,20 @@ jobs:
           if [ -z "${PORTAL}" ]; then PORTAL="nginx"; fi
           if [ -z "${REST}" ]; then REST="${IMAGE_REF:-}"; fi
           if [ -z "${HAY}" ]; then HAY="${IMAGE_REF:-}"; fi
+          if [ "${ACTION}" = "configure-only" ]; then
+            # Docker + Compose on all guests. No portal/REST/Haystack compose (app CD).
+            ansible-playbook playbooks/configure.yml \
+              -e "neo4j_image=neo4j:5" \
+              -e "image_http_url=" \
+              -e "aws_region=${AWS_REGION}" \
+              -e "ansible_aws_ssm_bucket_name=${BUCKET}"
+            {
+              echo "### Ansible"
+              echo ""
+              echo "\`configure-only\`: Docker + Compose plugin on all guests; Neo4j compose only. Portal / REST / Haystack images are app CD."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           ansible-playbook playbooks/site.yml \
             -e "portal_image=${PORTAL}" \
             -e "neo4j_image=neo4j:5" \
@@ -716,7 +731,7 @@ jobs:
           {
             echo "### Ansible"
             echo ""
-            echo "Compose via SSM. Portal image: \`${PORTAL}\` (Environment \`PORTAL_IMAGE\`, else stock nginx). REST/Haystack need \`REST_IMAGE\` / \`HAYSTACK_IMAGE\` or \`image_ref\`."
+            echo "Compose via SSM (apply). Portal image: \`${PORTAL}\` (Environment \`PORTAL_IMAGE\`, else stock nginx). REST/Haystack need \`REST_IMAGE\` / \`HAYSTACK_IMAGE\` or \`image_ref\`."
           } >> "$GITHUB_STEP_SUMMARY"
 
   stop:

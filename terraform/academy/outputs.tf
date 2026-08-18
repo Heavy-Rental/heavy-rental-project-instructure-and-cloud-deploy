@@ -10,7 +10,7 @@ output "rest_alb_dns" {
 
 output "haystack_alb_dns" {
   value       = aws_lb.haystack.dns_name
-  description = "Internal Haystack ALB. Lands in heavy-rental/rest HAYSTACK_URL (branch 3)."
+  description = "Internal Haystack ALB. Lands in heavy-rental/rest HAYSTACK_BASE_URL."
 }
 
 output "rds_endpoint" {

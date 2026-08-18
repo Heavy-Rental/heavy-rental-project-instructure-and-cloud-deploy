@@ -94,9 +94,14 @@ Browser → public portal ALB → portal → internal REST ALB → REST → SoR 
 REST → internal Haystack ALB → Haystack → Haystack RDS + Bolt NLB → Neo4j.  
 Private outbound HTTPS → the **NAT Gateway in the same AZ**. S3 via gateway endpoint (no NAT). If AZ-0 dies, AZ-1 guests keep outbound. NAT Gateways bill until `action=destroy`; session end and `action=stop` do not pause them.
 
+## Terraform vs Ansible
+
+**Terraform** (`terraform/academy/`) creates the architecture: VPC, two NAT Gateways, four ASGs, ALBs, two Multi-AZ RDS, Bolt NLB, empty SM shells.  
+**Ansible** only configures guests that already exist: Docker, SM → `.env`, compose, portal `/api`. It does not create or destroy VPC/ASG/RDS.
+
 ## Configure (Ansible)
 
-`action=apply` and `action=configure-only` run `sync-secrets` → `sync-ssh-keys` → Ansible over **`amazon.aws.aws_ssm`**.
+`action=apply` runs Terraform first, then `sync-secrets` → `sync-ssh-keys` → Ansible over **`amazon.aws.aws_ssm`** (all four groups, first compose). `action=configure-only` does **not** run Terraform apply. It refills SM + PEMs, installs **Docker + Compose** on all guests, and composes **Neo4j only**. Portal / REST / Haystack **images** are those projects’ app CD (env-driven / static SPA — not baked in CI).
 
 | Role | Image | Notes |
 | --- | --- | --- |
@@ -104,4 +109,6 @@ Private outbound HTTPS → the **NAT Gateway in the same AZ**. S3 via gateway en
 | REST / Haystack | Env `REST_IMAGE` / `HAYSTACK_IMAGE` or Run `image_ref` | Fail if empty. Haystack compose has **no** `neo4j` service. |
 | Neo4j | `neo4j:5` | `/data` on extra EBS |
 
-Portal SM JSON includes `STRIPE_PUBLISHABLE_KEY` and `VITE_STRIPE_PUBLISHABLE_KEY` (same `pk_`). REST has `STRIPE_API_KEY` + webhook. Prefer a **new tag** on each redeploy (`compose up` does not `--pull always`).
+Portal SM JSON includes `STRIPE_PUBLISHABLE_KEY` and `VITE_STRIPE_PUBLISHABLE_KEY` (same `pk_`). REST has `STRIPE_API_KEY` + webhook. Prefer a **new tag** on each redeploy (`compose up` does not `--pull always`). Haystack SM includes `SOURCE_*` (SoR) and `TARGET_*` (Haystack RDS) from infra `sync-secrets` (ADR 0013).
+
+Portal-only redeploy: portal app CD in `heavy-rental-web-portal-pipeline/deploy-pipeline/` (same `guest_base` + `portal`, `--limit portal`, **no Terraform**). REST-only: `heavy-rental-rest-api/deploy-pipeline/`. Haystack-only: `haystack-fast-api-pipeline/deploy-pipeline/`.

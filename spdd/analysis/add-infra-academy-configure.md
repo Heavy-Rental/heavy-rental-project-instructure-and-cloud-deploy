@@ -12,16 +12,19 @@ The estate exists. Shells are empty. Guests have no Docker compose. Operators ca
 
 | Concept | Meaning here |
 | --- | --- |
-| sync-secrets | `put-secret-value` from Terraform outputs + Environment app secrets |
+| Terraform | Creates architecture and resources. Not guest Docker. |
+| Ansible | Configures existing guests only. No VPC/ASG/RDS create. |
+| sync-secrets | `put-secret-value` from Terraform outputs + Environment app secrets, including Haystack `SOURCE_*` / `TARGET_*` |
 | sync-ssh-keys | PEMs after InService; public key via SSM |
-| First compose | Ansible on all four groups |
+| First compose | Ansible on all four groups **after** Terraform apply |
+| configure-only | No Terraform apply. Docker all guests; compose **Neo4j only** |
 | stop | Pause: ASG desired=0 + stop both RDS. Not destroy |
 | Image | CI tar or registry tag. No `docker build` |
 
 ## Stakeholders
 
 - Class operators (configure-only after Start Lab; stop at end of day)
-- App CD (same playbook, one group, later)
+- App CD (same playbook, one group; lives in pipeline-development; must not run Terraform)
 
 ## Risks
 
@@ -39,6 +42,8 @@ The estate exists. Shells are empty. Guests have no Docker compose. Operators ca
 
 ## Success
 
-- `configure-only` fills SM and composes (portal/neo4j always; rest/haystack when images exist).
+- `apply` runs Terraform (architecture) then `sync-secrets` (including Haystack `SOURCE_*` / `TARGET_*`) then Ansible first-compose.
+- `configure-only` fills SM, installs Docker on all guests, and composes **Neo4j only** (no Terraform apply; no portal/REST/Haystack image roll).
 - `stop` pauses ASGs + both RDS; Gateways remain.
 - `destroy` still requires `confirm_destroy=destroy`.
+- Ansible never creates VPC/ASG/RDS.

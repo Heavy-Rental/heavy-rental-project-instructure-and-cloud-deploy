@@ -20,6 +20,9 @@ Follow `ANSIBLE-PROCESS.md` and AWS study §8.2. Everyday path is SSM.
 - No Neo4j container on `asg-haystack`.
 - No `sk_` on `heavy-rental/portal`.
 - No `docker build`.
+- Ansible does **not** create VPC, ASGs, ALBs, or RDS (Terraform only).
+- Ansible does **not** invent `SOURCE_*` / `TARGET_*` (infra `sync-secrets` only).
+- `configure-only` does not compose portal / REST / Haystack.
 - `stop` does not delete NAT Gateways.
 - `destroy` still needs `confirm_destroy=destroy`.
 
@@ -29,4 +32,4 @@ OpenSpec + ADRs + scripts + `ansible/` + workflow jobs.
 
 ## Next
 
-App CD and paid stay later.
+Paid stays later. Academy app CD is in pipeline-development (`deploy-pipeline/`).
