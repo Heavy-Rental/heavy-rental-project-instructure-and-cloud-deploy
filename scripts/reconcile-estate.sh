@@ -102,11 +102,20 @@ rtb_id_by_name() {
     --query 'RouteTables[0].RouteTableId'
 }
 
-assoc_id_for_subnet() {
+# AWS provider import id is "subnet-id/route-table-id", not rtbassoc-*.
+assoc_import_id() {
   local rtb="$1"
   local subnet="$2"
-  aws_text ec2 describe-route-tables --route-table-ids "${rtb}" \
-    --query "RouteTables[0].Associations[?SubnetId==\`${subnet}\`].RouteTableAssociationId | [0]"
+  local assoc
+  if [ -z "${rtb}" ] || [ "${rtb}" = "None" ] || [ -z "${subnet}" ] || [ "${subnet}" = "None" ]; then
+    return 0
+  fi
+  assoc="$(aws_text ec2 describe-route-tables --route-table-ids "${rtb}" \
+    --query "RouteTables[0].Associations[?SubnetId==\`${subnet}\`].RouteTableAssociationId | [0]")"
+  if [ -z "${assoc}" ] || [ "${assoc}" = "None" ]; then
+    return 0
+  fi
+  printf '%s/%s\n' "${subnet}" "${rtb}"
 }
 
 lb_arn_by_name() {
@@ -353,8 +362,7 @@ import_network() {
     import_one aws_route.public_internet "${rtb}_0.0.0.0/0"
     for i in 0 1; do
       subnet="$(subnet_id_by_cidr "${vpc}" "${public_cidrs[$i]}")"
-      assoc="$(assoc_id_for_subnet "${rtb}" "${subnet}")"
-      import_one "aws_route_table_association.public[${i}]" "${assoc}"
+      import_one "aws_route_table_association.public[${i}]" "$(assoc_import_id "${rtb}" "${subnet}")"
     done
   fi
 
@@ -364,7 +372,7 @@ import_network() {
     if [ -n "${rtb}" ] && [ "${rtb}" != "None" ]; then
       import_one "aws_route.app_nat[${i}]" "${rtb}_0.0.0.0/0"
       subnet="$(subnet_id_by_cidr "${vpc}" "${app_cidrs[$i]}")"
-      import_one "aws_route_table_association.app[${i}]" "$(assoc_id_for_subnet "${rtb}" "${subnet}")"
+      import_one "aws_route_table_association.app[${i}]" "$(assoc_import_id "${rtb}" "${subnet}")"
     fi
 
     rtb="$(rtb_id_by_name "${vpc}" "rt-data-${azs[$i]}")"
@@ -372,7 +380,7 @@ import_network() {
     if [ -n "${rtb}" ] && [ "${rtb}" != "None" ]; then
       import_one "aws_route.data_nat[${i}]" "${rtb}_0.0.0.0/0"
       subnet="$(subnet_id_by_cidr "${vpc}" "${data_cidrs[$i]}")"
-      import_one "aws_route_table_association.data[${i}]" "$(assoc_id_for_subnet "${rtb}" "${subnet}")"
+      import_one "aws_route_table_association.data[${i}]" "$(assoc_import_id "${rtb}" "${subnet}")"
     fi
   done
 
