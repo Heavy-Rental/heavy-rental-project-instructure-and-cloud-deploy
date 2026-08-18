@@ -64,6 +64,17 @@ resource "aws_s3_bucket_lifecycle_configuration" "observe" {
   }
 }
 
+# Regional ELB log-delivery account (us-east-1 = 127311923021). ModifyLoadBalancerAttributes
+# still probes this principal in pre-Aug 2022 Regions even when the service principal is set.
+data "aws_elb_service_account" "current" {}
+
+locals {
+  alb_access_log_objects = [
+    for prefix in ["alb/portal", "alb/rest", "alb/haystack"] :
+    "${aws_s3_bucket.observe.arn}/${prefix}/AWSLogs/${data.aws_caller_identity.current.account_id}/*"
+  ]
+}
+
 resource "aws_s3_bucket_policy" "observe" {
   bucket = aws_s3_bucket.observe.id
 
@@ -96,28 +107,18 @@ resource "aws_s3_bucket_policy" "observe" {
         }
       },
       {
-        Sid       = "ALBAccessLogsAcl"
-        Effect    = "Allow"
-        Principal = { Service = "elasticloadbalancing.amazonaws.com" }
-        Action    = "s3:GetBucketAcl"
-        Resource  = aws_s3_bucket.observe.arn
-        Condition = {
-          StringEquals = {
-            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
-          }
-        }
-      },
-      {
         Sid       = "ALBAccessLogsWrite"
         Effect    = "Allow"
-        Principal = { Service = "elasticloadbalancing.amazonaws.com" }
+        Principal = { Service = "logdelivery.elasticloadbalancing.amazonaws.com" }
         Action    = "s3:PutObject"
-        Resource  = "${aws_s3_bucket.observe.arn}/alb/*"
-        Condition = {
-          StringEquals = {
-            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
-          }
-        }
+        Resource  = local.alb_access_log_objects
+      },
+      {
+        Sid       = "ALBAccessLogsWriteLegacyElbAccount"
+        Effect    = "Allow"
+        Principal = { AWS = data.aws_elb_service_account.current.arn }
+        Action    = "s3:PutObject"
+        Resource  = local.alb_access_log_objects
       },
       {
         Sid       = "VpcFlowLogsAcl"
