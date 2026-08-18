@@ -36,9 +36,10 @@
   roles:
     - haystack
 
+# run_once is wrong if RDS has no pgvector: each haystack guest needs the
+# local container fallback. CREATE EXTENSION IF NOT EXISTS is idempotent.
 - name: RDS logical (Haystack vector extension)
   hosts: haystack
   become: true
-  run_once: true
   roles:
     - rds_logical

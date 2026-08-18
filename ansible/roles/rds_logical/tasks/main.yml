@@ -1,10 +1,15 @@
 ---
+# Haystack RDS is Academy PG 12.22 / 11.22. RDS does not ship pgvector there.
+# Try CREATE EXTENSION on RDS; if it fails, start pgvector/pgvector on this guest
+# (study §6.1 / VERSIONS.md). Do not print POSTGRES_PASSWORD.
+
 - name: Install a Postgres client
   ansible.builtin.dnf:
-    name:
-      - postgresql15
-      - postgresql
+    name: "{{ item }}"
     state: present
+  loop:
+    - postgresql15
+    - postgresql
   register: pg_client
   failed_when: false
 
@@ -15,18 +20,182 @@
     # shellcheck disable=SC1091
     source "{{ env_path }}"
     if [ -z "${POSTGRES_HOST:-}" ] || [ -z "${POSTGRES_PASSWORD:-}" ]; then
-      echo "No POSTGRES_* on this host; skip."
+      echo "SKIP_NO_SECRET"
       exit 0
     fi
-    if [ "${POSTGRES_DATABASE:-}" != "haystack" ]; then
-      echo "Not the Haystack RDS guest secret; skip."
+    if [ "${POSTGRES_DATABASE:-${POSTGRES_DB:-}}" != "haystack" ]; then
+      echo "SKIP_NOT_HAYSTACK"
       exit 0
     fi
+    if ! command -v psql >/dev/null 2>&1; then
+      echo "PSQL_MISSING"
+      exit 2
+    fi
+    USERNAME="${POSTGRES_USERNAME:-${POSTGRES_USER:-}}"
+    DBNAME="${POSTGRES_DATABASE:-${POSTGRES_DB:-haystack}}"
     export PGPASSWORD="${POSTGRES_PASSWORD}"
-    psql -h "${POSTGRES_HOST}" -p "${POSTGRES_PORT:-5432}" -U "${POSTGRES_USERNAME}" -d "${POSTGRES_DATABASE}" \
+    if psql -h "${POSTGRES_HOST}" -p "${POSTGRES_PORT:-5432}" -U "${USERNAME}" -d "${DBNAME}" \
       -v ON_ERROR_STOP=1 \
-      -c "CREATE EXTENSION IF NOT EXISTS vector;"
+      -c "CREATE EXTENSION IF NOT EXISTS vector;" >/tmp/hr-vector.out 2>/tmp/hr-vector.err
+    then
+      echo "RDS_VECTOR_OK"
+      exit 0
+    fi
+    echo "RDS_VECTOR_FAIL"
+    sed "s/${POSTGRES_PASSWORD}//g" /tmp/hr-vector.err | tr -d '\r' | head -c 400
+    echo
+    exit 1
+  args:
+    executable: /bin/bash
+  register: vector_rds
+  failed_when: false
+  no_log: true
+  when: app_role == "haystack"
+
+- name: RDS vector result
+  ansible.builtin.debug:
+    msg: "{{ vector_rds.stdout_lines | default(['RDS vector step produced no output']) }}"
+  when: app_role == "haystack"
+
+- name: Write pgvector fallback compose
+  ansible.builtin.template:
+    src: pgvector-fallback.yml.j2
+    dest: "{{ compose_dir }}/pgvector-fallback.yml"
+    mode: "0644"
+  when:
+    - app_role == "haystack"
+    - vector_rds.rc | default(0) != 0
+    - "'SKIP_' not in (vector_rds.stdout | default(''))"
+
+- name: Point Haystack env at local pgvector
+  ansible.builtin.shell: |
+    set -euo pipefail
+    python3 - <<'PY'
+    from pathlib import Path
+    path = Path("{{ env_path }}")
+    data = {}
+    order = []
+    for line in path.read_text().splitlines():
+        if not line or line.lstrip().startswith("#") or "=" not in line:
+            continue
+        key, _, val = line.partition("=")
+        if key not in data:
+            order.append(key)
+        data[key] = val
+    data["POSTGRES_HOST"] = "pgvector"
+    data["POSTGRES_HOSTNAME"] = "pgvector"
+    data["POSTGRES_PORT"] = "5432"
+    data["TARGET_HOST"] = "pgvector"
+    data["TARGET_PORT"] = "5432"
+    user = data.get("POSTGRES_USER") or data.get("POSTGRES_USERNAME") or "hradmin"
+    db = data.get("POSTGRES_DB") or data.get("POSTGRES_DATABASE") or "haystack"
+    data["POSTGRES_USER"] = user
+    data["POSTGRES_USERNAME"] = data.get("POSTGRES_USERNAME") or user
+    data["POSTGRES_DB"] = db
+    data["POSTGRES_DATABASE"] = data.get("POSTGRES_DATABASE") or db
+    for key in (
+        "POSTGRES_HOST", "POSTGRES_HOSTNAME", "POSTGRES_PORT",
+        "POSTGRES_USER", "POSTGRES_USERNAME", "POSTGRES_DB", "POSTGRES_DATABASE",
+        "TARGET_HOST", "TARGET_PORT",
+    ):
+        if key not in order:
+            order.append(key)
+    password = data.get("POSTGRES_PASSWORD") or ""
+    url = f"postgresql://{user}:{password}@pgvector:5432/{db}"
+    for key in ("POSTGRES_URL", "DATABASE_URL"):
+        data[key] = url
+        if key not in order:
+            order.append(key)
+    path.write_text("".join(f"{k}={data[k]}\n" for k in order))
+    PY
+    chmod 600 "{{ env_path }}"
   args:
     executable: /bin/bash
   no_log: true
-  when: app_role == "haystack"
+  when:
+    - app_role == "haystack"
+    - vector_rds.rc | default(0) != 0
+    - "'SKIP_' not in (vector_rds.stdout | default(''))"
+
+- name: Compose Haystack with pgvector fallback
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --env-file
+      - "{{ env_path }}"
+      - -f
+      - "{{ compose_dir }}/compose.yml"
+      - -f
+      - "{{ compose_dir }}/pgvector-fallback.yml"
+      - up
+      - -d
+      - --remove-orphans
+    chdir: "{{ compose_dir }}"
+  when:
+    - app_role == "haystack"
+    - vector_rds.rc | default(0) != 0
+    - "'SKIP_' not in (vector_rds.stdout | default(''))"
+
+- name: Wait for local pgvector
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - -f
+      - "{{ compose_dir }}/compose.yml"
+      - -f
+      - "{{ compose_dir }}/pgvector-fallback.yml"
+      - exec
+      - -T
+      - pgvector
+      - pg_isready
+    chdir: "{{ compose_dir }}"
+  register: pg_ready
+  retries: 18
+  delay: 5
+  until: pg_ready.rc == 0
+  changed_when: false
+  failed_when: false
+  when:
+    - app_role == "haystack"
+    - vector_rds.rc | default(0) != 0
+    - "'SKIP_' not in (vector_rds.stdout | default(''))"
+
+- name: CREATE EXTENSION vector on local pgvector
+  ansible.builtin.shell: |
+    set -euo pipefail
+    set +x
+    # shellcheck disable=SC1091
+    source "{{ env_path }}"
+    USERNAME="${POSTGRES_USERNAME:-${POSTGRES_USER:-hradmin}}"
+    DBNAME="${POSTGRES_DATABASE:-${POSTGRES_DB:-haystack}}"
+    docker compose -f "{{ compose_dir }}/compose.yml" -f "{{ compose_dir }}/pgvector-fallback.yml" \
+      exec -T -e PGPASSWORD="${POSTGRES_PASSWORD}" pgvector \
+      psql -U "${USERNAME}" -d "${DBNAME}" -v ON_ERROR_STOP=1 \
+      -c "CREATE EXTENSION IF NOT EXISTS vector;"
+  args:
+    executable: /bin/bash
+    chdir: "{{ compose_dir }}"
+  register: vector_local
+  failed_when: false
+  no_log: true
+  when:
+    - app_role == "haystack"
+    - vector_rds.rc | default(0) != 0
+    - "'SKIP_' not in (vector_rds.stdout | default(''))"
+
+- name: pgvector fallback is required when RDS has no vector
+  ansible.builtin.assert:
+    that:
+      - >-
+        (vector_rds.stdout | default('')) is search('RDS_VECTOR_OK')
+        or (vector_rds.stdout | default('')) is search('SKIP_')
+        or (pg_ready.rc | default(1) == 0 and vector_local.rc | default(1) == 0)
+    fail_msg: >-
+      CREATE EXTENSION vector failed on Haystack RDS (Academy PG 12.22 does not
+      ship pgvector) and the local pgvector/pgvector container did not become
+      ready. Check docker compose on the haystack guest. Password not logged.
+  when:
+    - app_role == "haystack"
+    - "'SKIP_' not in (vector_rds.stdout | default(''))"
