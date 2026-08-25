@@ -1,11 +1,25 @@
 #!/usr/bin/env bash
-# Bind existing Academy estate objects into Terraform state so plan/apply can
-# be re-run after voc-cancel-cred, a lost state object, or a partial apply.
+# Bind existing estate objects into Terraform state so plan/apply can
+# be re-run after lost state or a partial apply.
 # Does not create AWS resources. Writes only terraform state (imports).
+#
+# Requires DEPLOYMENT=academy|actual (workflow env). Observe leftovers
+# (trail / dashboard / flow-log) use that profile's names. VPC tag and RDS
+# identifiers stay Terraform names (heavy-rental-academy) on both profiles.
 #
 # ESTATE_ON_VPC_FORK=fail|continue  (fail is default; destroy uses continue)
 # ESTATE_IMPORT_STRICT=true|false   (destroy sets false so a bad import cannot block sweep)
 set -euo pipefail
+
+case "${DEPLOYMENT:-}" in
+  academy|actual) ;;
+  *)
+    echo "::error::reconcile-estate: set DEPLOYMENT to academy or actual."
+    exit 1
+    ;;
+esac
+OBSERVE_NAME="heavy-rental-${DEPLOYMENT}"
+OBSERVE_FLOW="${OBSERVE_NAME}-flow"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TF_DIR="${ROOT}/terraform/academy"
@@ -201,7 +215,7 @@ import_account_scoped() {
 import_observe() {
   local account bucket trail topic dash app key flow
   account="$(aws_text sts get-caller-identity --query Account)"
-  bucket="heavy-rental-observe-${account}-${DEPLOYMENT:-academy}"
+  bucket="heavy-rental-observe-${account}-${DEPLOYMENT}"
   if aws s3api head-bucket --bucket "${bucket}" >/dev/null 2>&1; then
     import_one aws_s3_bucket.observe "${bucket}"
     import_one aws_s3_bucket_public_access_block.observe "${bucket}"
@@ -210,13 +224,13 @@ import_observe() {
     import_one aws_s3_bucket_policy.observe "${bucket}"
   fi
 
-  trail="$(aws_text cloudtrail get-trail --name heavy-rental-academy --query 'Trail.Name')"
+  trail="$(aws_text cloudtrail get-trail --name "${OBSERVE_NAME}" --query 'Trail.Name')"
   import_one aws_cloudtrail.academy "${trail}"
 
   topic="$(aws_text sns list-topics --query "Topics[?contains(TopicArn, ':hr-academy-alarms')].TopicArn | [0]")"
   import_one aws_sns_topic.alarms "${topic}"
 
-  dash="$(aws_text cloudwatch list-dashboards --query "DashboardEntries[?DashboardName==\`heavy-rental-academy\`].DashboardName | [0]")"
+  dash="$(aws_text cloudwatch list-dashboards --query "DashboardEntries[?DashboardName==\`${OBSERVE_NAME}\`].DashboardName | [0]")"
   import_one aws_cloudwatch_dashboard.estate "${dash}"
 
   for app in portal rest haystack neo4j; do
@@ -255,7 +269,7 @@ import_observe() {
   done
 
   flow="$(aws_text ec2 describe-flow-logs \
-    --filter Name=tag:Name,Values=heavy-rental-academy-flow \
+    --filter Name=tag:Name,Values="${OBSERVE_FLOW}" \
     --query 'FlowLogs[0].FlowLogId')"
   import_one aws_flow_log.academy "${flow}"
 }

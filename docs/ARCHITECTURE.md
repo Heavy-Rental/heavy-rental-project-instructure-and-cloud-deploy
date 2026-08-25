@@ -19,7 +19,7 @@ This is the live target for `terraform/academy/`. `postgres-haystack-sync` is a 
      |   public AZ-0         public AZ-1   |
      |  10.0.0.0/24         10.0.1.0/24    |
      |  NAT GW + EIP        NAT GW + EIP   |
-     |  portal ALB (spans both)            |
+     |  portal ALB + REST ALB (public)     |
      +------------------+------------------+
                         |
      +------------------+------------------+
@@ -28,7 +28,7 @@ This is the live target for `terraform/academy/`. `postgres-haystack-sync` is a 
      |  asg-portal x1       asg-portal x1  |  desired=2
      |  asg-rest x1         asg-rest x1    |
      |  asg-haystack x1     asg-haystack x1|
-     |  internal REST ALB + Haystack ALB   |
+     |  internal Haystack ALB              |
      |  0.0.0.0/0 -> NAT GW in same AZ     |
      +------------------+------------------+
                         |
@@ -46,9 +46,10 @@ This is the live target for `terraform/academy/`. `postgres-haystack-sync` is a 
 flowchart TB
   browser[Browser] --> igw[IGW]
   igw --> albP[Public ALB portal :80]
+  igw --> albR[Public ALB REST :8080]
   albP --> asgP0[asg-portal AZ-0]
   albP --> asgP1[asg-portal AZ-1]
-  asgP0 --> albR[Internal ALB REST :8080]
+  asgP0 --> albR
   asgP1 --> albR
   albR --> asgR0[asg-rest AZ-0]
   albR --> asgR1[asg-rest AZ-1]
@@ -80,7 +81,7 @@ flowchart TB
 
 | Role | How many | Redundancy |
 | --- | --- | --- |
-| Portal / REST / Haystack EC2 | 2 each (one per app AZ) | AZ loss keeps one guest behind the ALB |
+| Portal / REST / Haystack EC2 | 2 each (one per app AZ) | AZ loss keeps one guest behind the ALB. REST ALB is public :8080; guests stay private |
 | Neo4j EC2 | 2 (one per data AZ) | AZ loss keeps one guest behind the Bolt NLB. **Not** a causal cluster |
 | NAT | **2 Gateways** (one per public AZ) + EIP each | Same-AZ outbound for portal / REST / Haystack / Neo4j. Not an EC2 instance |
 | RDS `heavy_rental` | 1 Multi-AZ | Primary + standby |
@@ -91,13 +92,14 @@ flowchart TB
 
 ## Traffic
 
-Browser → public portal ALB → portal → internal REST ALB → REST → SoR RDS.  
+Browser → public portal ALB → portal → **internet-facing REST ALB :8080** → REST → SoR RDS.  
+Internet clients may also hit the REST ALB :8080 directly (`REST_BASE_URL`).  
 REST → internal Haystack ALB → Haystack → Haystack RDS + Bolt NLB → Neo4j.  
 Private outbound HTTPS → the **NAT Gateway in the same AZ**. S3 via gateway endpoint (no NAT). If AZ-0 dies, AZ-1 guests keep outbound. NAT Gateways bill until `action=destroy`; session end and `action=stop` do not pause them.
 
 ## Terraform vs Ansible
 
-**Terraform** (`terraform/academy/`) creates the architecture: VPC, two NAT Gateways, four ASGs, ALBs, two Multi-AZ RDS, Bolt NLB, empty SM shells, and Monitor (CloudTrail + CloudWatch + S3 logs). Every guest uses **`LabInstanceProfile` → `LabRole`**. Terraform does not create IAM.  
+**Terraform** (`terraform/academy/`) creates the architecture: VPC, two NAT Gateways, four ASGs, ALBs (portal :80 and REST :8080 internet-facing; Haystack internal), two Multi-AZ RDS, Bolt NLB, empty SM shells, and Monitor (CloudTrail + CloudWatch + S3 logs). Academy guests use **`LabInstanceProfile` → `LabRole`** (no IAM create). AWS_ACTUAL guests use Terraform `hr-paid-*` profiles.  
 **Ansible** only configures guests that already exist: Docker, SM → `.env`, compose, portal `/api`. It does not create or destroy VPC/ASG/RDS.
 
 ## Monitor (apply)

@@ -60,7 +60,7 @@ runs:
           exit 1
         fi
         if [ -z "${ROLE}" ]; then
-          echo "::error::Set Environment AWS_ACTUAL variable AWS_ROLE_TO_ASSUME (IAM role ARN for GitHub OIDC)."
+          echo "::error::Set Environment AWS_ACTUAL variable or secret AWS_ROLE_TO_ASSUME (IAM role ARN). See docs/OIDC-PAID.md."
           exit 1
         fi
 
@@ -70,6 +70,7 @@ runs:
       with:
         role-to-assume: ${{ inputs.aws_role_to_assume }}
         aws-region: ${{ inputs.aws_region }}
+        audience: sts.amazonaws.com
 
     - name: Resolve Vocareum credentials
       if: inputs.profile == 'academy'

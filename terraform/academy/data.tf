@@ -97,6 +97,8 @@ locals {
   ])
 
   observe_bucket = "heavy-rental-observe-${data.aws_caller_identity.current.account_id}-${var.deployment}"
+  # Academy keeps historical names so apply does not replace the trail.
+  observe_name = var.deployment == "academy" ? "heavy-rental-academy" : "heavy-rental-actual"
 
   is_academy = var.deployment == "academy"
   is_actual  = var.deployment == "actual"

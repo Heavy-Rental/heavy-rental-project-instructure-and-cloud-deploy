@@ -1,6 +1,6 @@
 # Academy / Vocareum estate (branch 3 configure)
 
-This repo’s pipeline supports **two profiles** on the same Action: **`academy`** (Vocareum) and **`AWS_ACTUAL`** (public AWS via OIDC). They use different GitHub Environments and different Terraform state buckets.
+This repo has **two Actions**: **AWS infrastructure (Academy)** (`aws-infra-academy.yml`, Vocareum) and **AWS infrastructure (paid)** (`aws-infra-paid.yml`, GitHub OIDC, Environment `AWS_ACTUAL`). Each file owns its jobs (ADR 0019). They use different GitHub Environments and different Terraform state buckets.
 
 **Terraform** creates the estate. **Ansible** only configures guests that already exist (Docker, `.env`, compose). It does not create VPCs or ASGs. Beginner walkthrough (every `action`): [`../OPERATOR-GUIDE.md`](../OPERATOR-GUIDE.md). Spec index: [`../specification/README.md`](../specification/README.md).
 
@@ -14,7 +14,7 @@ This repo’s pipeline supports **two profiles** on the same Action: **`academy`
 3. **Required secrets for `apply` / `configure-only`:** `SPRING_DATASOURCE_PASSWORD` (≥ 8), `NEO4J_PASSWORD`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_API_KEY` (`sk_…`), `STRIPE_WEBHOOK_SECRET`. **Not** workflow inputs. Do not add `VITE_STRIPE_PUBLISHABLE_KEY` (copied from the publishable key). Optional: `APP_JWT_SECRET` (≥ 32 chars, HS256). If unset, `sync-secrets` reuses the value already in `heavy-rental/rest` or generates one. Set it if you need the same JWT secret after `destroy` + `apply`. Optional OneMap: `ONEMAP_EMAIL` and `ONEMAP_PASSWORD` (both or neither). `APP_CORS_ALLOWED_ORIGINS` is **not** a GitHub secret — `sync-secrets` sets it from the public portal ALB DNS. Optional pricing **variables** (not secrets): `DYNAMIC_PRICING_ENABLED`, `PRICING_DEFAULT_DISTANCE_KM`, `PRICING_ORIGIN_POSTAL_CODE`, `PRICING_DISTANCE_LOOKUP_ENABLED`. Empty = omit (Spring defaults). REST CD Environment `academy` can overlay the same names without a new infra run.
 4. Variable: `AWS_REGION` = `us-east-1`. Optional: `ALARM_EMAIL` for CloudWatch SNS (confirm the AWS mail).
 5. Image **variables** (not secrets) on this repo’s Environment `academy` — not the app-repo Environments: `PORTAL_IMAGE` (ECR or public GHCR tag; **required** for `deploy-projects`, stock `nginx` forbidden on that action), `REST_IMAGE`, `HAYSTACK_IMAGE`. Do **not** set `IMAGE_HTTP_URL` for `deploy-projects` (one tar cannot satisfy three images). `image_ref` on the Run form is REST/Haystack fallback only. `ansible/inventory/group_vars/all.yml` looks these up from the runner env. `apply` / `configure-only` still do **not** compose portal/REST/Haystack (`configure.yml`).
-6. GitHub cannot create Environments from git. For public AWS: create Environment **`AWS_ACTUAL`**, set `AWS_ROLE_TO_ASSUME` (OIDC role ARN in the billed account), same app secrets as academy, **no** `AWS_ACCESS_KEY_ID`. See ADR 0016.
+6. GitHub cannot create Environments from git. For public AWS: follow [`OIDC-PAID.md`](OIDC-PAID.md) (AWS OIDC provider + role, then Environment **`AWS_ACTUAL`** variable **or** secret `AWS_ROLE_TO_ASSUME`). Same app secrets as academy, **no** `AWS_ACCESS_KEY_ID`. Run **AWS infrastructure (paid)**, not the academy Action. See ADR 0017.
 
 ## Every lab session
 
@@ -23,7 +23,7 @@ Vocareum tokens **expire when the session ends**.
 1. Instructure → **Start Lab** → AWS Details.
 2. Actions → **AWS infrastructure (Academy)** → Run workflow.
 3. Paste `aws_access_key_id`, `aws_secret_access_key`, `aws_session_token` (or leave empty to use Environment AWS secrets). Job logs mask these; the run Inputs page may still show them.
-4. Set `aws_environment` = `academy` (Vocareum) or `AWS_ACTUAL` (public AWS).
+4. Set `aws_environment` = `academy`. For billed AWS use workflow **AWS infrastructure (paid)** instead.
 5. Choose `action`:
    - **`plan`** — import any named leftovers into state, then show the estate (no apply). Works without `SPRING_DATASOURCE_PASSWORD` (uses a plan-only placeholder).
    - **`apply`** — same import, then create or update the estate (Terraform), then `sync-secrets` → `sync-ssh-keys` → Ansible **`configure.yml`** (Docker + Compose on all guests; **Neo4j only**). Does **not** pull portal/REST/Haystack images. Needs `SPRING_DATASOURCE_PASSWORD`, `NEO4J_PASSWORD`, Stripe trio. Guest count is **8 EC2**. Also creates CloudTrail (S3 only), VPC flow logs, ALB access logs, CloudWatch alarms + dashboard `heavy-rental-academy`. Guests use **LabRole**. NAT Gateways bill until `destroy`. Safe to re-run after a failed apply.
@@ -34,6 +34,18 @@ Vocareum tokens **expire when the session ends**.
    - **`bootstrap`** — state bucket only (S3 native lockfile).
 
 Expect **20–40 minutes** on apply (two Multi-AZ RDS + ALBs). This spends lab credits. Start apply at the beginning of a lab session. **Ending the Vocareum session does not stop RDS or ALB billing.**
+
+## Every paid run (billed AWS)
+
+No Start Lab. No Vocareum keys.
+
+1. Confirm Environment **`AWS_ACTUAL`**: `AWS_ROLE_TO_ASSUME` (variable or secret), app secrets, **no** `AWS_ACCESS_KEY_ID`. Guide: [`OIDC-PAID.md`](OIDC-PAID.md).
+2. Actions → **AWS infrastructure (paid)** → Run workflow.
+3. `aws_environment` must be `AWS_ACTUAL`.
+4. Same `action` list as academy. Image variables for `deploy-projects` are on Environment `AWS_ACTUAL`, not `academy`.
+5. Apply summary prints the **public REST ALB** (`http://<dns>:8080`) and portal ALB. Haystack stays internal.
+
+OIDC one-time: [`OIDC-PAID.md`](OIDC-PAID.md) ([sample JSON](samples/github-oidc-paid.json)). Guests use `hr-paid-*`. Ansible file transfer uses `heavy-rental-ssm-<account>-actual`, not the tfstate bucket.
 
 ### Apply fails: `voc-cancel-cred` / failed to persist state
 
@@ -62,7 +74,8 @@ To wipe the whole half-applied estate instead: `action=destroy` with `confirm_de
 | --- | --- |
 | `describe-auto-scaling-groups --auto-scaling-group-names asg-portal asg-rest asg-haystack asg-neo4j` | All four exist |
 | Public portal ALB DNS (job summary) | Resolves; **502** on `:80` until `deploy-projects` or portal app CD |
-| `describe-secret --secret-id heavy-rental/portal` | Has `REST_BASE_URL` after `sync-secrets` |
+| Public REST ALB DNS (job summary) | `http://<dns>:8080` after compose; **502** until REST is up |
+| `describe-secret --secret-id heavy-rental/portal` | Has `REST_BASE_URL=http://<rest-alb>:8080` after `sync-secrets` |
 | `configure-only` | Fills SM + PEMs. Docker + Compose on all guests. Composes **Neo4j only**. |
 | `deploy-projects` | After apply/configure-only. Composes portal + REST + Haystack. |
 | `stop` | ASGs desired=0; both RDS stopped; Gateways still bill |
@@ -81,12 +94,12 @@ To wipe the whole half-applied estate instead: `action=destroy` with `confirm_de
 
 ## What this must not do
 
-- Create IAM roles or an OIDC provider (`LabInstanceProfile` only)
+- Create IAM roles or an OIDC provider on the **academy** Action (`LabInstanceProfile` only). Paid creates `hr-paid-*` and assumes an out-of-band OIDC role.
 - Create a NAT **instance** or Marketplace Neo4j. Outbound is two NAT Gateways (ADR 0010).
 - Write Vocareum keys into Secrets Manager or onto EC2
 - Put `SPRING_DATASOURCE_PASSWORD` on the Run form
 - Echo Vocareum keys in job logs (`env:` / `${{ inputs.aws_* }}`)
 - Put `sk_` on the portal secret
-- Create IAM (`aws_iam_role`) or attach LabRole to CloudTrail / flow-log delivery
+- Attach LabRole to CloudTrail / flow-log delivery
 - Enable CloudTrail → CloudWatch Logs or RDS enhanced monitoring
-- Target a billed / paid account
+- Target a billed / paid account from this academy Action (use `aws-infra-paid.yml`)

@@ -1,6 +1,6 @@
-# Heavy Rental — Academy infra CD
+# Heavy Rental — Academy and paid infra CD
 
-GitHub Actions, Terraform, and Ansible that create and operate the **AWS Academy / Vocareum** estate.
+GitHub Actions, Terraform, and Ansible that create and operate the estate on **AWS Academy / Vocareum** and on a **billed AWS** account.
 
 **Terraform** creates the architecture (VPC, NAT, ASGs, ALBs, RDS, secret shells, NLB).  
 **Ansible** only **configures** guests that Terraform already created (Docker, `.env` from Secrets Manager, compose). It does not create VPCs, ASGs, or RDS.
@@ -18,7 +18,14 @@ GitHub Actions, Terraform, and Ansible that create and operate the **AWS Academy
 | `ansible/` | Guest configuration only |
 | `scripts/` | `sync-secrets`, `sync-ssh-keys`, `stop-estate` |
 
-## Actions (`aws-infra-academy.yml`)
+## Actions
+
+Two operator workflows, **separate job graphs** (ADR 0019):
+
+| Workflow | Environment | Auth |
+| --- | --- | --- |
+| `aws-infra-academy.yml` | `academy` | Vocareum keys |
+| `aws-infra-paid.yml` | `AWS_ACTUAL` | GitHub OIDC (`AWS_ROLE_TO_ASSUME` variable or secret). Setup: [`docs/OIDC-PAID.md`](docs/OIDC-PAID.md) |
 
 | Action | Terraform | Ansible |
 | --- | --- | --- |
@@ -30,10 +37,14 @@ GitHub Actions, Terraform, and Ansible that create and operate the **AWS Academy
 | `stop` | No | Pause ASGs + stop both RDS (`scripts/stop-estate.sh`) |
 | `destroy` | Tear down estate | No |
 
-Portal / REST / Haystack **first compose** on the estate: `action=deploy-projects` after apply. **Later** image redeploys are app CD in `heavy-rental-project-pipeline-development`. Paid / OIDC is later.
+Portal / REST / Haystack **first compose** on the estate: `action=deploy-projects` after apply. **Later** image redeploys on Academy are app CD in `heavy-rental-project-pipeline-development` (still academy-only). Paid first-compose is the same `deploy-projects` action on `aws-infra-paid.yml`.
+
+REST ALB (`hr-alb-rest`) is internet-facing on **:8080**. Haystack stays internal.
 
 ## Out of scope
 
-- Creating IAM roles (use `LabInstanceProfile` / `LabRole`)
-- App product specs
+- Creating the GitHub OIDC role from estate apply (out of band; see `docs/samples/github-oidc-paid.json`)
+- Academy creating IAM (`LabInstanceProfile` / `LabRole` only)
+- Portal/REST HTTPS (ACM)
+- Paid portal/REST/Haystack **app** CD
 - Marketplace Neo4j, EKS, NAT instance

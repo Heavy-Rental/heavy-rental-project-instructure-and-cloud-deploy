@@ -1,6 +1,6 @@
 # ADR 0001: Academy / Vocareum only on the first pipeline
 
-- **Status:** Partially superseded by [0016](0016-dual-profile-academy-paid.md) (paid may be selected on this workflow; Vocareum keys still must not target paid)
+- **Status:** Restored for `aws-infra-academy.yml` by [0017](0017-two-actions-academy-paid.md). Paid is `.github/workflows/aws-infra-paid.yml`. [0016](0016-dual-profile-academy-paid.md) isolation rules still apply.
 - **Date:** 2026-08-16
 - **Branch:** `feat/infra-academy-bootstrap`
 

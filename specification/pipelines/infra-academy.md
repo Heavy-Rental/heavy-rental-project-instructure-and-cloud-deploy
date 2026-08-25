@@ -1,13 +1,13 @@
 # Academy infra CD
 
 **Authoring tree:** this repo  
-**Trigger:** `workflow_dispatch` on Environment `academy` (Vocareum keys on the runner; EC2 uses `LabRole`)
+**Trigger:** `workflow_dispatch` on `.github/workflows/aws-infra-academy.yml`, Environment `academy` (Vocareum keys on the runner; EC2 uses `LabRole`). Paid: [`infra-paid.md`](infra-paid.md).
 
 ## Split of work
 
 | Tool | Owns |
 | --- | --- |
-| **Terraform** | Architecture and cloud **resources**: VPC, subnets, IGW, two NAT Gateways, four ASGs + LTs, public portal ALB, internal REST/Haystack ALBs, Bolt NLB, two Multi-AZ RDS, SM **shells**, S3 state, CloudTrail (S3), VPC flow logs (S3), ALB access logs, CloudWatch alarms + dashboard. Guests use **LabRole** / `LabInstanceProfile` only |
+| **Terraform** | Architecture and cloud **resources**: VPC, subnets, IGW, two NAT Gateways, four ASGs + LTs, public portal ALB, **internet-facing REST ALB :8080**, internal Haystack ALB, Bolt NLB, two Multi-AZ RDS, SM **shells**, S3 state, CloudTrail (S3), VPC flow logs (S3), ALB access logs, CloudWatch alarms + dashboard. Guests use **LabRole** / `LabInstanceProfile` only |
 | **Ansible** | Guest **configuration** only: Docker/Compose, map SM → `.env`, pull/load a CI image, compose, portal nginx `/api`, RDS *logical* grants/extensions. **No** `terraform apply`, no create-ASG, no create-RDS |
 
 `sync-secrets` and `sync-ssh-keys` are shell wrappers (not Terraform). They write JSON / PEMs into shells Terraform already created.
@@ -61,7 +61,8 @@ CI images are env-driven (Haystack/REST) or a static SPA (portal). Ansible injec
 
 ## Specs
 
-- OpenSpec: bootstrap / estate / configure / deploy-projects changes under [`../../openspec/changes/`](../../openspec/changes/)
+- OpenSpec: bootstrap / estate / configure / deploy-projects / paid-pipeline changes under [`../../openspec/changes/`](../../openspec/changes/)
 - OpenSPDD: [`../../spdd/`](../../spdd/)
-- ADRs: [`../../docs/adr/`](../../docs/adr/) (0014 = `deploy-projects`)
+- ADRs: [`../../docs/adr/`](../../docs/adr/) (0014 = `deploy-projects`; 0017 = academy file is Vocareum-only again; 0018 = public REST ALB; 0019 = this file owns its jobs)
 - Secrets: [`infra-secrets.md`](infra-secrets.md)
+- Paid: [`infra-paid.md`](infra-paid.md)

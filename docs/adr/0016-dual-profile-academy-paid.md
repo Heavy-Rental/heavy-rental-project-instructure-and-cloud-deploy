@@ -1,8 +1,8 @@
 # ADR 0016: One Action, two profiles (academy Vocareum / paid OIDC)
 
-- **Status:** Accepted
+- **Status:** Superseded in part by [0017](0017-two-actions-academy-paid.md) — isolation (OIDC vs Vocareum, separate state, `hr-paid-*`) remains; one Action becomes two files
 - **Date:** 2026-08-18
-- **Supersedes (in part):** [0001](0001-academy-vocareum-only.md) — paid may be **selected** on this workflow; isolation remains
+- **Supersedes (in part):** [0001](0001-academy-vocareum-only.md) — paid may be **selected**; 0017 puts paid on its own Action
 - **Related:** [0005](0005-labinstanceprofile-only.md), [0009](0009-academy-keys-in-environment-secrets.md)
 
 ## Context
