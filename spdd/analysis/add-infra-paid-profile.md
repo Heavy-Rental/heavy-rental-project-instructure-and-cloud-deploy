@@ -1,6 +1,6 @@
 # SPDD Analysis: add-infra-paid-profile
 
-**Status:** Active  
+**Status:** Superseded in part by [add-infra-paid-pipeline](add-infra-paid-pipeline.md) — one Action becomes two files; isolation (OIDC vs Vocareum, separate state, `hr-paid-*`) remains.  
 **Companion:** [REASONS Canvas](../prompt/add-infra-paid-profile.md) · [OpenSpec](../../openspec/changes/add-infra-paid-profile/proposal.md)
 
 ## Problem

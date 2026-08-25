@@ -12,7 +12,7 @@ resource "aws_security_group" "alb_public" {
 
 resource "aws_security_group" "alb_rest" {
   name        = "hr-alb-rest"
-  description = "Internal REST ALB :8080"
+  description = "Internet-facing REST ALB :8080"
   vpc_id      = aws_vpc.academy.id
   tags        = { Name = "sg-alb-rest" }
 }
@@ -111,7 +111,16 @@ resource "aws_vpc_security_group_egress_rule" "portal_http" {
   cidr_ipv4         = "0.0.0.0/0"
 }
 
-# --- internal REST ALB ---
+# --- internet-facing REST ALB ---
+resource "aws_vpc_security_group_ingress_rule" "alb_rest_from_internet" {
+  security_group_id = aws_security_group.alb_rest.id
+  ip_protocol       = "tcp"
+  from_port         = 8080
+  to_port           = 8080
+  cidr_ipv4         = "0.0.0.0/0"
+  description       = "Internet to REST ALB :8080"
+}
+
 resource "aws_vpc_security_group_ingress_rule" "alb_rest_from_portal" {
   security_group_id            = aws_security_group.alb_rest.id
   ip_protocol                  = "tcp"

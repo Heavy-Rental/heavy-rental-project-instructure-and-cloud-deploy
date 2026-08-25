@@ -1,5 +1,6 @@
 # REASONS Canvas: add-infra-paid-profile
 
+**Status:** Superseded in part by [add-infra-paid-pipeline](add-infra-paid-pipeline.md) — two Actions; isolation remains.  
 **Input analysis:** [add-infra-paid-profile.md](../analysis/add-infra-paid-profile.md)  
 **Behavior contract:** [OpenSpec](../../openspec/changes/add-infra-paid-profile/)
 

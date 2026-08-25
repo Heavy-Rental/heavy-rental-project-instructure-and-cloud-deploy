@@ -1,21 +1,21 @@
 # Operator guide — set up AWS and deploy the projects
 
-This is a beginner walkthrough for the GitHub Action **AWS infrastructure** in this repo.
+This is a beginner walkthrough for the GitHub Actions in this repo.
 
 You will:
 
-1. Create the AWS lab estate (`apply`)
+1. Create the AWS estate (`apply`)
 2. Deploy the portal, REST API, and Haystack onto that estate (`deploy-projects`)
-3. Pause or wipe the lab when you are done (`stop` / `destroy`)
+3. Pause or wipe when you are done (`stop` / `destroy`)
 
-This workflow has two **profiles**. On Run workflow pick **`aws_environment`**:
+There are **two Actions**. Do not put Vocareum keys on the paid Action.
 
-| Profile | When | How you authenticate |
+| Action | When | How you authenticate |
 | --- | --- | --- |
-| **`academy`** | AWS Academy Learner Lab (Vocareum) | Start Lab keys on the form, or Environment `academy` `AWS_*` |
-| **`AWS_ACTUAL`** | Billed public AWS account | Environment `AWS_ACTUAL` variable `AWS_ROLE_TO_ASSUME` (GitHub OIDC). **Leave Vocareum form keys empty.** |
+| **AWS infrastructure (Academy)** | AWS Academy Learner Lab (Vocareum) | Start Lab keys on the form, or Environment `academy` `AWS_*`. `aws_environment` **must** be `academy`. |
+| **AWS infrastructure (paid)** | Billed public AWS account | Environment `AWS_ACTUAL` variable **or** secret `AWS_ROLE_TO_ASSUME` (GitHub OIDC). **No** Vocareum form fields. Guide: [`docs/OIDC-PAID.md`](docs/OIDC-PAID.md). |
 
-Do **not** put `AWS_ACCESS_KEY_ID` on Environment `AWS_ACTUAL`. Do **not** paste lab keys when `AWS_ACTUAL` is selected.
+Do **not** put `AWS_ACCESS_KEY_ID` on Environment `AWS_ACTUAL`. OIDC sample: [`docs/samples/github-oidc-paid.json`](docs/samples/github-oidc-paid.json).
 
 Related reference (more compact): [`docs/BOOTSTRAP.md`](docs/BOOTSTRAP.md). Specs: [`specification/pipelines/infra-academy.md`](specification/pipelines/infra-academy.md).
 
@@ -100,6 +100,22 @@ Leave `IMAGE_HTTP_URL` unset for `deploy-projects`. One image tar cannot satisfy
 
 These names on the **infra** Environment `academy` are separate from the same names on the three application repos.
 
+### 4. Paid Environment `AWS_ACTUAL` (billed account)
+
+Do this once if you will run **AWS infrastructure (paid)**. Do **not** paste Vocareum keys into this Environment.
+
+**Full walkthrough (AWS Console + CLI + GitHub):** [`docs/OIDC-PAID.md`](docs/OIDC-PAID.md).
+
+1. In AWS, create the GitHub OIDC provider and role `github-actions-infra` (script: `GITHUB_ORG=YOUR_ORG ./scripts/bootstrap-github-oidc-paid.sh`). Copy the **role ARN**.
+2. **Settings → Environments → New environment** named exactly `AWS_ACTUAL`.
+3. Store the ARN as Environment **variable** `AWS_ROLE_TO_ASSUME` **or** Environment **secret** `AWS_ROLE_TO_ASSUME` (same name; either works). This is not an AWS access key.
+4. **Variable** `AWS_REGION` = `us-east-1`. Same optional image variables and `ALARM_EMAIL` as academy (this Environment’s copies, not academy’s).
+5. **Secrets:** same app set as academy (`SPRING_DATASOURCE_PASSWORD`, `NEO4J_PASSWORD`, Stripe trio, optional JWT / OneMap / `LLM_API_KEY`). **No** `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN`.
+
+Then: **Actions → AWS infrastructure (paid)** → `aws_environment` = `AWS_ACTUAL` → `plan`, then `apply`, then a **later** `deploy-projects`. Same action meanings as academy. App CD is still academy-only; paid first-compose is this Action’s `deploy-projects`.
+
+REST is reachable at `http://<rest_alb_dns>:8080` after compose (public ALB). Portal remains `http://<portal_alb_dns>/`. Haystack stays internal.
+
 ---
 
 ## Every lab session
@@ -135,6 +151,8 @@ Every run uses the same form. Only some fields matter for each action.
 | **image_http_url** | Leave empty | `deploy-projects` **fails** if this is set |
 
 Job logs mask the three keys. The run **Inputs** page may still show them. Treat that page as sensitive.
+
+On **AWS infrastructure (paid)** the form has **no** Vocareum key fields. Use `aws_environment` = `AWS_ACTUAL` and the same `action` / `confirm_destroy` / image fields.
 
 ---
 
@@ -284,7 +302,7 @@ It does **not** pull portal, REST, or Haystack images. That is why apply no long
 **Success:**
 
 - Portal ALB answers on `/` (no longer 502)
-- REST answers on the internal REST ALB / guest `:8080`
+- REST answers on the **public** REST ALB `:8080` (and on the guest `:8080`). Haystack stays internal.
 - Haystack answers on `:8000`
 
 **Common problems:**
@@ -408,4 +426,4 @@ App CD workflows must **not** run Terraform. This repo owns the estate.
 - Write Vocareum `AWS_*` keys into Secrets Manager or onto EC2
 - Put `SPRING_DATASOURCE_PASSWORD` on the Run form
 - Put a GitHub PAT on the guests to pull private GHCR
-- Target a billed account **with Vocareum keys** (select Environment `AWS_ACTUAL` and OIDC instead)
+- Target a billed account **with Vocareum keys** (use workflow **AWS infrastructure (paid)** and OIDC instead)

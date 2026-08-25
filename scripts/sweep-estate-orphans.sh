@@ -1,8 +1,21 @@
 #!/usr/bin/env bash
-# Delete Academy estate leftovers that Terraform state cannot see (lost state,
-# voc-cancel-cred, or a second VPC from a failed re-apply). Idempotent.
+# Delete estate leftovers that Terraform state cannot see (lost state,
+# cancelled credentials, or a second VPC from a failed re-apply). Idempotent.
 # Does not delete the S3 state bucket or Vocareum IAM.
+#
+# Requires DEPLOYMENT=academy|actual. Observe leftovers use that profile's
+# names. VPC tag and RDS identifiers stay Terraform names on both profiles.
 set -euo pipefail
+
+case "${DEPLOYMENT:-}" in
+  academy|actual) ;;
+  *)
+    echo "::error::sweep-estate-orphans: set DEPLOYMENT to academy or actual."
+    exit 1
+    ;;
+esac
+OBSERVE_NAME="heavy-rental-${DEPLOYMENT}"
+OBSERVE_FLOW="${OBSERVE_NAME}-flow"
 
 REGION="${AWS_DEFAULT_REGION:-us-east-1}"
 
@@ -202,14 +215,14 @@ empty_and_delete_vpc() {
 delete_observe() {
   local account bucket name id
   account="$(aws sts get-caller-identity --query Account --output text 2>/dev/null || true)"
-  bucket="heavy-rental-observe-${account}-${DEPLOYMENT:-academy}"
+  bucket="heavy-rental-observe-${account}-${DEPLOYMENT}"
 
-  if aws cloudtrail get-trail --name heavy-rental-academy >/dev/null 2>&1; then
-    echo "Deleting CloudTrail heavy-rental-academy."
-    aws cloudtrail delete-trail --name heavy-rental-academy || true
+  if aws cloudtrail get-trail --name "${OBSERVE_NAME}" >/dev/null 2>&1; then
+    echo "Deleting CloudTrail ${OBSERVE_NAME}."
+    aws cloudtrail delete-trail --name "${OBSERVE_NAME}" || true
   fi
 
-  aws cloudwatch delete-dashboards --dashboard-names heavy-rental-academy >/dev/null 2>&1 || true
+  aws cloudwatch delete-dashboards --dashboard-names "${OBSERVE_NAME}" >/dev/null 2>&1 || true
   aws cloudwatch delete-alarms --alarm-names \
     hr-alb-portal-5xx hr-alb-rest-5xx hr-alb-haystack-5xx \
     hr-alb-portal-unhealthy hr-alb-rest-unhealthy hr-alb-haystack-unhealthy \
@@ -227,7 +240,7 @@ delete_observe() {
     aws sns delete-topic --topic-arn "${id}" || true
   done
 
-  for id in $(aws ec2 describe-flow-logs --filter Name=tag:Name,Values=heavy-rental-academy-flow \
+  for id in $(aws ec2 describe-flow-logs --filter Name=tag:Name,Values="${OBSERVE_FLOW}" \
     --query 'FlowLogs[].FlowLogId' --output text 2>/dev/null | tr '\t' ' '); do
     [ -n "${id}" ] || continue
     echo "Deleting flow log ${id}."

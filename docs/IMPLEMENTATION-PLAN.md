@@ -22,7 +22,7 @@ Stand up the **Academy (Vocareum)** estate from GitHub Actions:
 
 **Non-goals (not in the minimum branch set):**
 
-- Paid / OIDC (`aws-infra-paid.yml`)
+- Paid / OIDC (`aws-infra-paid.yml`) — **delivered** (ADR 0017); REST ALB is internet-facing :8080 (ADR 0018)
 - Portal / REST / Haystack **app CD** (they consume this estate; they do not create it)
 - CDK, Marketplace Neo4j CFT, NAT **instance**, new IAM roles, EKS
 
@@ -102,7 +102,7 @@ Terraform in `terraform/academy/` (see [`ARCHITECTURE.md`](ARCHITECTURE.md) and 
 - **Two NAT Gateways** (one per public AZ) + EIP each. Per-AZ private route tables. Guest count **8 EC2**. Gateways bill until `destroy`.
 - Security groups (portal :80 from public ALB; REST :8080 from portal; Haystack :8000 from rest; RDS :5432 from rest+haystack; Bolt :7687 from haystack / NLB)
 - Four launch templates + ASGs with **`LabInstanceProfile` → `LabRole`**. Portal (React), REST (Spring Boot), Haystack **desired=2** (one per app AZ, ALBs span both). `asg-neo4j` **desired=2** (one per data AZ)
-- Public portal ALB + `tg-portal` :80; internal REST + Haystack ALBs
+- Public portal ALB + `tg-portal` :80; REST ALB internet-facing :8080 (ADR 0018); internal Haystack ALB
 - Internal **Bolt NLB** + `tg-neo4j` :7687
 - Two **Multi-AZ** RDS (`heavy_rental` SoR + `haystack`). No third RDS for db-sync
 - Secrets Manager **shells**: `heavy-rental/{portal,rest,haystack,neo4j}` and `heavy-rental/ssh/*`

@@ -4,7 +4,7 @@ ADRs for this CD repo (Nygard format). Conflict order: **OpenSpec → OpenSPDD S
 
 | ID | Title |
 | --- | --- |
-| [0001](0001-academy-vocareum-only.md) | Academy / Vocareum only on the first pipeline |
+| [0001](0001-academy-vocareum-only.md) | Academy / Vocareum only on `aws-infra-academy.yml` (restored by 0017) |
 | [0002](0002-vocareum-keys-on-dispatch.md) | Session keys on Run workflow (**superseded** by 0009) |
 | [0003](0003-remote-state-outside-estate.md) | Remote Terraform state outside the estate |
 | [0004](0004-nat-instance-not-gateway.md) | NAT instance, not NAT Gateway (**superseded** by 0010) |
@@ -18,5 +18,8 @@ ADRs for this CD repo (Nygard format). Conflict order: **OpenSpec → OpenSPDD S
 | [0012](0012-ansible-over-ssm.md) | Ansible over SSM, not SSH (configuration only; Terraform owns architecture) |
 | [0013](0013-haystack-source-target-in-sync-secrets.md) | SoR → Haystack sync endpoints in infra `sync-secrets` |
 | [0014](0014-deploy-projects-after-configure.md) | `deploy-projects` is a later run of `site.yml`, not part of apply |
-| [0015](0015-academy-observe-no-iam.md) | Observe uses LabRole + S3; no CloudTrail → CloudWatch Logs |
-| [0016](0016-dual-profile-academy-paid.md) | One Action: academy (Vocareum) or AWS_ACTUAL (OIDC) |
+| [0015](0015-academy-observe-no-iam.md) | Observe uses LabRole + S3; no CloudTrail → CloudWatch Logs (paid trail name `heavy-rental-actual`) |
+| [0016](0016-dual-profile-academy-paid.md) | Dual profile isolation (superseded in part by 0017) |
+| [0017](0017-two-actions-academy-paid.md) | Two Actions: academy Vocareum / paid OIDC |
+| [0018](0018-public-rest-alb.md) | REST ALB is internet-facing :8080 (diverges from §6P) |
+| [0019](0019-separate-job-graphs.md) | Separate job graphs (no reusable estate workflow) |

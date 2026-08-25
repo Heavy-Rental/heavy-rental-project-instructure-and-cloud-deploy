@@ -94,8 +94,8 @@ echo "::add-mask::${JWT}"
 
 REST_BASE_URL="http://${REST_DNS}:8080"
 HAYSTACK_BASE_URL="http://${HAY_DNS}:8000"
-# Public portal ALB :80. Same-origin /api does not need this; direct browser→REST does.
-APP_CORS_ALLOWED_ORIGINS="http://${PORTAL_DNS}"
+# Portal SPA is same-origin /api. Direct browser → public REST ALB :8080 needs CORS too.
+APP_CORS_ALLOWED_ORIGINS="http://${PORTAL_DNS},http://${REST_DNS}:8080"
 SOR_JDBC="jdbc:postgresql://${SOR_HOST}:${SOR_PORT}/${SOR_DB}"
 HAY_URL="postgresql://${DB_USER}:${DB_PASS}@${HAY_HOST}:${HAY_PORT}/${HAY_DB}"
 

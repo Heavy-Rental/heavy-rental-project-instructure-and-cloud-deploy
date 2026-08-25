@@ -1,15 +1,14 @@
-# AWS infrastructure — Vocareum / Academy only (ADR 0001 / 0017 / 0019).
-# Paid / OIDC: .github/workflows/aws-infra-paid.yml (separate job graph).
+# AWS infrastructure — billed account via GitHub OIDC (ADR 0017 / 0019).
+# Academy / Vocareum: .github/workflows/aws-infra-academy.yml (separate job graph).
 #
 # Operator:
-#   1. Start Lab → paste Vocareum keys (or Environment academy AWS_*)
-#   2. aws_environment must be academy
-#   3. Environment secrets: SPRING_DATASOURCE_PASSWORD, NEO4J_PASSWORD, Stripe trio
+#   1. Environment AWS_ACTUAL: AWS_ROLE_TO_ASSUME (variable or secret). No AWS_ACCESS_KEY_ID.
+#      Setup: docs/OIDC-PAID.md
+#   2. Same app secrets as academy (SPRING_DATASOURCE_PASSWORD, Neo4j, Stripe trio).
+#   3. Leave Vocareum form keys off this Action (they are not declared).
 #   4. action=plan | apply | configure-only | deploy-projects | stop | destroy
-#
-# Form keys are read from $GITHUB_EVENT_PATH so job logs can mask them.
 
-name: AWS infrastructure (Academy)
+name: AWS infrastructure (paid)
 
 on:
   workflow_dispatch:
@@ -28,10 +27,10 @@ on:
           - stop
           - destroy
       aws_environment:
-        description: Must be academy (Vocareum Learner Lab). Paid uses AWS infrastructure (paid).
+        description: Must be AWS_ACTUAL (billed account, GitHub OIDC).
         required: true
         type: environment
-        default: academy
+        default: AWS_ACTUAL
       confirm_destroy:
         description: For action=destroy, pick destroy here too. action=destroy alone is not enough. Leaves the state bucket.
         required: true
@@ -40,21 +39,6 @@ on:
         options:
           - "no"
           - destroy
-      aws_access_key_id:
-        description: Vocareum AWS Details access key (changes every Start Lab). Empty = Environment academy.
-        required: false
-        type: string
-        default: ""
-      aws_secret_access_key:
-        description: Vocareum secret access key. Empty = Environment academy.
-        required: false
-        type: string
-        default: ""
-      aws_session_token:
-        description: Vocareum session token. Empty = Environment academy.
-        required: false
-        type: string
-        default: ""
       image_ref:
         description: Fallback registry tag for REST/Haystack if REST_IMAGE / HAYSTACK_IMAGE are empty. Does not set the portal image.
         required: false
@@ -67,70 +51,83 @@ on:
         default: ""
 
 concurrency:
-  group: aws-infra-academy-${{ github.repository }}
+  group: aws-infra-paid-${{ github.repository }}
   cancel-in-progress: false
 
 permissions:
   contents: read
+  id-token: write
 
 env:
   TF_IN_AUTOMATION: "true"
   TF_INPUT: "false"
   AWS_DEFAULT_REGION: us-east-1
   DB_PASSWORD_PLAN_PLACEHOLDER: "PlanOnlyNotApplied1!"
-  TF_VAR_deployment: academy
-  DEPLOYMENT: academy
+  TF_VAR_deployment: actual
+  DEPLOYMENT: actual
 
 jobs:
-  refuse-non-academy:
-    name: Assert Environment academy
+  refuse-non-paid:
+    name: Assert Environment AWS_ACTUAL
     runs-on: ubuntu-latest
+    environment: ${{ inputs.aws_environment }}
     timeout-minutes: 2
     steps:
-      - name: Refuse non-academy
+      - name: Refuse Vocareum and unknown Environments
         env:
           ENV_NAME: ${{ inputs.aws_environment }}
+          ENV_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          ROLE: ${{ vars.AWS_ROLE_TO_ASSUME || secrets.AWS_ROLE_TO_ASSUME }}
         run: |
+          set +x
           set -euo pipefail
-          if [ "${ENV_NAME}" != "academy" ]; then
-            echo "::error::This Action is AWS Academy / Vocareum only (got '${ENV_NAME}'). Use workflow AWS infrastructure (paid) with Environment AWS_ACTUAL."
+          if [ "${ENV_NAME}" != "AWS_ACTUAL" ]; then
+            echo "::error::This Action is billed AWS / OIDC only (got '${ENV_NAME}'). Use workflow AWS infrastructure (Academy) with Environment academy."
+            exit 1
+          fi
+          if [ -n "${ENV_KEY}" ]; then
+            echo "::error::Environment AWS_ACTUAL must not contain AWS_ACCESS_KEY_ID. Paid uses GitHub OIDC only."
+            exit 1
+          fi
+          if [ -z "${ROLE}" ]; then
+            echo "::error::Set Environment AWS_ACTUAL variable or secret AWS_ROLE_TO_ASSUME (IAM role ARN). See docs/OIDC-PAID.md. Do not put AWS access keys here."
             exit 1
           fi
 
   assert-lab:
     name: Assert AWS profile
-    needs: [refuse-non-academy]
+    needs: [refuse-non-paid]
     runs-on: ubuntu-latest
-    environment: academy
+    environment: AWS_ACTUAL
     timeout-minutes: 5
     outputs:
       account_id: ${{ steps.sts.outputs.account_id }}
       bucket: ${{ steps.sts.outputs.bucket }}
+      ssm_bucket: ${{ steps.sts.outputs.ssm_bucket }}
       deployment: ${{ steps.sts.outputs.deployment }}
     steps:
       - uses: actions/checkout@v7.0.1
 
       - uses: ./.github/actions/resolve-aws-profile
         with:
-          profile: academy
+          profile: AWS_ACTUAL
           aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws_session_token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws_role_to_assume: ${{ vars.AWS_ROLE_TO_ASSUME || secrets.AWS_ROLE_TO_ASSUME }}
 
       - name: Prove the AWS session
         id: sts
         env:
-          PROFILE: academy
+          PROFILE: AWS_ACTUAL
         run: |
           set -euo pipefail
           if ! ARN=$(aws sts get-caller-identity --query Arn --output text); then
-            echo "::error::sts failed. Start Lab and paste fresh AWS Details."
+            echo "::error::sts failed. Check Environment AWS_ACTUAL AWS_ROLE_TO_ASSUME / GitHub OIDC."
             exit 1
           fi
           ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
           echo "account_id=${ACCOUNT}" >> "$GITHUB_OUTPUT"
           echo "bucket=heavy-rental-tfstate-${ACCOUNT}-${DEPLOYMENT}" >> "$GITHUB_OUTPUT"
+          echo "ssm_bucket=heavy-rental-ssm-${ACCOUNT}-${DEPLOYMENT}" >> "$GITHUB_OUTPUT"
           echo "deployment=${DEPLOYMENT}" >> "$GITHUB_OUTPUT"
           {
             echo "### AWS profile \`${PROFILE}\` (deployment \`${DEPLOYMENT}\`)"
@@ -146,18 +143,16 @@ jobs:
     needs: [assert-lab]
     if: inputs.action == 'plan' || inputs.action == 'bootstrap' || inputs.action == 'apply'
     runs-on: ubuntu-latest
-    environment: academy
+    environment: AWS_ACTUAL
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7.0.1
 
       - uses: ./.github/actions/resolve-aws-profile
         with:
-          profile: academy
+          profile: AWS_ACTUAL
           aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws_session_token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws_role_to_assume: ${{ vars.AWS_ROLE_TO_ASSUME || secrets.AWS_ROLE_TO_ASSUME }}
 
       - uses: hashicorp/setup-terraform@v4.0.1
         with:
@@ -186,18 +181,16 @@ jobs:
     needs: [assert-lab, ensure-backend]
     if: always() && needs.assert-lab.result == 'success' && needs.ensure-backend.result == 'success' && (inputs.action == 'plan' || inputs.action == 'apply')
     runs-on: ubuntu-latest
-    environment: academy
+    environment: AWS_ACTUAL
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7.0.1
 
       - uses: ./.github/actions/resolve-aws-profile
         with:
-          profile: academy
+          profile: AWS_ACTUAL
           aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws_session_token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws_role_to_assume: ${{ vars.AWS_ROLE_TO_ASSUME || secrets.AWS_ROLE_TO_ASSUME }}
 
       - uses: hashicorp/setup-terraform@v4.0.1
         with:
@@ -234,41 +227,6 @@ jobs:
         run: |
           set -euo pipefail
           echo "TF_VAR_alarm_email=${ALARM_EMAIL}" >> "$GITHUB_ENV"
-
-      - name: Preflight Vocareum data sources
-        run: |
-          set -euo pipefail
-          if ! aws iam get-instance-profile --instance-profile-name LabInstanceProfile >/dev/null; then
-            echo "::error::IAM instance profile LabInstanceProfile was not found. Vocareum must expose this name for every ASG."
-            exit 1
-          fi
-          if ! aws iam get-role --role-name LabRole >/dev/null; then
-            echo "::error::IAM role LabRole was not found. Vocareum must pre-create LabRole."
-            exit 1
-          fi
-          PROFILE_ROLE="$(aws iam get-instance-profile \
-            --instance-profile-name LabInstanceProfile \
-            --query 'InstanceProfile.Roles[0].RoleName' \
-            --output text)"
-          if [ "${PROFILE_ROLE}" != "LabRole" ]; then
-            echo "::error::LabInstanceProfile must use LabRole (got '${PROFILE_ROLE}'). Do not create IAM."
-            exit 1
-          fi
-          echo "LabInstanceProfile uses LabRole."
-          echo "Available Postgres engine versions (first 8):"
-          aws rds describe-db-engine-versions \
-            --engine postgres \
-            --query 'DBEngineVersions[0:8].EngineVersion' \
-            --output text
-          echo "Latest Amazon Linux 2023 x86_64 AMI (DescribeImages):"
-          aws ec2 describe-images \
-            --owners amazon \
-            --filters \
-              Name=name,Values=al2023-ami-*-kernel-*-x86_64 \
-              Name=state,Values=available \
-              Name=architecture,Values=x86_64 \
-            --query 'sort_by(Images,&CreationDate)[-1].[ImageId,Name]' \
-            --output text
 
       - name: terraform init
         env:
@@ -314,42 +272,34 @@ jobs:
           rc=$?
           cat /tmp/tfplan.out
           if [ "${rc}" -ne 0 ]; then
-            if grep -q 'voc-cancel-cred' /tmp/tfplan.out; then
+            if grep -qE 'AccessDenied|UnauthorizedOperation|ExpiredToken|AccessDeniedException' /tmp/tfplan.out; then
               {
-                echo "### Terraform plan failed — Vocareum session cancelled"
+                echo "### Terraform plan failed — AWS auth"
                 echo ""
-                echo "IAM policy \`voc-cancel-cred\` denied S3 or other APIs. Start Lab and paste fresh AWS Details."
-                echo "If a lock file remains, \`force-unlock\` only after no other run is in the Terraform job."
+                echo "OIDC assume-role or IAM policy denied an API. Check AWS_ROLE_TO_ASSUME and the runner policy."
               } >> "$GITHUB_STEP_SUMMARY"
-              echo "::error::Vocareum cancelled the lab credentials (voc-cancel-cred). Start Lab, paste fresh AWS Details. Do not treat this as a missing S3 bucket policy."
+              echo "::error::Paid plan failed AWS auth. Check AWS_ROLE_TO_ASSUME / OIDC trust (aws-infra-paid.yml)."
               exit 1
             fi
             {
               echo "### Terraform plan failed"
               echo ""
               echo '```'
-              grep -E '^Error:|  on |AccessDenied|UnauthorizedOperation|voc-cancel-cred' /tmp/tfplan.out | head -n 40 || true
+              grep -E '^Error:|  on |AccessDenied|UnauthorizedOperation|ExpiredToken' /tmp/tfplan.out | head -n 40 || true
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
             echo "::error::terraform plan failed. See job summary and the Error: lines above."
             exit 1
           fi
           set -euo pipefail
-          if terraform show -json tfplan | jq -e '
-              .resource_changes[]?
-              | select(.type == "aws_iam_role" and (.change.actions | index("create")))
-            ' >/dev/null; then
-            echo "::error::Academy plan would create aws_iam_role. Vocareum forbids that. Use LabInstanceProfile / LabRole only."
-            exit 1
-          fi
           {
             echo "### Terraform plan"
             echo ""
-            echo "Profile: \`academy\`"
+            echo "Profile: \`actual\`"
             echo "Backend: \`s3://${BUCKET}/estate/terraform.tfstate\`"
             echo "Action: \`${{ inputs.action }}\`"
-            echo "- instance profile: \`LabInstanceProfile\` / \`LabRole\`"
-            echo "- observability: CloudTrail \`heavy-rental-academy\`, dashboard \`heavy-rental-academy\`, observe S3"
+            echo "- instance profiles: \`hr-paid-{portal,rest,haystack,neo4j}\`"
+            echo "- observability: CloudTrail \`heavy-rental-actual\`, dashboard \`heavy-rental-actual\`, observe S3"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: terraform apply
@@ -362,16 +312,14 @@ jobs:
           rc=$?
           cat /tmp/tfapply.out
           if [ "${rc}" -ne 0 ]; then
-            if grep -q 'voc-cancel-cred' /tmp/tfapply.out; then
+            if grep -qE 'AccessDenied|UnauthorizedOperation|ExpiredToken|AccessDeniedException' /tmp/tfapply.out; then
               {
-                echo "### Terraform apply failed — Vocareum session cancelled"
+                echo "### Terraform apply failed — AWS auth"
                 echo ""
-                echo "IAM policy \`voc-cancel-cred\` denied S3 state persist after resources were created."
-                echo "Start Lab, paste **fresh** AWS Details, then re-run \`apply\`."
+                echo "OIDC assume-role or IAM policy denied persist. Re-run apply after fixing AWS_ROLE_TO_ASSUME."
                 echo "The next run imports leftovers into state (or \`destroy\` if two estate VPCs exist)."
-                echo "The runner \`errored.tfstate\` is not kept. See OPERATOR-GUIDE: voc-cancel-cred."
               } >> "$GITHUB_STEP_SUMMARY"
-              echo "::error::Vocareum cancelled the lab credentials (voc-cancel-cred) after Terraform created resources. Start Lab, paste fresh AWS Details, then re-run apply (reconcile imports leftovers). See OPERATOR-GUIDE."
+              echo "::error::Paid apply failed AWS auth after resources may have been created. Fix OIDC/IAM and re-run apply."
               exit 1
             fi
             if grep -qE 'AlreadyExists|RepositoryAlreadyExistsException|ResourceExistsException|DBSubnetGroupAlreadyExists|DBInstanceAlreadyExists|DuplicateLoadBalancerName|InvalidGroup.Duplicate' /tmp/tfapply.out; then
@@ -379,22 +327,21 @@ jobs:
                 echo "### Terraform apply failed — named AWS object already exists"
                 echo ""
                 echo "Reconcile did not bind every leftover into state, or two estate VPCs exist."
-                echo "1. Start Lab and paste fresh AWS Details."
-                echo "2. If the job reported two \`heavy-rental-academy\` VPCs: \`action=destroy\` then \`apply\`."
-                echo "3. Otherwise re-run \`action=plan\` (reconcile runs again) then \`apply\`."
+                echo "1. If the job reported two \`heavy-rental-academy\` VPCs: \`action=destroy\` then \`apply\`."
+                echo "2. Otherwise re-run \`action=plan\` (reconcile runs again) then \`apply\`."
                 echo ""
                 echo '```'
                 grep -E '^Error:|  on |AlreadyExists|RepositoryAlreadyExists|ResourceExists|DBSubnetGroupAlreadyExists|DBInstanceAlreadyExists' /tmp/tfapply.out | head -n 40 || true
                 echo '```'
               } >> "$GITHUB_STEP_SUMMARY"
-              echo "::error::Named AWS objects already exist and are not fully in state. Re-run plan/apply after Start Lab, or destroy if two estate VPCs exist. See OPERATOR-GUIDE."
+              echo "::error::Named AWS objects already exist and are not fully in state. Re-run plan/apply, or destroy if two estate VPCs exist."
               exit 1
             fi
             {
               echo "### Terraform apply failed"
               echo ""
               echo '```'
-              grep -E '^Error:|  on |AccessDenied|UnauthorizedOperation|voc-cancel-cred|errored.tfstate' /tmp/tfapply.out | head -n 40 || true
+              grep -E '^Error:|  on |AccessDenied|UnauthorizedOperation|ExpiredToken|errored.tfstate' /tmp/tfapply.out | head -n 40 || true
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
             echo "::error::terraform apply failed. See job summary."
@@ -412,8 +359,8 @@ jobs:
             echo "- RDS Haystack (\`haystack\`): \`$(terraform output -raw rds_haystack_endpoint)\`"
             echo "- Neo4j Bolt NLB: \`$(terraform output -raw neo4j_uri)\`"
             echo "- NAT Gateways: \`$(terraform output -json nat_gateway_ids)\`"
-            echo "- instance profile: \`$(terraform output -raw lab_instance_profile)\`"
-            echo "- IAM: \`$(terraform output -raw lab_role)\` (Vocareum LabRole; no new IAM)"
+            echo "- instance profiles: Terraform \`hr-paid-{portal,rest,haystack,neo4j}\`"
+            echo "- Ansible SSM bucket: \`$(terraform output -raw ansible_ssm_bucket)\`"
             echo "- CloudTrail: \`$(terraform output -raw cloudtrail_name)\` (S3 only)"
             echo "- observe bucket: \`$(terraform output -raw observe_bucket)\`"
             echo "- CloudWatch dashboard: \`$(terraform output -raw cloudwatch_dashboard)\`"
@@ -453,7 +400,7 @@ jobs:
     needs: [assert-lab]
     if: needs.assert-lab.result == 'success' && inputs.action == 'destroy'
     runs-on: ubuntu-latest
-    environment: academy
+    environment: AWS_ACTUAL
     timeout-minutes: 90
     steps:
       - name: Require confirm_destroy
@@ -474,11 +421,9 @@ jobs:
 
       - uses: ./.github/actions/resolve-aws-profile
         with:
-          profile: academy
+          profile: AWS_ACTUAL
           aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws_session_token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws_role_to_assume: ${{ vars.AWS_ROLE_TO_ASSUME || secrets.AWS_ROLE_TO_ASSUME }}
 
       - uses: hashicorp/setup-terraform@v4.0.1
         with:
@@ -564,14 +509,13 @@ jobs:
           terraform destroy -input=false -auto-approve -no-color > /tmp/tfdestroy.out 2>&1
           rc=$?
           cat /tmp/tfdestroy.out
-          if grep -q 'voc-cancel-cred' /tmp/tfdestroy.out; then
+          if grep -qE 'AccessDenied|UnauthorizedOperation|ExpiredToken|AccessDeniedException' /tmp/tfdestroy.out; then
             {
-              echo "### Terraform destroy failed — Vocareum session cancelled"
+              echo "### Terraform destroy failed — AWS auth"
               echo ""
-              echo "IAM policy \`voc-cancel-cred\` denied S3 or destroy APIs. Start Lab and paste fresh AWS Details."
-              echo "Do not assume the estate is gone. Re-run destroy after a live session."
+              echo "OIDC assume-role or IAM policy denied destroy. Do not assume the estate is gone. Re-run destroy."
             } >> "$GITHUB_STEP_SUMMARY"
-            echo "::error::Vocareum cancelled the lab credentials (voc-cancel-cred) during destroy. Start Lab and re-run destroy. Do not assume resources were deleted."
+            echo "::error::Paid destroy failed AWS auth. Re-run destroy. Do not assume resources were deleted."
             exit 1
           fi
           if [ "${rc}" -ne 0 ] && grep -q 'device index 0' /tmp/tfdestroy.out; then
@@ -602,7 +546,7 @@ jobs:
             echo "### Terraform destroy failed"
             echo ""
             echo '```'
-            grep -E '^Error:|  on |AccessDenied|UnauthorizedOperation|device index|voc-cancel-cred' /tmp/tfdestroy.out | head -n 40 || true
+            grep -E '^Error:|  on |AccessDenied|UnauthorizedOperation|device index|ExpiredToken' /tmp/tfdestroy.out | head -n 40 || true
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
           echo "::error::terraform destroy or leftover sweep failed. See job summary."
@@ -613,18 +557,16 @@ jobs:
     needs: [assert-lab, terraform]
     if: always() && needs.assert-lab.result == 'success' && (inputs.action == 'apply' || inputs.action == 'configure-only' || inputs.action == 'deploy-projects') && (needs.terraform.result == 'success' || needs.terraform.result == 'skipped')
     runs-on: ubuntu-latest
-    environment: academy
+    environment: AWS_ACTUAL
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7.0.1
 
       - uses: ./.github/actions/resolve-aws-profile
         with:
-          profile: academy
+          profile: AWS_ACTUAL
           aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws_session_token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws_role_to_assume: ${{ vars.AWS_ROLE_TO_ASSUME || secrets.AWS_ROLE_TO_ASSUME }}
 
       - uses: hashicorp/setup-terraform@v4.0.1
         with:
@@ -657,7 +599,7 @@ jobs:
             echo "### sync-secrets"
             echo ""
             echo "Wrote \`heavy-rental/{portal,rest,haystack,neo4j}\`. SecretString not printed."
-            echo "Vocareum AWS keys were not written."
+            echo "No AWS access keys were written."
           } >> "$GITHUB_STEP_SUMMARY"
 
   sync-ssh-keys:
@@ -665,18 +607,16 @@ jobs:
     needs: [assert-lab, terraform]
     if: always() && needs.assert-lab.result == 'success' && (inputs.action == 'apply' || inputs.action == 'configure-only' || inputs.action == 'deploy-projects') && (needs.terraform.result == 'success' || needs.terraform.result == 'skipped')
     runs-on: ubuntu-latest
-    environment: academy
+    environment: AWS_ACTUAL
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7.0.1
 
       - uses: ./.github/actions/resolve-aws-profile
         with:
-          profile: academy
+          profile: AWS_ACTUAL
           aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws_session_token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws_role_to_assume: ${{ vars.AWS_ROLE_TO_ASSUME || secrets.AWS_ROLE_TO_ASSUME }}
 
       - name: Wait InService and install public keys
         run: |
@@ -694,18 +634,16 @@ jobs:
     needs: [assert-lab, terraform, sync-secrets, sync-ssh-keys]
     if: always() && needs.assert-lab.result == 'success' && needs.sync-secrets.result == 'success' && needs.sync-ssh-keys.result == 'success' && (inputs.action == 'apply' || inputs.action == 'configure-only') && (needs.terraform.result == 'success' || needs.terraform.result == 'skipped')
     runs-on: ubuntu-latest
-    environment: academy
+    environment: AWS_ACTUAL
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7.0.1
 
       - uses: ./.github/actions/resolve-aws-profile
         with:
-          profile: academy
+          profile: AWS_ACTUAL
           aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws_session_token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws_role_to_assume: ${{ vars.AWS_ROLE_TO_ASSUME || secrets.AWS_ROLE_TO_ASSUME }}
 
       - name: Session Manager plugin
         run: |
@@ -732,11 +670,12 @@ jobs:
           HAYSTACK_IMAGE: ${{ vars.HAYSTACK_IMAGE }}
           AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
           BUCKET: ${{ needs.assert-lab.outputs.bucket }}
+          SSM_BUCKET: ${{ needs.assert-lab.outputs.ssm_bucket }}
         working-directory: ansible
         run: |
           set -euo pipefail
           chmod +x inventory/aws_ssm.py
-          ANSIBLE_S3="${BUCKET}" 
+          ANSIBLE_S3="${SSM_BUCKET}" 
           # apply and configure-only: same playbook. Docker + Compose on all
           # guests; Neo4j compose only. Do not pull portal/REST/Haystack images
           # (private GHCR fails without a token). App compose is app CD.
@@ -756,18 +695,16 @@ jobs:
     needs: [assert-lab, sync-secrets, sync-ssh-keys]
     if: always() && needs.assert-lab.result == 'success' && needs.sync-secrets.result == 'success' && needs.sync-ssh-keys.result == 'success' && inputs.action == 'deploy-projects'
     runs-on: ubuntu-latest
-    environment: academy
+    environment: AWS_ACTUAL
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7.0.1
 
       - uses: ./.github/actions/resolve-aws-profile
         with:
-          profile: academy
+          profile: AWS_ACTUAL
           aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws_session_token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws_role_to_assume: ${{ vars.AWS_ROLE_TO_ASSUME || secrets.AWS_ROLE_TO_ASSUME }}
 
       - name: Resolve images and require estate
         env:
@@ -874,11 +811,12 @@ jobs:
           HAYSTACK_IMAGE: ${{ env.HAYSTACK_IMAGE }}
           AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
           BUCKET: ${{ needs.assert-lab.outputs.bucket }}
+          SSM_BUCKET: ${{ needs.assert-lab.outputs.ssm_bucket }}
         working-directory: ansible
         run: |
           set -euo pipefail
           chmod +x inventory/aws_ssm.py
-          ANSIBLE_S3="${BUCKET}" 
+          ANSIBLE_S3="${SSM_BUCKET}" 
           ansible-playbook playbooks/site.yml \
             -e "neo4j_image=neo4j:5" \
             -e "image_http_url=" \
@@ -895,18 +833,16 @@ jobs:
     needs: [assert-lab]
     if: needs.assert-lab.result == 'success' && inputs.action == 'stop'
     runs-on: ubuntu-latest
-    environment: academy
+    environment: AWS_ACTUAL
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7.0.1
 
       - uses: ./.github/actions/resolve-aws-profile
         with:
-          profile: academy
+          profile: AWS_ACTUAL
           aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws_session_token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws_role_to_assume: ${{ vars.AWS_ROLE_TO_ASSUME || secrets.AWS_ROLE_TO_ASSUME }}
 
       - name: Pause ASGs and both RDS
         run: |

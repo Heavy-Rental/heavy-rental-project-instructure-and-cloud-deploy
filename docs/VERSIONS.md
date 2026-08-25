@@ -2,13 +2,13 @@
 
 Contract: `heavy-rental-project-pipeline-development/cloud-deployment-feasibility-studies/` — AWS study §4.3 / §6.1 / §6.4 / §6.4a / §7.1, `TERRAFORM-PROCESS.md`, `ANSIBLE-PROCESS.md`.
 
-Recorded **2026-08-17**. Terraform CLI **1.15.8** and Ansible **14.3.1** are live in `aws-infra-academy.yml`.
+Recorded **2026-08-25**. Terraform CLI **1.15.8** and Ansible **14.3.1** are live in `aws-infra-academy.yml` and `aws-infra-paid.yml` (separate job graphs).
 
 ## Toolchain
 
 | Component | Design source | Recorded version | Where pinned |
 | --- | --- | --- | --- |
-| Terraform CLI | `TERRAFORM-PROCESS.md` | **1.15.8** (latest stable, 8 Jul 2026) | `.github/workflows/aws-infra-academy.yml` (`terraform_version`); `terraform/{backend,academy}/versions.tf` (`required_version >= 1.15.8`) |
+| Terraform CLI | `TERRAFORM-PROCESS.md` | **1.15.8** (latest stable, 8 Jul 2026) | `.github/workflows/aws-infra-{academy,paid}.yml` (`terraform_version`); `terraform/{backend,academy}/versions.tf` (`required_version >= 1.15.8`) |
 | hashicorp/aws provider | estate `.tf` | `~> 5.0` (do not bump; latest is 6.60.0) | `terraform/{backend,academy}/versions.tf` |
 | hashicorp/setup-terraform | Actions | **v4.0.1** | `aws-infra-academy.yml` |
 | actions/checkout | Actions | **v7.0.1** | `aws-infra-academy.yml` |

@@ -5,7 +5,7 @@ output "portal_alb_dns" {
 
 output "rest_alb_dns" {
   value       = aws_lb.rest.dns_name
-  description = "Internal REST ALB. Lands in heavy-rental/portal REST_BASE_URL (branch 3)."
+  description = "Internet-facing REST ALB :8080. Lands in heavy-rental/portal REST_BASE_URL."
 }
 
 output "haystack_alb_dns" {
@@ -127,7 +127,12 @@ output "cloudtrail_arn" {
 
 output "cloudwatch_dashboard" {
   value       = aws_cloudwatch_dashboard.estate.dashboard_name
-  description = "CloudWatch dashboard name (heavy-rental-academy)."
+  description = "CloudWatch dashboard name (heavy-rental-academy or heavy-rental-actual)."
+}
+
+output "ansible_ssm_bucket" {
+  value       = local.is_actual ? aws_s3_bucket.ansible_ssm[0].id : ""
+  description = "Paid Ansible SSM transfer bucket. Empty on academy (LabRole uses the tfstate bucket)."
 }
 
 output "sns_alarm_topic" {

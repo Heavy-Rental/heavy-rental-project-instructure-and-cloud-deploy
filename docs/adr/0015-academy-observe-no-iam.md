@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-08-18
 - **Branch:** `HR-183-update-on-aws-infrastructure-pipeline-to-reuse-possible-aws-resource-during-creation`
-- **Related:** [0005](0005-labinstanceprofile-only.md)
+- **Related:** [0005](0005-labinstanceprofile-only.md), [0017](0017-two-actions-academy-paid.md)
 
 ## Context
 
@@ -16,7 +16,7 @@ AWS study §2.1 also says Vocareum **cannot** enable CloudWatch logging on the t
 ## Decision
 
 1. Data-source **`LabRole`** and **`LabInstanceProfile`** only (ADR 0005). Observe adds no IAM resource. Plan still fails unless the profile’s role is `LabRole`.
-2. CloudTrail `heavy-rental-academy` writes **only to S3** (bucket policy, CloudTrail service principal). Do **not** set `cloud_watch_logs_group_arn` or `cloud_watch_logs_role_arn`. Do **not** pass LabRole as the trail’s CloudWatch role.
+2. CloudTrail `heavy-rental-academy` writes **only to S3** (bucket policy, CloudTrail service principal). Do **not** set `cloud_watch_logs_group_arn` or `cloud_watch_logs_role_arn`. Do **not** pass LabRole as the trail’s CloudWatch role. Paid (ADR 0017) names the trail `heavy-rental-actual`; the academy string is unchanged so apply does not replace it.
 3. VPC flow logs use **`log_destination_type = s3`**. Do **not** set `iam_role_arn` (including LabRole).
 4. ALB access logs use the same observe bucket (ELB service principal).
 5. CloudWatch **metric** alarms and a dashboard use the AWS/ApplicationELB, AWS/RDS, and AWS/AutoScaling namespaces. No extra role.
@@ -26,5 +26,5 @@ AWS study §2.1 also says Vocareum **cannot** enable CloudWatch logging on the t
 
 - Apply works under the Vocareum federated user without CreateRole.
 - Audit and flow logs are in S3, not Logs Insights, until a paid account can attach a purpose-built role.
-- Operators watch the `heavy-rental-academy` dashboard and alarms. Email needs `ALARM_EMAIL` plus a confirm click.
+- Operators watch the `heavy-rental-academy` dashboard and alarms (paid: `heavy-rental-actual`). Email needs `ALARM_EMAIL` plus a confirm click. Still no CloudTrail → CloudWatch Logs on either profile.
 - LabRole permissions stay whatever Vocareum attached. We do not grant `logs:PutLogEvents` ourselves.

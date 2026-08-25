@@ -55,9 +55,9 @@ resource "aws_lb_listener" "portal_http" {
 resource "aws_lb" "rest" {
   name               = "hr-alb-rest"
   load_balancer_type = "application"
-  internal           = true
+  internal           = false
   security_groups    = [aws_security_group.alb_rest.id]
-  subnets            = aws_subnet.app[*].id
+  subnets            = aws_subnet.public[*].id
   idle_timeout       = 60
 
   access_logs {

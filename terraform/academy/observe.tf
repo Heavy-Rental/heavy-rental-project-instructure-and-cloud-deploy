@@ -89,7 +89,7 @@ resource "aws_s3_bucket_policy" "observe" {
         Resource  = aws_s3_bucket.observe.arn
         Condition = {
           StringEquals = {
-            "AWS:SourceArn" = "arn:aws:cloudtrail:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:trail/heavy-rental-academy"
+            "AWS:SourceArn" = "arn:aws:cloudtrail:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:trail/${local.observe_name}"
           }
         }
       },
@@ -102,7 +102,7 @@ resource "aws_s3_bucket_policy" "observe" {
         Condition = {
           StringEquals = {
             "s3:x-amz-acl"  = "bucket-owner-full-control"
-            "AWS:SourceArn" = "arn:aws:cloudtrail:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:trail/heavy-rental-academy"
+            "AWS:SourceArn" = "arn:aws:cloudtrail:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:trail/${local.observe_name}"
           }
         }
       },
@@ -151,7 +151,7 @@ resource "aws_s3_bucket_policy" "observe" {
 
 # S3 only. Do not set cloud_watch_logs_* (Vocareum + ADR 0015).
 resource "aws_cloudtrail" "academy" {
-  name                          = "heavy-rental-academy"
+  name                          = local.observe_name
   s3_bucket_name                = aws_s3_bucket.observe.id
   s3_key_prefix                 = "cloudtrail"
   include_global_service_events = true
@@ -168,7 +168,7 @@ resource "aws_cloudtrail" "academy" {
   depends_on = [aws_s3_bucket_policy.observe]
 
   tags = {
-    Name = "heavy-rental-academy"
+    Name = local.observe_name
     Role = "observe"
   }
 }
@@ -187,7 +187,7 @@ resource "aws_flow_log" "academy" {
   }
 
   tags = {
-    Name = "heavy-rental-academy-flow"
+    Name = "${local.observe_name}-flow"
     Role = "observe"
   }
 
@@ -353,7 +353,7 @@ resource "aws_cloudwatch_metric_alarm" "asg_inservice" {
 }
 
 resource "aws_cloudwatch_dashboard" "estate" {
-  dashboard_name = "heavy-rental-academy"
+  dashboard_name = local.observe_name
   dashboard_body = jsonencode({
     widgets = concat(
       [

@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 # Pause: ASG desired=0 (keep max=2) + stop both RDS. NAT Gateways stay and still bill.
+#
+# RDS identifiers are Terraform names (heavy-rental-academy,
+# heavy-rental-haystack-academy) on academy and paid. Do not rename them
+# to -actual; that is not the live db-instance-identifier.
 set -euo pipefail
 
 ASGS=(asg-portal asg-rest asg-haystack asg-neo4j)

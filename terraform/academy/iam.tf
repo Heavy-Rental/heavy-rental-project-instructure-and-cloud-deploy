@@ -81,6 +81,21 @@ resource "aws_iam_role_policy" "guest_app" {
         Action   = ["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"]
         Resource = local.paid_secret_arn[each.key]
       },
+      {
+        Sid    = "AnsibleSsmGet"
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:GetObjectVersion",
+        ]
+        Resource = "${aws_s3_bucket.ansible_ssm[0].arn}/*"
+      },
+      {
+        Sid      = "AnsibleSsmList"
+        Effect   = "Allow"
+        Action   = ["s3:ListBucket"]
+        Resource = aws_s3_bucket.ansible_ssm[0].arn
+      },
     ]
   })
 }

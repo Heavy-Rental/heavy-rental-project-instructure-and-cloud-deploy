@@ -1,16 +1,20 @@
-# OpenSpec project config for Heavy Rental AWS Academy (Vocareum) infra CD.
+# OpenSpec project config for Heavy Rental Academy and paid infra CD.
 schema: spec-driven
 context: |
   This repository specifies GitHub Actions that create and operate the
-  Academy Learner Lab (Vocareum) estate.
+  estate on AWS Academy / Vocareum and on a billed AWS account.
   Terraform creates architecture and resources (VPC, two NAT Gateways,
   four ASGs, ALBs, two Multi-AZ RDS, Bolt NLB, empty SM shells,
   CloudWatch alarms/dashboard, CloudTrail to S3).
   Ansible only configures existing guests (Docker, .env, compose).
-  Six changes including add-infra-paid-profile (academy Vocareum or paid OIDC
-  on the same Action). add-infra-academy-bootstrap, add-infra-academy-estate,
+  Changes include add-infra-paid-pipeline (dedicated aws-infra-paid.yml OIDC
+  Action with its own jobs; academy.yml is Vocareum-only with its own jobs).
+  add-infra-academy-bootstrap, add-infra-academy-estate,
   add-infra-academy-configure, add-infra-academy-deploy-projects,
-  add-infra-academy-observe.
-  Observe uses Vocareum LabRole only (no aws_iam_role). Trail is S3-only.
-  Not paid/OIDC. Day-to-day portal/REST/Haystack rolls are app CD (other repo).
+  add-infra-academy-observe, add-infra-paid-profile (superseded in part).
+  REST ALB is internet-facing :8080. Haystack stays internal.
+  CORS includes portal and REST ALB origins. Paid Ansible uses a dedicated
+  SSM bucket (not tfstate). Academy observe uses Vocareum LabRole only
+  (no aws_iam_role). Trail is S3-only (heavy-rental-academy or -actual).
+  Day-to-day portal/REST/Haystack rolls are app CD (other repo; academy-only).
   Infra action=deploy-projects is a later first-compose of site.yml after apply.
