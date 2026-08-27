@@ -22,5 +22,5 @@ No `aws_iam_role` in either root on Academy.
 ## Consequences
 
 - `action=plan` can init the estate backend after the first `ensure-backend`.
-- Estate `destroy` (branch 3) empties `estate/terraform.tfstate` and does not delete the bucket.
+- Estate `destroy` (on the live Actions; confirm gate from configure) empties `estate/terraform.tfstate` and does not delete the bucket.
 - Vocareum **Reset** still wipes the account; `.tf` stays in git and is re-applied.

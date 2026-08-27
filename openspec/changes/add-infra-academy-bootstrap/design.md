@@ -1,8 +1,10 @@
 # Design: Academy / Vocareum infra CD bootstrap
 
+> **As implemented:** S3 native `use_lockfile=true`. No DynamoDB lock table (ADR 0003). An existing `heavy-rental-tfstate-lock-academy` table, if present, is unused leftover.
+
 ## Context
 
-Vocareum federates a short-lived `voclabs/…` principal. OIDC cannot be created on Academy. The GitHub runner is ephemeral. The estate Terraform state must live in S3 with a DynamoDB lock, but that bucket cannot be a resource *in* the same state it stores.
+Vocareum federates a short-lived `voclabs/…` principal. OIDC cannot be created on Academy. The GitHub runner is ephemeral. The estate Terraform state must live in S3 with a native S3 lock (`use_lockfile`), but that bucket cannot be a resource *in* the same state it stores.
 
 Application CI already builds images in another repo. This project only deploys to AWS. Branch 1 does not create the estate.
 
@@ -33,4 +35,4 @@ Application CI already builds images in another repo. This project only deploys 
 ## Risks / Trade-offs
 
 - GitHub cannot secret-type dispatch inputs (visible on the run Inputs page). Mitigate: private repo, reviewers, mask, `set +x`.
-- First `plan` creates a small S3 bucket + DynamoDB table (credit noise, not a VPC).
+- First `plan` creates a small S3 state bucket (credit noise, not a VPC). No DynamoDB lock table.

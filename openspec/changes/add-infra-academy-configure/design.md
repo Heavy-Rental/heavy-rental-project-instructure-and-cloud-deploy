@@ -1,5 +1,7 @@
 # Design: Academy configure
 
+> **Later modified by** [`add-infra-academy-deploy-projects`](../add-infra-academy-deploy-projects/proposal.md) / [ADR 0014](../../../docs/adr/0014-deploy-projects-after-configure.md): `apply` / `configure-only` run `configure.yml` (Docker + Neo4j only). Portal / REST / Haystack first-compose is a later `action=deploy-projects` (`site.yml`). Ansible spec already matches.
+
 ## Context
 
 `ANSIBLE-PROCESS.md` and AWS study §8.2 define `apply` / `configure-only` as Terraform (if any) → `sync-secrets` → `sync-ssh-keys` → Ansible. `stop` pauses compute and both RDS. NAT Gateways cannot be stopped.

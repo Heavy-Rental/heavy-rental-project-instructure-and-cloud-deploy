@@ -1,6 +1,6 @@
 # SPDD Analysis: add-infra-academy-configure
 
-**Status:** Active  
+**Status:** Delivered. Later `add-infra-academy-deploy-projects` moved portal/REST/Haystack compose off apply (`configure.yml` = Docker + Neo4j; `site.yml` = later `deploy-projects`).  
 **Audience:** Implementers of Academy configure (`HR-162`)  
 **Companion:** [REASONS Canvas](../prompt/add-infra-academy-configure.md) · [OpenSpec change](../../openspec/changes/add-infra-academy-configure/proposal.md)
 
@@ -16,8 +16,9 @@ The estate exists. Shells are empty. Guests have no Docker compose. Operators ca
 | Ansible | Configures existing guests only. No VPC/ASG/RDS create. |
 | sync-secrets | `put-secret-value` from Terraform outputs + Environment app secrets, including Haystack `SOURCE_*` / `TARGET_*` |
 | sync-ssh-keys | PEMs after InService; public key via SSM |
-| First compose | Ansible on all four groups **after** Terraform apply |
-| configure-only | No Terraform apply. Docker all guests; compose **Neo4j only** |
+| Apply Ansible | `configure.yml`: Docker all guests; compose **Neo4j only** (same as configure-only). App images wait for `deploy-projects`. |
+| configure-only | No Terraform apply. Same Ansible as apply. |
+| First compose | Later change: `action=deploy-projects` / `site.yml` |
 | stop | Pause: ASG desired=0 + stop both RDS. Not destroy |
 | Image | CI tar or registry tag. No `docker build` |
 

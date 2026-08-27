@@ -1,15 +1,33 @@
 # Changelog
 
-## v1.0.0
+## As-built estate (infra CD)
 
-### Added or Changed
-- Added this changelog :)
-- Fixed typos in both templates
-- Back to top links
-- Added more "Built With" frameworks/libraries
-- Changed table of contents to start collapsed
-- Added checkboxes for major features on roadmap
+Delivered on this repo. Operator walkthrough: [`OPERATOR-GUIDE.md`](OPERATOR-GUIDE.md). Specs: [`specification/README.md`](specification/README.md).
 
-### Removed
+### Actions
 
-- Some packages/libraries from acknowledgements I no longer use
+- Two operator workflows with separate job graphs (ADR 0017 / 0019):
+  - **AWS infrastructure (Academy)** — `aws-infra-academy.yml`, Environment `academy`, Vocareum keys
+  - **AWS infrastructure (paid)** — `aws-infra-paid.yml`, Environment `AWS_ACTUAL`, GitHub OIDC (`AWS_ROLE_TO_ASSUME`)
+- `action`: `bootstrap`, `plan`, `apply`, `configure-only`, `deploy-projects`, `stop`, `destroy`
+- `apply` / `configure-only` run Ansible `configure.yml` (Docker + Neo4j only)
+- `deploy-projects` is a later run of `site.yml` (portal + REST + Haystack first-compose)
+- Day-to-day image rolls: app CD academy **and** paid callers in `heavy-rental-project-pipeline-development`
+
+### Estate
+
+- Two NAT Gateways (one per public AZ). Guest count **8 EC2**. No NAT instance (ADR 0010)
+- Public portal ALB `:80` and internet-facing REST ALB `:8080` (ADR 0018). Haystack ALB, Bolt NLB, RDS stay internal
+- `APP_CORS_ALLOWED_ORIGINS` includes portal origin and `http://<rest_alb_dns>:8080`
+- Remote Terraform state: S3 `use_lockfile=true` (no DynamoDB lock table)
+- Academy guests: `LabInstanceProfile` / `LabRole` only. Paid guests: `hr-paid-*`
+- Observe: CloudTrail + flow logs + ALB access logs to S3; dashboard `heavy-rental-academy` or `heavy-rental-actual`. No CloudTrail → CloudWatch Logs
+- ASG health stays `EC2` (ADR 0008) — unhealthy ALB targets do not replace instances
+- ALB `tg-rest` waits for `GET <instance>:8080/actuator/health` matcher **`200-299`** (2xx). `GET /` is Spring 401 and is not healthy
+- ALB `tg-haystack` waits for `GET <instance>:8000/health` matcher **`200-299`** (2xx). `/docs` is not the ALB check
+
+### Out of scope (unchanged)
+
+- Portal / REST HTTPS (ACM)
+- Marketplace Neo4j, EKS, NAT instance
+- Authoring app CD YAML in this repo

@@ -23,7 +23,7 @@ Feasibility §6P keeps REST on an **internal** ALB and forbids public 8080. Oper
 ## Decision
 
 1. `hr-alb-rest` is **internet-facing** in the **public** subnets (same AZs as the portal ALB).
-2. Listener stays **TCP 8080** → `tg-rest` :8080 so `REST_BASE_URL=http://<dns>:8080` does not change shape.
+2. Listener stays **TCP 8080** → `tg-rest` :8080 so `REST_BASE_URL=http://<dns>:8080` does not change shape. **Current health:** `tg-rest` waits for `GET <instance-ip>:8080/actuator/health` matcher **`200-299`** (2xx). `GET /` is Spring 401 and is not healthy.
 3. `sg-alb-rest` allows 8080 from `0.0.0.0/0`. Portal SG → REST ALB :8080 remains.
 4. `asg-rest` stays in **private app** subnets with **no public IP**. Outbound is still the same-AZ NAT Gateway.
 5. Haystack ALB, Bolt NLB, and RDS stay internal / non-public. Portal ALB stays the only public :80.

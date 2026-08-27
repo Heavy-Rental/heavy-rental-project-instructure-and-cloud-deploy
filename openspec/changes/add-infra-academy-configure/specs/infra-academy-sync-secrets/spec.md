@@ -1,5 +1,7 @@
 # Delta for infra-academy-sync-secrets
 
+> **Later modified by** [`add-infra-paid-pipeline`](../../../add-infra-paid-pipeline/specs/infra-academy-sync-secrets/spec.md) / [ADR 0018](../../../../../docs/adr/0018-public-rest-alb.md): `APP_CORS_ALLOWED_ORIGINS` is `http://<portal_alb_dns>,http://<rest_alb_dns>:8080`, not the portal origin alone.
+
 ## Purpose
 
 `sync-secrets` writes required JSON into the empty Secrets Manager shells. It does not write Vocareum AWS keys or SSH PEMs.

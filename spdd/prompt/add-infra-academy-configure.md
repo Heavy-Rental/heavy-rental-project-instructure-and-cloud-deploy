@@ -10,7 +10,7 @@ Follow `ANSIBLE-PROCESS.md` and AWS study §8.2. Everyday path is SSM.
 
 ## Ask
 
-`sync-secrets` → `sync-ssh-keys` → Ansible compose → `stop`.
+`sync-secrets` → `sync-ssh-keys` → Ansible `configure.yml` (Docker + Neo4j only) → `stop`. Portal / REST / Haystack compose is later `deploy-projects` / `site.yml`.
 
 ## Safeguards
 

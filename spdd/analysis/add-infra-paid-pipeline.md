@@ -29,7 +29,7 @@ Paid Ansible over SSM must not give guests write on `estate/terraform.tfstate`.
 
 - Class operators (academy Action unchanged)
 - Paid operators (billed account, OIDC role created out of band)
-- App CD (still academy-only; paid first-compose is infra `deploy-projects`)
+- App CD (academy and paid callers in `heavy-rental-project-pipeline-development`; paid first-compose is still infra `deploy-projects`)
 - Branch `add-infra-paid-profile` (one Action, two profiles — superseded in part)
 
 ## Risks
@@ -47,7 +47,7 @@ Paid Ansible over SSM must not give guests write on `estate/terraform.tfstate`.
 1. Specify behavior (OpenSpec capabilities on this change).
 2. Bind safeguards in the REASONS Canvas and ADRs 0017–0019.
 3. Two full job graphs; public REST ALB; paid SSM bucket; deployment-scoped observe leftovers.
-4. Leave paid app CD, ACM, and CloudTrail → Logs failing / out of scope.
+4. Leave ACM and CloudTrail → Logs out of scope. Day-to-day paid rolls are the app-CD paid callers in the other repo, not this Action.
 
 ## Success
 

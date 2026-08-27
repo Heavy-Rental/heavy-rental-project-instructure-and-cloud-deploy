@@ -55,9 +55,22 @@ On `apply` and `configure-only`, Ansible runs `configure.yml` only (Docker + Com
 
 `action=deploy-projects` is a **later** `workflow_dispatch` after a successful apply or configure-only (ADR 0014). It is not chained onto those actions. Preflight requires public GHCR or ECR tags (no stock `nginx`, no `image_http_url`), then runs `site.yml`. Re-running it resets all three apps to the infra Environment tags.
 
-Day-to-day image rolls: `haystack-fast-api-pipeline/deploy-pipeline/`, `heavy-rental-rest-api/deploy-pipeline/`, `heavy-rental-web-portal-pipeline/deploy-pipeline/`. Those workflows must not run Terraform.
+Day-to-day image rolls: academy **and** paid callers in `heavy-rental-project-pipeline-development` (`haystack-fast-api-pipeline/deploy-pipeline/`, `heavy-rental-rest-api/deploy-pipeline/`, `heavy-rental-web-portal-pipeline/deploy-pipeline/`). Those workflows must not run Terraform. CORS and secret JSON: [`infra-secrets.md`](infra-secrets.md).
 
 CI images are env-driven (Haystack/REST) or a static SPA (portal). Ansible injects SM; it does not bake lab hostnames into an image.
+
+## ALB health checks
+
+Layout table: [`../../docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md). ASGs stay `health_check_type = EC2` (ADR 0008).
+
+| Target group | Probe | Matcher |
+| --- | --- | --- |
+| `tg-portal` | `GET <instance-ip>:80/` | `200-399` |
+| `tg-rest` | `GET <instance-ip>:8080/actuator/health` | **`200-299`** (2xx). Not `GET /` (Spring 401). |
+| `tg-haystack` | `GET <instance-ip>:8000/health` | **`200-299`** (2xx). Not `/` or `/docs`. |
+| `tg-neo4j` | TCP `<instance-ip>:7687` | TCP |
+
+`site.yml` (deploy-projects) waits for REST and Haystack 2xx on those paths.
 
 ## Specs
 

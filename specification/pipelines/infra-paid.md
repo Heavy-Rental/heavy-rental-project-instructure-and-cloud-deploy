@@ -49,7 +49,7 @@ workflow_dispatch (Environment AWS_ACTUAL)
 | `deploy-projects` | No | Yes — `site.yml` (portal + REST + Haystack + Neo4j + `rds_logical`) |
 | `stop` | No (pauses compute/RDS) | No compose |
 
-`configure-only` does **not** replace portal / REST / Haystack images. `deploy-projects` is the infra first-compose (later run). Day-to-day rolls are app CD and are still **academy-only**.
+`configure-only` does **not** replace portal / REST / Haystack images. `deploy-projects` is the infra first-compose (later run). Day-to-day rolls are app CD in `heavy-rental-project-pipeline-development` (academy **and** paid callers).
 
 ## Image variables (infra Environment `AWS_ACTUAL`)
 
@@ -70,7 +70,7 @@ On `apply` and `configure-only`, Ansible runs `configure.yml` only (Docker + Com
 
 `action=deploy-projects` is a **later** `workflow_dispatch` after a successful apply or configure-only (ADR 0014). It is not chained onto those actions. Preflight requires public GHCR or ECR tags (no stock `nginx`, no `image_http_url`), then runs `site.yml`. Re-running it resets all three apps to the infra Environment `AWS_ACTUAL` tags.
 
-Day-to-day image rolls remain academy-only in `heavy-rental-project-pipeline-development` until a later change. Those workflows must not run Terraform.
+Day-to-day image rolls: academy and paid callers in `heavy-rental-project-pipeline-development` (`haystack-fast-api-pipeline/deploy-pipeline/`, `heavy-rental-rest-api/deploy-pipeline/`, `heavy-rental-web-portal-pipeline/deploy-pipeline/`). Those workflows must not run Terraform.
 
 ## One-time OIDC
 
@@ -83,6 +83,8 @@ Put the role ARN on Environment `AWS_ACTUAL` as **variable** or **secret** `AWS_
 ## REST ALB
 
 `hr-alb-rest` is internet-facing on **:8080** (ADR 0018). `REST_BASE_URL=http://<rest_alb_dns>:8080`. `APP_CORS_ALLOWED_ORIGINS` is `http://<portal_alb_dns>,http://<rest_alb_dns>:8080`. Haystack stays internal. HTTPS is not this pipeline. This diverges from feasibility §6P (study said REST internal / no public 8080).
+
+**Health:** `tg-rest` waits for `GET <instance-ip>:8080/actuator/health` matcher **`200-299`** (2xx). `GET /` is Spring 401 and is not healthy. `tg-haystack` waits for `GET <instance-ip>:8000/health` matcher **`200-299`**. Table: [`../../docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md). OpenSpec: [`../../openspec/changes/add-infra-paid-pipeline/specs/infra-estate-rest-alb/spec.md`](../../openspec/changes/add-infra-paid-pipeline/specs/infra-estate-rest-alb/spec.md).
 
 ## Specs
 

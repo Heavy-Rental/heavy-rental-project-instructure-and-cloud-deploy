@@ -1,5 +1,5 @@
 # No key_name. No tls_private_key. LabInstanceProfile (LabRole) only.
-# health_check_type = EC2 until branch 3 compose (ADR 0008).
+# health_check_type = EC2 (ADR 0008). Not switched to ELB after compose.
 # Portal (React/nginx), REST (Spring Boot), Haystack: one guest per app AZ.
 # ALBs already span both app (or public) subnets.
 

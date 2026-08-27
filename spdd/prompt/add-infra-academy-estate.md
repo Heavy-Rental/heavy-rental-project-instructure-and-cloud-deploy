@@ -11,10 +11,11 @@ When reality diverges, fix this prompt first — then update YAML / `.tf`.
 
 - Academy / Vocareum only. Environment must be `academy`. Form keys unchanged.
 - `action=plan` plans the estate. `action=apply` creates it.
-- Three-tier VPC, NAT **instance**, §6.2 security groups, four ASGs, three ALBs, one RDS, SM shells, ECR.
-- `LabInstanceProfile` only. No IAM role, NAT Gateway, Marketplace AMI, Multi-AZ, PEM in Terraform.
+- Three-tier VPC, **two NAT Gateways** (one per public AZ), §6.2 security groups, four ASGs at desired=2, three ALBs, **two Multi-AZ RDS**, Bolt NLB, SM shells, ECR.
+- `LabInstanceProfile` only. No IAM role, NAT **instance**, Marketplace AMI, PEM in Terraform.
 - RDS password from Environment `SPRING_DATASOURCE_PASSWORD`. Fail apply if missing.
 - `configure-only` / `stop` / `destroy` fail on this branch.
+- REST ALB scheme (internet-facing :8080) is **not** this canvas — see `add-infra-paid-pipeline` and ADR 0018.
 
 ## E — Entities
 
@@ -26,10 +27,13 @@ classDiagram
     }
     class EstateStack {
       +vpc
-      +natInstance
+      +natGatewayAz0
+      +natGatewayAz1
       +asgPortal rest haystack neo4j
       +albPortal rest haystack
-      +rds
+      +rdsSor
+      +rdsHaystack
+      +boltNlb
       +secretShells
     }
     class LabInstanceProfile {
@@ -42,11 +46,11 @@ classDiagram
 ## A — Approach
 
 1. Data-source AMI (AL2023 SSM parameter) and `LabInstanceProfile`.
-2. VPC + routes; NAT instance with IP forwarding; S3 gateway endpoint.
+2. VPC + routes; two NAT Gateways + EIP; per-AZ private route tables; S3 gateway endpoint.
 3. Security groups as separate ingress/egress rules (avoid cycles).
-4. Launch templates + ASGs; Neo4j dedicated ENI; EC2 health.
-5. ALBs + target groups (register, but ASG health stays EC2).
-6. RDS `db.t3.micro` + empty SM secrets + ECR.
+4. Launch templates + ASGs (desired=2); Neo4j in data subnets; EC2 health on app ASGs.
+5. ALBs + target groups (register, but ASG health stays EC2). Bolt NLB :7687.
+6. Two RDS `db.t3.micro` Multi-AZ + empty SM secrets + ECR.
 7. Workflow: remove branch-1 apply refuse; pass `TF_VAR_db_master_password`.
 
 ## S — Structure
@@ -56,7 +60,7 @@ terraform/academy/{variables,data,vpc,nat,security_groups,alb,compute,rds,secret
 .github/workflows/aws-infra-academy.yml
 openspec/changes/add-infra-academy-estate/
 spdd/{analysis,prompt}/add-infra-academy-estate.md
-docs/adr/0004–0008
+docs/adr/0005–0008, 0010
 ```
 
 ## O — Operations
@@ -77,12 +81,13 @@ docs/adr/0004–0008
 
 ## S — Safeguards
 
-- No `aws_iam_role`, `aws_nat_gateway`, `tls_private_key`, `key_name`, `aws_secretsmanager_secret_version`.
+- No `aws_iam_role`, NAT **instance**, `tls_private_key`, `key_name`, `aws_secretsmanager_secret_version`.
+- NAT **is** two `aws_nat_gateway` (ADR 0010). Do not reintroduce `aws_instance` used as NAT.
 - No Vocareum keys in SM or on the guest.
-- No paid workflow / OIDC.
+- No paid workflow / OIDC on this branch.
 - Apply refuses empty or plan-only DB password.
-- ASG health = EC2 until branch 3 compose.
+- ASG health = EC2 (ADR 0008). Compose later did **not** switch to ELB health.
 
 ## Negative space
 
-Do not invent: IAM roles, NAT Gateway, Marketplace Neo4j CFT, Multi-AZ RDS, HTTPS listener, Ansible, `put-secret-value` of app fields, ELB health replacement, `destroy`.
+Do not invent: IAM roles, NAT **instance**, Marketplace Neo4j CFT, HTTPS listener, Ansible, `put-secret-value` of app fields, ELB health replacement, `destroy` on this branch, a third RDS for the sync worker.

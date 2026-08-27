@@ -16,7 +16,7 @@ GitHub Actions, Terraform, and Ansible that create and operate the estate on **A
 | `terraform/backend/` | Remote state bucket (bootstrap) |
 | `terraform/academy/` | Estate |
 | `ansible/` | Guest configuration only |
-| `scripts/` | `sync-secrets`, `sync-ssh-keys`, `stop-estate` |
+| `scripts/` | `sync-secrets`, `sync-ssh-keys`, `stop-estate`, `estate-tf-init`, `estate-unlock`, `reconcile-estate`, `sweep-estate-orphans`, `bootstrap-github-oidc-paid` |
 
 ## Actions
 
@@ -37,14 +37,16 @@ Two operator workflows, **separate job graphs** (ADR 0019):
 | `stop` | No | Pause ASGs + stop both RDS (`scripts/stop-estate.sh`) |
 | `destroy` | Tear down estate | No |
 
-Portal / REST / Haystack **first compose** on the estate: `action=deploy-projects` after apply. **Later** image redeploys on Academy are app CD in `heavy-rental-project-pipeline-development` (still academy-only). Paid first-compose is the same `deploy-projects` action on `aws-infra-paid.yml`.
+Portal / REST / Haystack **first compose** on the estate: `action=deploy-projects` after apply. **Later** image redeploys are app CD in `heavy-rental-project-pipeline-development` (academy **and** paid callers). Paid first-compose is the same `deploy-projects` action on `aws-infra-paid.yml`.
 
 REST ALB (`hr-alb-rest`) is internet-facing on **:8080**. Haystack stays internal.
+
+ALB health (after compose): `tg-rest` waits for `GET <instance>:8080/actuator/health` **2xx** (`200-299`); `tg-haystack` waits for `GET <instance>:8000/health` **2xx**. Layout: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Out of scope
 
 - Creating the GitHub OIDC role from estate apply (out of band; see `docs/samples/github-oidc-paid.json`)
 - Academy creating IAM (`LabInstanceProfile` / `LabRole` only)
 - Portal/REST HTTPS (ACM)
-- Paid portal/REST/Haystack **app** CD
 - Marketplace Neo4j, EKS, NAT instance
+- Authoring portal/REST/Haystack **app** CD YAML (that lives in `heavy-rental-project-pipeline-development`)

@@ -11,11 +11,11 @@ Operators cannot select a billed AWS account on the infra Action. ADR 0001 block
 
 | Concept | Meaning |
 | --- | --- |
-| Profile | `academy` (Vocareum) or `paid` (public AWS) |
+| Profile | This change: `academy` or paid on one Action. **Current:** Environment `academy` vs **`AWS_ACTUAL`** on two Actions. S3 suffix `-actual` (not `-paid`). |
 | OIDC role | Environment `AWS_ROLE_TO_ASSUME` — GitHub Actions in the billed account |
 | LabRole | Vocareum-only guest identity |
 | hr-paid-* | Terraform-created instance profiles on paid |
-| State suffix | `-academy` vs `-paid` on the tfstate bucket |
+| State suffix | `-academy` vs `-actual` on the tfstate bucket (ADR 0017; not feasibility’s `-paid`) |
 
 ## Risks
 
@@ -27,5 +27,5 @@ Operators cannot select a billed AWS account on the infra Action. ADR 0001 block
 ## Success
 
 - Selecting `academy` still applies with LabRole and no IAM resources.
-- Selecting `paid` with OIDC applies `hr-paid-*` profiles and a `-paid` state bucket.
+- Selecting paid (live Environment **`AWS_ACTUAL`**) with OIDC applies `hr-paid-*` profiles and a **`-actual`** state bucket. Feasibility’s Environment name `paid` / suffix `-paid` were **not** used.
 - Cross-wired secrets fail assert.

@@ -12,7 +12,7 @@ When reality diverges, fix this prompt first — then update YAML / `.tf`.
 - Academy / Vocareum only. Environment must be `academy`.
 - Operator pastes three AWS Details values on Run workflow (they change every Start Lab) or uses Environment fallback.
 - Mask credentials. Never write them to Secrets Manager or the guest.
-- First `plan`/`bootstrap` creates S3 + DynamoDB lock if missing.
+- First `plan`/`bootstrap` creates the S3 state bucket if missing. Estate `init` uses `use_lockfile=true`. Do **not** create a DynamoDB lock table.
 - Estate `terraform plan` uses that backend and contains no VPC.
 - `apply` / configure / stop / destroy fail on this branch.
 
@@ -49,7 +49,7 @@ classDiagram
 | Estate TF | `terraform/academy/` |
 | State bucket | `heavy-rental-tfstate-<account>-academy` |
 | Estate key | `estate/terraform.tfstate` |
-| Lock table | `heavy-rental-tfstate-lock-academy` |
+| Lock | S3 native `use_lockfile=true` (no DynamoDB). Leftover `heavy-rental-tfstate-lock-academy`, if present, is unused. |
 
 ## A — Approach
 

@@ -112,7 +112,7 @@ Do this once if you will run **AWS infrastructure (paid)**. Do **not** paste Voc
 4. **Variable** `AWS_REGION` = `us-east-1`. Same optional image variables and `ALARM_EMAIL` as academy (this Environment’s copies, not academy’s).
 5. **Secrets:** same app set as academy (`SPRING_DATASOURCE_PASSWORD`, `NEO4J_PASSWORD`, Stripe trio, optional JWT / OneMap / `LLM_API_KEY`). **No** `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN`.
 
-Then: **Actions → AWS infrastructure (paid)** → `aws_environment` = `AWS_ACTUAL` → `plan`, then `apply`, then a **later** `deploy-projects`. Same action meanings as academy. App CD is still academy-only; paid first-compose is this Action’s `deploy-projects`.
+Then: **Actions → AWS infrastructure (paid)** → `aws_environment` = `AWS_ACTUAL` → `plan`, then `apply`, then a **later** `deploy-projects`. Same action meanings as academy. Paid first-compose is this Action’s `deploy-projects`. Day-to-day portal / REST / Haystack rolls are app CD in `heavy-rental-project-pipeline-development` (academy **and** paid callers).
 
 REST is reachable at `http://<rest_alb_dns>:8080` after compose (public ALB). Portal remains `http://<portal_alb_dns>/`. Haystack stays internal.
 
@@ -302,8 +302,8 @@ It does **not** pull portal, REST, or Haystack images. That is why apply no long
 **Success:**
 
 - Portal ALB answers on `/` (no longer 502)
-- REST answers on the **public** REST ALB `:8080` (and on the guest `:8080`). Haystack stays internal.
-- Haystack answers on `:8000`
+- REST answers on the **public** REST ALB `:8080` (and on the guest `:8080/actuator/health` **2xx**). Haystack stays internal.
+- Haystack answers on `:8000/health` **2xx** (`tg-haystack`)
 
 **Common problems:**
 

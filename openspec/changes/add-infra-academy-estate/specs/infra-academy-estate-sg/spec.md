@@ -1,8 +1,10 @@
 # Delta for infra-academy-estate-sg
 
+> **Later modified by** [`add-infra-paid-pipeline`](../../../add-infra-paid-pipeline/specs/infra-academy-estate-sg/spec.md) / [ADR 0018](../../../../../docs/adr/0018-public-rest-alb.md): `sg-alb-rest` allows TCP 8080 from `0.0.0.0/0`. Portal ALB (`sg-alb-public`) stays the only public TCP 80. Haystack / RDS / Bolt stay private.
+
 ## Purpose
 
-Security groups implement AWS study §6.2. Only the public portal ALB is internet-facing.
+Security groups implement AWS study §6.2. This delta made the public portal ALB the only internet-facing listener; REST public :8080 is the later change above.
 
 ## ADDED Requirements
 

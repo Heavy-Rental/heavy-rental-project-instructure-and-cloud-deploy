@@ -93,9 +93,22 @@ flowchart TB
 ## Traffic
 
 Browser → public portal ALB → portal → **internet-facing REST ALB :8080** → REST → SoR RDS.  
-Internet clients may also hit the REST ALB :8080 directly (`REST_BASE_URL`).  
+Internet clients may also hit the REST ALB :8080 directly (`REST_BASE_URL`). `sync-secrets` sets `APP_CORS_ALLOWED_ORIGINS` to the portal origin and `http://<rest_alb_dns>:8080` ([`../specification/pipelines/infra-secrets.md`](../specification/pipelines/infra-secrets.md)).  
 REST → internal Haystack ALB → Haystack → Haystack RDS + Bolt NLB → Neo4j.  
 Private outbound HTTPS → the **NAT Gateway in the same AZ**. S3 via gateway endpoint (no NAT). If AZ-0 dies, AZ-1 guests keep outbound. NAT Gateways bill until `action=destroy`; session end and `action=stop` do not pause them.
+
+## ALB / NLB health checks
+
+Terraform target groups probe each **registered instance private IP**. Matcher **`200-299`** means **2xx only** (3xx/4xx/5xx stay unhealthy). ASGs still use `health_check_type = EC2` (ADR 0008): an unhealthy target does **not** replace the instance.
+
+| Target group | Probe | Matcher | Notes |
+| --- | --- | --- | --- |
+| `tg-portal` | `http://<instance-ip>:80/` | `200-399` | 502 until nginx is composed |
+| `tg-rest` | `http://<instance-ip>:8080/actuator/health` | **`200-299`** | Spring Security **401**s `GET /` — not this check |
+| `tg-haystack` | `http://<instance-ip>:8000/health` | **`200-299`** | `GET /` is 404; `/docs` is OpenAPI, not the ALB check |
+| `tg-neo4j` | TCP `<instance-ip>:7687` | TCP | Internal Bolt NLB |
+
+`deploy-projects` / `site.yml` waits for REST `:8080/actuator/health` and Haystack `:8000/health` to return 2xx before the play succeeds.
 
 ## Terraform vs Ansible
 
@@ -125,7 +138,7 @@ Optional Environment variable `ALARM_EMAIL` subscribes SNS topic `hr-academy-ala
 | Role | Image | Notes |
 | --- | --- | --- |
 | Portal | Env `PORTAL_IMAGE` or stock `nginx` | `/api` → `REST_BASE_URL`. ECR tags get `docker login` on the guest. Public GHCR pulls with no login. |
-| REST / Haystack | Env `REST_IMAGE` / `HAYSTACK_IMAGE` or Run `image_ref` | Fail if empty. Haystack compose has **no** `neo4j` service. |
+| REST / Haystack | Env `REST_IMAGE` / `HAYSTACK_IMAGE` or Run `image_ref` | Fail if empty. Haystack compose has **no** `neo4j` service. Compose waits for REST `:8080/actuator/health` **2xx** and Haystack `:8000/health` **2xx**. |
 | Neo4j | `neo4j:5` | `/data` on extra EBS |
 
 Portal SM JSON includes `STRIPE_PUBLISHABLE_KEY` and `VITE_STRIPE_PUBLISHABLE_KEY` (same `pk_`). REST has `STRIPE_API_KEY` + webhook. Prefer a **new tag** on each redeploy (`compose up` does not `--pull always`). Haystack SM includes `SOURCE_*` (SoR) and `TARGET_*` (Haystack RDS) from infra `sync-secrets` (ADR 0013).

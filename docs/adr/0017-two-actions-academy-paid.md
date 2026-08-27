@@ -34,5 +34,5 @@ Ansible over SSM (ADR 0012) uploads modules to S3. Academy LabRole already uses 
 
 - Lab keys cannot be aimed at the billed account from the academy Action; the paid Action has nowhere to paste them.
 - Academy class path is unchanged if operators keep using the academy Action.
-- App CD remains academy-only until a later change; paid first-compose is `deploy-projects` on the paid Action.
+- Paid first-compose is `deploy-projects` on the paid Action. Day-to-day portal / REST / Haystack rolls are the app-CD paid callers in `heavy-rental-project-pipeline-development` (`add-*-cd-paid-deploy`). This infra Action does not author those workflows.
 - Observe trail/dashboard names follow `deployment` (`heavy-rental-academy` unchanged; paid `heavy-rental-actual`). Sweep/reconcile leftover observe names follow `DEPLOYMENT` (ADR 0019).

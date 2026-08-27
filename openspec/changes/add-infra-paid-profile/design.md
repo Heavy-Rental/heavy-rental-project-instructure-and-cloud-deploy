@@ -1,5 +1,7 @@
 # Design: academy | paid profile on one Action
 
+> **Superseded in part by** [`add-infra-paid-pipeline`](../add-infra-paid-pipeline/design.md) / ADR 0017 / 0019. Isolation stands. Live: Environment **`AWS_ACTUAL`**, suffix **`-actual`**, two Actions. The Goals below record this change’s original one-Action shape.
+
 ## Context
 
 ADR 0001 made `aws-infra-academy.yml` Vocareum-only so lab keys could not hit a billed account. Operators now need to **select** Vocareum vs public AWS on that same Action. Feasibility §6P: paid is another account + state + OIDC; guests must not use `LabRole`.

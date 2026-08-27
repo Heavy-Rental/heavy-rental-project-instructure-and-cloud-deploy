@@ -24,3 +24,16 @@ Infra CD (`apply` and `configure-only`) SHALL run `playbooks/configure.yml`. It 
 - WHEN the Ansible step runs
 - THEN it invokes `playbooks/site.yml`
 - AND it does not invoke `playbooks/configure.yml`
+
+### Requirement: site.yml waits for REST and Haystack 2xx health
+On `action=deploy-projects`, after compose, Ansible SHALL wait until `GET http://127.0.0.1:8080/actuator/health` returns HTTP **2xx** on REST guests and `GET http://127.0.0.1:8000/health` returns HTTP **2xx** on Haystack guests (same contract as ALB `tg-rest` / `tg-haystack` matcher `200-299`). `GET /` on REST (401) and `GET /` or `/docs` on Haystack SHALL NOT count as healthy.
+
+#### Scenario: REST actuator 2xx
+- GIVEN `site.yml` composed REST
+- WHEN the REST health task finishes
+- THEN `:8080/actuator/health` returned 2xx
+
+#### Scenario: Haystack /health 2xx
+- GIVEN `site.yml` composed Haystack
+- WHEN the Haystack health task finishes
+- THEN `:8000/health` returned 2xx

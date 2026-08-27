@@ -1,6 +1,6 @@
 output "portal_alb_dns" {
   value       = aws_lb.portal.dns_name
-  description = "Public portal ALB. Students use this. May 502 until branch 3 compose."
+  description = "Public portal ALB. Students use this. May 502 until deploy-projects or portal app CD."
 }
 
 output "rest_alb_dns" {
@@ -55,7 +55,7 @@ output "neo4j_nlb_dns" {
 
 output "neo4j_uri" {
   value       = "bolt://${aws_lb.neo4j.dns_name}:7687"
-  description = "NEO4J_URI for heavy-rental/haystack (branch 3)."
+  description = "NEO4J_URI for heavy-rental/haystack (written by sync-secrets)."
 }
 
 output "secret_arns" {
