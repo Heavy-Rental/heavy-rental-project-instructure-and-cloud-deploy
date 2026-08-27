@@ -17,7 +17,7 @@
 
 ## 3. Terraform
 
-- [x] 3.1 `terraform/backend/` S3 + DynamoDB (no IAM role)
+- [x] 3.1 `terraform/backend/` S3 native lockfile (no DynamoDB, no IAM role)
 - [x] 3.2 `terraform/academy/` remote backend + placeholder (no VPC)
 
 ## 4. Operator docs

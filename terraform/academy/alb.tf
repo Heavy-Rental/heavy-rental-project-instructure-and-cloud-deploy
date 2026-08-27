@@ -79,13 +79,16 @@ resource "aws_lb_target_group" "rest" {
   protocol = "HTTP"
   vpc_id   = aws_vpc.academy.id
 
+  # Probe each registered instance at <private-ip>:8080/actuator/health.
+  # Matcher is 2xx only. Spring Security 401s GET / — that is unhealthy.
   health_check {
     enabled             = true
-    path                = "/"
-    port                = "traffic-port"
+    path                = "/actuator/health"
+    port                = "8080"
     protocol            = "HTTP"
-    matcher             = "200-399"
+    matcher             = "200-299"
     interval            = 30
+    timeout             = 10
     healthy_threshold   = 2
     unhealthy_threshold = 3
   }
@@ -133,13 +136,16 @@ resource "aws_lb_target_group" "haystack" {
   protocol = "HTTP"
   vpc_id   = aws_vpc.academy.id
 
+  # Probe each registered instance at <private-ip>:8000/health.
+  # Matcher is 2xx only. GET / is 404; /docs is OpenAPI — not the ALB check.
   health_check {
     enabled             = true
-    path                = "/"
-    port                = "traffic-port"
+    path                = "/health"
+    port                = "8000"
     protocol            = "HTTP"
-    matcher             = "200-399"
+    matcher             = "200-299"
     interval            = 30
+    timeout             = 10
     healthy_threshold   = 2
     unhealthy_threshold = 3
   }
@@ -178,10 +184,15 @@ resource "aws_lb_target_group" "neo4j" {
   protocol = "TCP"
   vpc_id   = aws_vpc.academy.id
 
+  # NLB + instance targets share the data subnets. Preserve-client-IP hairpins
+  # health checks; Haystack is in app subnets so it does not need the client IP.
+  preserve_client_ip = false
+
+  # TCP only (no timeout/path/matcher). Thresholds must match on an NLB.
   health_check {
     enabled             = true
     protocol            = "TCP"
-    port                = "7687"
+    port                = "traffic-port"
     interval            = 30
     healthy_threshold   = 2
     unhealthy_threshold = 2

@@ -83,7 +83,7 @@ Optional image **variables** on this Environment (for a later `deploy-projects`)
 
 Success: job summary prints caller ARN, state `s3://heavy-rental-tfstate-<account>-actual/estate/terraform.tfstate`, public portal ALB, public REST ALB `:8080`, and `hr-paid-*`.
 
-Portal / REST / Haystack **images** are a later `deploy-projects`, not part of `apply`.
+Portal / REST / Haystack **images** are a later `deploy-projects`, not part of `apply`. Day-to-day rolls after that are app CD paid callers in `heavy-rental-project-pipeline-development`.
 
 ## If assert fails
 

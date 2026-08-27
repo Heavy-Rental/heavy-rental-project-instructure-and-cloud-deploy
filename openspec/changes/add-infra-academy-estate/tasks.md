@@ -12,8 +12,8 @@
 - [x] 2.1 VPC, three subnet tiers (2 AZs), IGW, two NAT Gateways, S3 gateway endpoint
 - [x] 2.2 Security groups per AWS study §6.2
 - [x] 2.3 Four launch templates + ASGs (`LabInstanceProfile`, no `key_name`)
-- [x] 2.4 Public portal ALB + internal REST/Haystack ALBs
-- [x] 2.5 One RDS in data subnet group; Neo4j ENI + `asg-neo4j` max=1
+- [x] 2.4 Public portal ALB + REST/Haystack ALBs (REST internet-facing :8080 is later `add-infra-paid-pipeline` / ADR 0018)
+- [x] 2.5 Two Multi-AZ RDS in the data subnet group; Bolt NLB; `asg-neo4j` desired=2
 - [x] 2.6 Empty SM shells + ECR repos; outputs
 - [x] 2.7 `terraform validate`; no IAM role / NAT instance / PEM resources
 

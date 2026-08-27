@@ -13,8 +13,12 @@ context: |
   add-infra-academy-configure, add-infra-academy-deploy-projects,
   add-infra-academy-observe, add-infra-paid-profile (superseded in part).
   REST ALB is internet-facing :8080. Haystack stays internal.
+  tg-rest health is GET <instance>:8080/actuator/health matcher 200-299 (2xx).
+  Spring Security 4xx only on authentication exceptions; GET / 401 is not healthy.
+  tg-haystack health is GET <instance>:8000/health matcher 200-299 (2xx).
   CORS includes portal and REST ALB origins. Paid Ansible uses a dedicated
   SSM bucket (not tfstate). Academy observe uses Vocareum LabRole only
   (no aws_iam_role). Trail is S3-only (heavy-rental-academy or -actual).
-  Day-to-day portal/REST/Haystack rolls are app CD (other repo; academy-only).
+  Day-to-day portal/REST/Haystack rolls are app CD in
+  heavy-rental-project-pipeline-development (academy and paid callers).
   Infra action=deploy-projects is a later first-compose of site.yml after apply.

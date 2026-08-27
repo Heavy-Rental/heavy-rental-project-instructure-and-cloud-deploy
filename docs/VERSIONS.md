@@ -10,12 +10,12 @@ Recorded **2026-08-25**. Terraform CLI **1.15.8** and Ansible **14.3.1** are liv
 | --- | --- | --- | --- |
 | Terraform CLI | `TERRAFORM-PROCESS.md` | **1.15.8** (latest stable, 8 Jul 2026) | `.github/workflows/aws-infra-{academy,paid}.yml` (`terraform_version`); `terraform/{backend,academy}/versions.tf` (`required_version >= 1.15.8`) |
 | hashicorp/aws provider | estate `.tf` | `~> 5.0` (do not bump; latest is 6.60.0) | `terraform/{backend,academy}/versions.tf` |
-| hashicorp/setup-terraform | Actions | **v4.0.1** | `aws-infra-academy.yml` |
-| actions/checkout | Actions | **v7.0.1** | `aws-infra-academy.yml` |
-| aws-actions/configure-aws-credentials | Actions | **v6.2.3** | `aws-infra-academy.yml` |
-| Ansible community package | `ANSIBLE-PROCESS.md` / study §7.1a | **14.3.1** (depends on ansible-core **2.21.3**) | `aws-infra-academy.yml` (`pip install ansible==14.3.1`) |
+| hashicorp/setup-terraform | Actions | **v4.0.1** | `aws-infra-{academy,paid}.yml` |
+| actions/checkout | Actions | **v7.0.1** | `aws-infra-{academy,paid}.yml` |
+| aws-actions/configure-aws-credentials | Actions | **v6.2.3** | `.github/actions/resolve-aws-profile` (both Actions) |
+| Ansible community package | `ANSIBLE-PROCESS.md` / study §7.1a | **14.3.1** (depends on ansible-core **2.21.3**) | `aws-infra-{academy,paid}.yml` (`pip install ansible==14.3.1`) |
 | amazon.aws collection | ansible `_text` deprecation | **>=11.3.0,<12** (uses `common.text.converters`) | `ansible/requirements.yml` |
-| boto3 / botocore (runner) | amazon.aws 11 | **>=1.35.0** | `aws-infra-academy.yml` pip (ubuntu image is older) |
+| boto3 / botocore (runner) | amazon.aws 11 | **>=1.35.0** | `aws-infra-{academy,paid}.yml` pip (ubuntu image is older) |
 
 ## Estate runtime
 
@@ -31,3 +31,7 @@ Recorded **2026-08-25**. Terraform CLI **1.15.8** and Ansible **14.3.1** are liv
 | Portal | study §6.4a | Infra `group_vars` looks up Environment `PORTAL_IMAGE`. `deploy-projects` forbids stock `nginx`. Portal-only redeploy: `heavy-rental-web-portal-pipeline/deploy-pipeline/` (same compose contract). |
 | Docker Compose | AL2023 | Try `docker-compose-plugin` RPM; else GitHub **v2.39.2** CLI plugin |
 | Instance types | study §6.4 | NAT Gateway **x2** (not EC2); portal `t3.micro` **x2**; rest/haystack `t3.small` **x2**; neo4j `t3.large` **x2** (8 EC2) |
+| ASG health | ADR 0008 | `health_check_type = EC2` on all four ASGs. Compose did **not** switch to ELB instance replacement. |
+| ALB `tg-rest` | `alb.tf` | `GET <instance>:8080/actuator/health`, matcher **`200-299`** (2xx). Not `GET /` (Spring 401). |
+| ALB `tg-haystack` | `alb.tf` | `GET <instance>:8000/health`, matcher **`200-299`** (2xx). Not `/` or `/docs`. |
+| ALB `tg-portal` | `alb.tf` | `GET <instance>:80/`, matcher `200-399`. |

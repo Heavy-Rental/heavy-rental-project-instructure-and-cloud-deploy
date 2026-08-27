@@ -54,6 +54,17 @@ The Spring Boot REST ALB is reachable from the internet on :8080. REST guests ke
 - THEN `APP_CORS_ALLOWED_ORIGINS` contains the portal ALB `http://` origin
 - AND it contains `http://` plus the REST ALB DNS plus `:8080`
 
+### Requirement: tg-rest health waits for :8080/actuator/health 2xx
+`tg-rest` SHALL health-check each registered instance at `http://<instance-ip>:8080/actuator/health` (health-check port **8080**, path `/actuator/health`) with matcher `200-299`. It SHALL NOT use `GET /` (Spring Security returns 401). HTTP 3xx/4xx/5xx SHALL mark the target unhealthy.
+
+#### Scenario: REST target group health path
+- GIVEN the estate is applied
+- WHEN `tg-rest` is described
+- THEN the health-check path is `/actuator/health`
+- AND the health-check port is `8080`
+- AND the matcher is `200-299`
+- AND the matcher does not include `301`, `401`, or `403`
+
 ### Requirement: Haystack stays internal
 `hr-alb-haystack` SHALL remain internal. Bolt NLB and RDS SHALL remain non-public.
 
@@ -61,3 +72,13 @@ The Spring Boot REST ALB is reachable from the internet on :8080. REST guests ke
 - GIVEN the estate is applied
 - WHEN `hr-alb-haystack` is described
 - THEN `Scheme` is `internal`
+
+### Requirement: tg-haystack health waits for :8000/health 2xx
+`tg-haystack` SHALL health-check each registered instance at `http://<instance-ip>:8000/health` (health-check port **8000**, path `/health`) with matcher `200-299`. It SHALL NOT use `GET /` (404) or `GET /docs` as the ALB path. HTTP 3xx/4xx/5xx SHALL mark the target unhealthy.
+
+#### Scenario: Haystack target group health path
+- GIVEN the estate is applied
+- WHEN `tg-haystack` is described
+- THEN the health-check path is `/health`
+- AND the health-check port is `8000`
+- AND the matcher is `200-299`

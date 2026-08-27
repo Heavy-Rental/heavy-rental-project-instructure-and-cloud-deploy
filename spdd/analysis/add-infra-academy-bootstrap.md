@@ -1,6 +1,6 @@
 # SPDD Analysis: add-infra-academy-bootstrap
 
-**Status:** Active  
+**Status:** Delivered. Backend lock is S3 `use_lockfile=true` (not DynamoDB). Paid Action later shipped separately (`add-infra-paid-pipeline`); this change’s non-goal was “no paid YAML here,” not “the repo stays academy-only forever.”  
 **Audience:** Implementers of the Academy / Vocareum infra CD bootstrap  
 **Companion:** [REASONS Canvas](../prompt/add-infra-academy-bootstrap.md) · [OpenSpec change](../../openspec/changes/add-infra-academy-bootstrap/proposal.md)
 
@@ -17,9 +17,9 @@ Creating the VPC in the same change hides a dead lab session behind a large appl
 | Academy / Vocareum | Instructure Learner Lab; federated `voclabs/…`; no new IAM roles |
 | Form keys | `workflow_dispatch` inputs for the three AWS Details values |
 | Environment `academy` | Fallback secrets + `AWS_REGION`; reviewers |
-| Backend stack | S3 + DynamoDB lock; `terraform/backend/`; not the estate |
+| Backend stack | S3 + native lockfile (`use_lockfile=true`); `terraform/backend/`; not the estate. No DynamoDB lock table. |
 | Estate stack | `terraform/academy/`; placeholder on this branch |
-| Paid | Billed account + OIDC; **another** workflow; not this change |
+| Paid | Billed account + OIDC; **another** workflow; not this change (later `aws-infra-paid.yml`) |
 
 ## Stakeholders
 
@@ -46,5 +46,5 @@ Creating the VPC in the same change hides a dead lab session behind a large appl
 
 - `action=plan` after Start Lab is green.
 - No `aws_vpc` / ALB / RDS / ASG in `terraform/academy/`.
-- Only workflow is `aws-infra-academy.yml`.
+- Only workflow **on this change** is `aws-infra-academy.yml` (paid YAML is a later change).
 - Backend bucket name includes the Vocareum account id and the suffix `-academy`.

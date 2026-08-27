@@ -37,3 +37,10 @@
       - -d
       - --remove-orphans
     chdir: "{{ compose_dir }}"
+
+- name: Bolt must listen on 7687
+  ansible.builtin.wait_for:
+    host: 127.0.0.1
+    port: 7687
+    delay: 10
+    timeout: 180

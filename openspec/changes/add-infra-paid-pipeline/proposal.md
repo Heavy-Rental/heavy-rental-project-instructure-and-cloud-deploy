@@ -38,4 +38,4 @@ Paid Ansible over SSM must not reuse the Terraform state bucket: guests would be
 - Operators run **AWS infrastructure (paid)** against Environment `AWS_ACTUAL`.
 - Academy class path is unchanged if they keep using the academy Action.
 - **Diverges from feasibility §6P:** Environment name stays `AWS_ACTUAL` (not `paid`); REST ALB is internet-facing :8080 (study said internal / no public 8080). Recorded in ADR 0017 / 0018.
-- **Not in this change:** portal HTTPS/ACM, CloudTrail → CloudWatch Logs, paid app CD, Marketplace Neo4j, a second Terraform root, renaming Environment `AWS_ACTUAL` to `paid`.
+- **Not in this change:** portal HTTPS/ACM, CloudTrail → CloudWatch Logs, Marketplace Neo4j, a second Terraform root, renaming Environment `AWS_ACTUAL` to `paid`. Paid **app** CD is a later change in `heavy-rental-project-pipeline-development` (`add-*-cd-paid-deploy`); this Action’s first-compose stays `deploy-projects`.

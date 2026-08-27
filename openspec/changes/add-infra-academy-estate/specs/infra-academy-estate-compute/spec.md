@@ -1,5 +1,7 @@
 # Delta for infra-academy-estate-compute
 
+> **Later modified by** [`add-infra-paid-pipeline`](../../../add-infra-paid-pipeline/specs/infra-estate-rest-alb/spec.md) / [ADR 0018](../../../../../docs/adr/0018-public-rest-alb.md): `hr-alb-rest` is internet-facing in the **public** subnets. Haystack ALB stays internal. App ASGs stay in private-app subnets.
+
 ## Purpose
 
 Every compute role is a launch template + Auto Scaling group with `LabInstanceProfile`. No new IAM.
@@ -17,7 +19,7 @@ Terraform SHALL create `asg-portal` (React/nginx), `asg-rest` (Spring Boot), `as
 - AND `asg-neo4j` has min=2 desired=2 max=2 across both data AZs
 
 ### Requirement: App load balancers span both AZs
-The public portal ALB SHALL register both public subnets. The internal REST and Haystack ALBs SHALL register both private-app subnets. The Bolt NLB SHALL register both private-data subnets.
+The public portal ALB SHALL register both public subnets. As of this delta, the REST and Haystack ALBs SHALL register both private-app subnets (REST was internal). The Bolt NLB SHALL register both private-data subnets. **Current:** REST ALB is internet-facing in the public subnets (banner above); Haystack stays internal.
 
 #### Scenario: Each ALB has two subnets
 - GIVEN `action=apply` succeeded
@@ -47,6 +49,8 @@ Launch templates SHALL NOT set `key_name`. The configuration SHALL NOT contain `
 
 ### Requirement: EC2 health until compose
 `asg-portal`, `asg-rest`, and `asg-haystack` SHALL use `health_check_type = EC2` so empty guests are not replaced.
+
+> **ALB probes (later):** `tg-rest` is `GET <instance>:8080/actuator/health` matcher `200-299`. `tg-haystack` is `GET <instance>:8000/health` matcher `200-299`. Those checks do **not** replace instances (this requirement). See [`add-infra-paid-pipeline` / `infra-estate-rest-alb`](../../../add-infra-paid-pipeline/specs/infra-estate-rest-alb/spec.md).
 
 #### Scenario: Unhealthy target does not kill the instance
 - GIVEN containers are not installed

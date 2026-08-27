@@ -16,7 +16,7 @@ When reality diverges, fix this prompt first — then update YAML / `.tf`.
 - REST ALB internet-facing :8080 in public subnets; REST instances private + NAT. Haystack / Bolt / RDS stay internal. Portal ALB stays public :80 only.
 - Academy still creates no `aws_iam_role`. Paid guests use `hr-paid-*`.
 - Observe trail/dashboard/flow-log leftover names follow `DEPLOYMENT` (`heavy-rental-academy` or `heavy-rental-actual`).
-- No HTTPS, no paid app CD, no CloudTrail → Logs.
+- No HTTPS, no CloudTrail → Logs. This Action does not author portal/REST/Haystack **app** CD (those paid callers live in `heavy-rental-project-pipeline-development`).
 
 ## E — Entities
 
@@ -82,7 +82,7 @@ specification/pipelines/infra-paid.md
 | stop | ASG desired=0 + stop both RDS |
 | destroy | terraform destroy + **this** `DEPLOYMENT` leftover sweep; keeps state bucket |
 
-Day-to-day portal / REST / Haystack **app CD** stays academy-only. Paid first-compose is `deploy-projects` on the paid Action. OIDC provider + role are created out of band before the first paid `plan`.
+Paid first-compose is `deploy-projects` on the paid Action. Day-to-day portal / REST / Haystack rolls are the app-CD paid callers in `heavy-rental-project-pipeline-development` (not this YAML). OIDC provider + role are created out of band before the first paid `plan`.
 
 ## N — Norms
 
@@ -104,4 +104,4 @@ Day-to-day portal / REST / Haystack **app CD** stays academy-only. Paid first-co
 
 ## Negative space
 
-Do not invent: ACM / HTTPS listeners, CloudTrail → CloudWatch Logs, paid portal/REST/Haystack app CD, Marketplace Neo4j CFT, a second Terraform root, Environment rename to `paid`, a shared `aws-infra-estate.yml`, renaming RDS/VPC identifiers, ELB health-check path change.
+Do not invent: ACM / HTTPS listeners, CloudTrail → CloudWatch Logs, Marketplace Neo4j CFT, a second Terraform root, Environment rename to `paid`, a shared `aws-infra-estate.yml`, renaming RDS/VPC identifiers, ELB health-check path change. Do not author portal/REST/Haystack app CD in this repo.

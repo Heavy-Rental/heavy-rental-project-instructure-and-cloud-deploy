@@ -25,7 +25,7 @@ Ansible `amazon.aws.aws_ssm` uploads modules to S3. Academy LabRole already uses
 - HTTPS/ACM on portal or REST
 - CloudTrail → CloudWatch Logs
 - A second VPC design or a second Terraform root
-- Paid portal/REST/Haystack **app** CD (day-to-day rolls stay academy-only until a later change)
+- Paid portal/REST/Haystack **app** CD YAML (authored in `heavy-rental-project-pipeline-development`; this Action’s first-compose stays `deploy-projects`)
 - Renaming Environment `AWS_ACTUAL` to feasibility’s `paid`
 
 ## Decisions
@@ -44,5 +44,5 @@ Ansible `amazon.aws.aws_ssm` uploads modules to S3. Academy LabRole already uses
 - Portal in a private subnet reaches the public REST ALB via NAT (hairpin). Covered by 0.0.0.0/0 on :8080.
 - Public Tomcat :8080. Blast radius stays REST ALB only: no public 8000/5432/7687; REST instances have no public IP.
 - HTTP only. Stripe webhooks that require HTTPS still need a later listener.
-- App CD remains academy-only; paid first-compose is `deploy-projects` on the paid Action.
+- Paid first-compose is `deploy-projects` on the paid Action. Day-to-day paid rolls are the app-CD paid callers in the other repo.
 - Feasibility §6P still says internal REST and Environment `paid`. This change records the divergence in ADR 0017 / 0018; it does not edit the study.

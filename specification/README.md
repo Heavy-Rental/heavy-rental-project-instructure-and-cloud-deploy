@@ -1,4 +1,4 @@
-# Specification (Academy infra CD)
+# Specification (Academy and paid infra CD)
 
 This folder is the **human index** for the estate in `heavy-rental-project-instructure-and-cloud-deploy/`.
 
@@ -31,7 +31,7 @@ Conflict order: **OpenSpec scenarios → OpenSPDD Safeguards → ADR → YAML / 
 
 - Beginner walkthrough: [`../OPERATOR-GUIDE.md`](../OPERATOR-GUIDE.md)
 - Everyday run: [`../docs/BOOTSTRAP.md`](../docs/BOOTSTRAP.md)
-- Layout: [`../docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md)
+- Layout (including ALB health probes): [`../docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md)
 - Program plan: [`../docs/IMPLEMENTATION-PLAN.md`](../docs/IMPLEMENTATION-PLAN.md)
 
 ## Walkthroughs
@@ -49,7 +49,7 @@ Conflict order: **OpenSpec scenarios → OpenSPDD Safeguards → ADR → YAML / 
 | [`../openspec/changes/add-infra-academy-configure/`](../openspec/changes/add-infra-academy-configure/) | `sync-secrets`, Ansible configure, stop |
 | [`../openspec/changes/add-infra-academy-deploy-projects/`](../openspec/changes/add-infra-academy-deploy-projects/) | `deploy-projects` later run of `site.yml` |
 | [`../openspec/changes/add-infra-academy-observe/`](../openspec/changes/add-infra-academy-observe/) | CloudWatch + CloudTrail on apply (LabRole, S3 trail) |
-| [`../openspec/changes/add-infra-paid-profile/`](../openspec/changes/add-infra-paid-profile/) | Dual profile on one Action (superseded in part by paid-pipeline) |
+| [`../openspec/changes/add-infra-paid-profile/`](../openspec/changes/add-infra-paid-profile/) | Dual profile isolation (OIDC vs Vocareum, `-actual` state, `hr-paid-*`). One Action is **superseded** by `add-infra-paid-pipeline` |
 | [`../openspec/changes/add-infra-paid-pipeline/`](../openspec/changes/add-infra-paid-pipeline/) | Dedicated paid Action + public REST ALB; separate job graphs (ADRs 0017–0019) |
 
 SPDD: [`../spdd/analysis/`](../spdd/analysis/). ADRs 0001–0019: [`../docs/adr/`](../docs/adr/).

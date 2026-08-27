@@ -1,4 +1,4 @@
-# Academy / Vocareum estate (branch 3 configure)
+# Academy / Vocareum estate (operate)
 
 This repo has **two Actions**: **AWS infrastructure (Academy)** (`aws-infra-academy.yml`, Vocareum) and **AWS infrastructure (paid)** (`aws-infra-paid.yml`, GitHub OIDC, Environment `AWS_ACTUAL`). Each file owns its jobs (ADR 0019). They use different GitHub Environments and different Terraform state buckets.
 
@@ -11,7 +11,7 @@ This repo has **two Actions**: **AWS infrastructure (Academy)** (`aws-infra-acad
    - `AWS_ACCESS_KEY_ID`
    - `AWS_SECRET_ACCESS_KEY`
    - `AWS_SESSION_TOKEN`
-3. **Required secrets for `apply` / `configure-only`:** `SPRING_DATASOURCE_PASSWORD` (≥ 8), `NEO4J_PASSWORD`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_API_KEY` (`sk_…`), `STRIPE_WEBHOOK_SECRET`. **Not** workflow inputs. Do not add `VITE_STRIPE_PUBLISHABLE_KEY` (copied from the publishable key). Optional: `APP_JWT_SECRET` (≥ 32 chars, HS256). If unset, `sync-secrets` reuses the value already in `heavy-rental/rest` or generates one. Set it if you need the same JWT secret after `destroy` + `apply`. Optional OneMap: `ONEMAP_EMAIL` and `ONEMAP_PASSWORD` (both or neither). `APP_CORS_ALLOWED_ORIGINS` is **not** a GitHub secret — `sync-secrets` sets it from the public portal ALB DNS. Optional pricing **variables** (not secrets): `DYNAMIC_PRICING_ENABLED`, `PRICING_DEFAULT_DISTANCE_KM`, `PRICING_ORIGIN_POSTAL_CODE`, `PRICING_DISTANCE_LOOKUP_ENABLED`. Empty = omit (Spring defaults). REST CD Environment `academy` can overlay the same names without a new infra run.
+3. **Required secrets for `apply` / `configure-only`:** `SPRING_DATASOURCE_PASSWORD` (≥ 8), `NEO4J_PASSWORD`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_API_KEY` (`sk_…`), `STRIPE_WEBHOOK_SECRET`. **Not** workflow inputs. Do not add `VITE_STRIPE_PUBLISHABLE_KEY` (copied from the publishable key). Optional: `APP_JWT_SECRET` (≥ 32 chars, HS256). If unset, `sync-secrets` reuses the value already in `heavy-rental/rest` or generates one. Set it if you need the same JWT secret after `destroy` + `apply`. Optional OneMap: `ONEMAP_EMAIL` and `ONEMAP_PASSWORD` (both or neither). `APP_CORS_ALLOWED_ORIGINS` is **not** a GitHub secret — `sync-secrets` sets it to `http://<portal_alb_dns>,http://<rest_alb_dns>:8080` (portal origin plus the public REST ALB). Fields: [`../specification/pipelines/infra-secrets.md`](../specification/pipelines/infra-secrets.md). Optional pricing **variables** (not secrets): `DYNAMIC_PRICING_ENABLED`, `PRICING_DEFAULT_DISTANCE_KM`, `PRICING_ORIGIN_POSTAL_CODE`, `PRICING_DISTANCE_LOOKUP_ENABLED`. Empty = omit (Spring defaults). REST CD Environment `academy` can overlay the same names without a new infra run.
 4. Variable: `AWS_REGION` = `us-east-1`. Optional: `ALARM_EMAIL` for CloudWatch SNS (confirm the AWS mail).
 5. Image **variables** (not secrets) on this repo’s Environment `academy` — not the app-repo Environments: `PORTAL_IMAGE` (ECR or public GHCR tag; **required** for `deploy-projects`, stock `nginx` forbidden on that action), `REST_IMAGE`, `HAYSTACK_IMAGE`. Do **not** set `IMAGE_HTTP_URL` for `deploy-projects` (one tar cannot satisfy three images). `image_ref` on the Run form is REST/Haystack fallback only. `ansible/inventory/group_vars/all.yml` looks these up from the runner env. `apply` / `configure-only` still do **not** compose portal/REST/Haystack (`configure.yml`).
 6. GitHub cannot create Environments from git. For public AWS: follow [`OIDC-PAID.md`](OIDC-PAID.md) (AWS OIDC provider + role, then Environment **`AWS_ACTUAL`** variable **or** secret `AWS_ROLE_TO_ASSUME`). Same app secrets as academy, **no** `AWS_ACCESS_KEY_ID`. Run **AWS infrastructure (paid)**, not the academy Action. See ADR 0017.
@@ -74,7 +74,8 @@ To wipe the whole half-applied estate instead: `action=destroy` with `confirm_de
 | --- | --- |
 | `describe-auto-scaling-groups --auto-scaling-group-names asg-portal asg-rest asg-haystack asg-neo4j` | All four exist |
 | Public portal ALB DNS (job summary) | Resolves; **502** on `:80` until `deploy-projects` or portal app CD |
-| Public REST ALB DNS (job summary) | `http://<dns>:8080` after compose; **502** until REST is up |
+| Public REST ALB DNS (job summary) | `http://<dns>:8080` after compose; **502** until `tg-rest` sees **2xx** on `<instance>:8080/actuator/health` |
+| Internal Haystack ALB | Healthy after compose when `tg-haystack` sees **2xx** on `<instance>:8000/health` |
 | `describe-secret --secret-id heavy-rental/portal` | Has `REST_BASE_URL=http://<rest-alb>:8080` after `sync-secrets` |
 | `configure-only` | Fills SM + PEMs. Docker + Compose on all guests. Composes **Neo4j only**. |
 | `deploy-projects` | After apply/configure-only. Composes portal + REST + Haystack. |
