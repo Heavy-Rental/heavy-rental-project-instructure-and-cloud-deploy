@@ -1,6 +1,6 @@
 ---
 # Keep in sync with haystack-fast-api-pipeline deploy-pipeline haystack role
-# (env aliases + uv sidecars). deploy-projects uses this contract.
+# (env aliases + ADR 0020 workers). deploy-projects uses this contract.
 - name: Haystack image is required
   ansible.builtin.assert:
     that:
@@ -28,12 +28,39 @@
         ("POSTGRES_HOSTNAME", "POSTGRES_HOST"),
         ("POSTGRES_DB", "POSTGRES_DATABASE"),
         ("POSTGRES_USER", "POSTGRES_USERNAME"),
+        ("SOURCE_USER", "POSTGRES_USERNAME"),
+        ("SOURCE_PASSWORD", "POSTGRES_PASSWORD"),
+        ("SOURCE_DB", "SOURCE_DATABASE"),
+        ("TARGET_USER", "POSTGRES_USERNAME"),
+        ("TARGET_PASSWORD", "POSTGRES_PASSWORD"),
+        ("TARGET_DB", "TARGET_DATABASE"),
+        ("PGHOST", "TARGET_HOST"),
+        ("PGPORT", "TARGET_PORT"),
+        ("PGUSER", "TARGET_USER"),
+        ("PGPASSWORD", "TARGET_PASSWORD"),
+        ("PGDATABASE", "TARGET_DATABASE"),
     ):
         if not (data.get(dest) or "").strip() and (data.get(src) or "").strip():
             data[dest] = data[src]
             if dest not in order:
                 order.append(dest)
-    for key, val in (("FLEET_BACKEND", "sql"), ("NEO4J_BACKEND", "bolt")):
+    if not (data.get("PGHOST") or "").strip() and (data.get("POSTGRES_HOST") or "").strip():
+        data["PGHOST"] = data["POSTGRES_HOST"]
+        if "PGHOST" not in order:
+            order.append("PGHOST")
+    if not (data.get("PGDATABASE") or "").strip() and (data.get("POSTGRES_DATABASE") or "").strip():
+        data["PGDATABASE"] = data["POSTGRES_DATABASE"]
+        if "PGDATABASE" not in order:
+            order.append("PGDATABASE")
+    for key, val in (
+        ("FLEET_BACKEND", "sql"),
+        ("NEO4J_BACKEND", "bolt"),
+        ("SYNC_INTERVAL_SECONDS", "60"),
+        ("POPULATE_INTERVAL_SECONDS", "60"),
+        ("POPULATE_TRIGGER_MODE", "both"),
+        ("POPULATE_HTTP_ENABLED", "true"),
+        ("NEO4J_POPULATE_TRIGGER_URL", "http://neo4j-populate:8089/v1/populate"),
+    ):
         if not (data.get(key) or "").strip():
             data[key] = val
             if key not in order:
@@ -44,6 +71,22 @@
   args:
     executable: /bin/bash
   no_log: true
+
+- name: Worker script directory
+  ansible.builtin.file:
+    path: "{{ compose_dir }}/workers"
+    state: directory
+    mode: "0755"
+
+- name: Install Haystack worker scripts
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ compose_dir }}/workers/{{ item }}"
+    mode: "0755"
+  loop:
+    - sync-from-primary.sh
+    - populate_neo4j.py
+    - populate-neo4j-from-haystack.sh
 
 - name: Haystack compose (no neo4j service)
   ansible.builtin.template:

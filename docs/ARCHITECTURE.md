@@ -86,7 +86,8 @@ flowchart TB
 | NAT | **2 Gateways** (one per public AZ) + EIP each | Same-AZ outbound for portal / REST / Haystack / Neo4j. Not an EC2 instance |
 | RDS `heavy_rental` | 1 Multi-AZ | Primary + standby |
 | RDS `haystack` | 1 Multi-AZ | Primary + standby |
-| `postgres-haystack-sync` | 0 RDS | Worker on `asg-haystack` (compose profile/command) |
+| `postgres-haystack-sync` | 0 RDS | Worker on `asg-haystack`: `postgres:17` + `sync-from-primary.sh` (60s). Not a third RDS |
+| `neo4j-populate` | 0 RDS | Same guest: `python:3.12-slim` + `populate_neo4j.py` (60s + compose `:8089`) |
 
 **Guest count:** 8 ASG instances + **0** NAT EC2 = **8** EC2 (Vocareum default cap is 9).
 
@@ -95,6 +96,7 @@ flowchart TB
 Browser → public portal ALB → portal → **internet-facing REST ALB :8080** → REST → SoR RDS.  
 Internet clients may also hit the REST ALB :8080 directly (`REST_BASE_URL`). `sync-secrets` sets `APP_CORS_ALLOWED_ORIGINS` to the portal origin and `http://<rest_alb_dns>:8080` ([`../specification/pipelines/infra-secrets.md`](../specification/pipelines/infra-secrets.md)).  
 REST → internal Haystack ALB → Haystack → Haystack RDS + Bolt NLB → Neo4j.  
+On `asg-haystack`, `postgres-haystack-sync` merges SoR RDS → Haystack RDS (`postgres_fdw`, `sg-rds` self :5432). `neo4j-populate` reads Haystack RDS and writes Bolt (`NEO4J_URI`). HTTP `:8089` is Compose DNS only ([ADR 0020](adr/0020-haystack-devcontainer-workers.md)).  
 Private outbound HTTPS → the **NAT Gateway in the same AZ**. S3 via gateway endpoint (no NAT). If AZ-0 dies, AZ-1 guests keep outbound. NAT Gateways bill until `action=destroy`; session end and `action=stop` do not pause them.
 
 ## ALB / NLB health checks

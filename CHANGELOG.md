@@ -25,6 +25,8 @@ Delivered on this repo. Operator walkthrough: [`OPERATOR-GUIDE.md`](OPERATOR-GUI
 - ASG health stays `EC2` (ADR 0008) — unhealthy ALB targets do not replace instances
 - ALB `tg-rest` waits for `GET <instance>:8080/actuator/health` matcher **`200-299`** (2xx). `GET /` is Spring 401 and is not healthy
 - ALB `tg-haystack` waits for `GET <instance>:8000/health` matcher **`200-299`** (2xx). `/docs` is not the ALB check
+- Haystack workers (ADR 0020): `postgres:17` + `sync-from-primary.sh` (60s FDW merge) and `python:3.12-slim` + `populate_neo4j.py` (60s + compose `:8089`). Not uvicorn `-m`. `:8089` is not on the ALB. `sg-rds` allows :5432 to itself for FDW. `rds_logical` tries `postgres_fdw`.
+- REST / Haystack SGs pair with ALB and RDS / Neo4j by security-group id (HR-243). No public 5432 / 8000 / 7687 / 8089
 
 ### Out of scope (unchanged)
 

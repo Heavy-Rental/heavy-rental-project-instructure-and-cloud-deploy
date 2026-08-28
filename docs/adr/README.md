@@ -23,3 +23,4 @@ ADRs for this CD repo (Nygard format). Conflict order: **OpenSpec → OpenSPDD S
 | [0017](0017-two-actions-academy-paid.md) | Two Actions: academy Vocareum / paid OIDC |
 | [0018](0018-public-rest-alb.md) | REST ALB is internet-facing :8080 (diverges from §6P) |
 | [0019](0019-separate-job-graphs.md) | Separate job graphs (no reusable estate workflow) |
+| [0020](0020-haystack-devcontainer-workers.md) | Haystack workers are Fast API devcontainer scripts + `sg-rds` FDW |

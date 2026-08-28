@@ -22,3 +22,6 @@ context: |
   Day-to-day portal/REST/Haystack rolls are app CD in
   heavy-rental-project-pipeline-development (academy and paid callers).
   Infra action=deploy-projects is a later first-compose of site.yml after apply.
+  Haystack workers (ADR 0020): postgres:17 + sync-from-primary.sh and
+  python:3.12-slim + populate_neo4j.py. Not uvicorn -m. Compose :8089 only.
+  sg-rds allows :5432 to itself for postgres_fdw.
