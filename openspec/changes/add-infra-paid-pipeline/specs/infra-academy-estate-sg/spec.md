@@ -27,7 +27,7 @@ Terraform SHALL encode:
 - REST :8080 from the internet (`0.0.0.0/0`) and from `sg-portal` (via `sg-alb-rest`); instance SG ingress TCP 8080 from `sg-alb-rest` and egress TCP 8080 to `sg-alb-rest`; ingress TCP 5432 from `sg-rds`; egress 5432 to `sg-rds`; ingress and egress TCP 8000 with `sg-alb-haystack`; no egress 7687; no instance-SG pairing with `sg-portal` or `sg-haystack`
 - Haystack ALB :8000 from `sg-rest` and from `sg-alb-haystack`; egress TCP 8000 to `sg-rest`, `sg-alb-haystack`, and `sg-haystack`; not public
 - Haystack :8000 from `sg-alb-haystack`; ingress and egress TCP 5432 with `sg-rds`; ingress and egress TCP 7687 and 7474 with `sg-neo4j`
-- RDS :5432 from `sg-rest` and `sg-haystack` only; egress 5432 to `sg-rest` and `sg-haystack`
+- RDS :5432 from `sg-rest`, `sg-haystack`, and `sg-rds` (Haystack RDS `postgres_fdw` to SoR); egress 5432 to `sg-rest`, `sg-haystack`, and `sg-rds`
 - Neo4j :7687 from `sg-haystack` (and Bolt NLB / VPC CIDR); egress TCP 7687 and 7474 to `sg-haystack`
 
 #### Scenario: Portal cannot reach RDS
@@ -71,6 +71,7 @@ Terraform SHALL encode:
 - WHEN `sg-haystack` and `sg-rds` rules are listed
 - THEN `sg-haystack` allows ingress TCP 5432 from `sg-rds` and egress TCP 5432 to `sg-rds`
 - AND `sg-rds` allows ingress TCP 5432 from `sg-haystack` and egress TCP 5432 to `sg-haystack`
+- AND `sg-rds` allows ingress TCP 5432 from `sg-rds` and egress TCP 5432 to `sg-rds`
 - AND neither rule uses `0.0.0.0/0` on 5432
 
 #### Scenario: Haystack pairs with Neo4j on :7687 and :7474 by security-group id

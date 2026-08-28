@@ -57,6 +57,50 @@
     msg: "{{ vector_rds.stdout_lines | default(['RDS vector step produced no output']) }}"
   when: app_role == "haystack"
 
+- name: CREATE EXTENSION postgres_fdw on Haystack RDS
+  ansible.builtin.shell: |
+    set -euo pipefail
+    set +x
+    # shellcheck disable=SC1091
+    source "{{ env_path }}"
+    if [ -z "${POSTGRES_HOST:-}" ] || [ -z "${POSTGRES_PASSWORD:-}" ]; then
+      echo "SKIP_NO_SECRET"
+      exit 0
+    fi
+    if [ "${POSTGRES_DATABASE:-${POSTGRES_DB:-}}" != "haystack" ]; then
+      echo "SKIP_NOT_HAYSTACK"
+      exit 0
+    fi
+    if ! command -v psql >/dev/null 2>&1; then
+      echo "PSQL_MISSING"
+      exit 2
+    fi
+    USERNAME="${POSTGRES_USERNAME:-${POSTGRES_USER:-}}"
+    DBNAME="${POSTGRES_DATABASE:-${POSTGRES_DB:-haystack}}"
+    export PGPASSWORD="${POSTGRES_PASSWORD}"
+    if psql -h "${POSTGRES_HOST}" -p "${POSTGRES_PORT:-5432}" -U "${USERNAME}" -d "${DBNAME}" \
+      -v ON_ERROR_STOP=1 \
+      -c "CREATE EXTENSION IF NOT EXISTS postgres_fdw;" >/tmp/hr-fdw.out 2>/tmp/hr-fdw.err
+    then
+      echo "RDS_FDW_OK"
+      exit 0
+    fi
+    echo "RDS_FDW_FAIL"
+    sed "s/${POSTGRES_PASSWORD}//g" /tmp/hr-fdw.err | tr -d '\r' | head -c 400
+    echo
+    exit 1
+  args:
+    executable: /bin/bash
+  register: fdw_rds
+  failed_when: false
+  no_log: true
+  when: app_role == "haystack"
+
+- name: RDS postgres_fdw result
+  ansible.builtin.debug:
+    msg: "{{ fdw_rds.stdout_lines | default(['RDS postgres_fdw step produced no output']) }}"
+  when: app_role == "haystack"
+
 - name: Write pgvector fallback compose
   ansible.builtin.template:
     src: pgvector-fallback.yml.j2

@@ -368,6 +368,25 @@ resource "aws_vpc_security_group_egress_rule" "rds_to_haystack" {
   description                  = "RDS Postgres to Haystack"
 }
 
+# postgres_fdw on Haystack RDS opens :5432 to SoR RDS (same sg-rds).
+resource "aws_vpc_security_group_ingress_rule" "rds_from_rds" {
+  security_group_id            = aws_security_group.rds.id
+  ip_protocol                  = "tcp"
+  from_port                    = 5432
+  to_port                      = 5432
+  referenced_security_group_id = aws_security_group.rds.id
+  description                  = "Haystack RDS FDW to SoR RDS"
+}
+
+resource "aws_vpc_security_group_egress_rule" "rds_to_rds" {
+  security_group_id            = aws_security_group.rds.id
+  ip_protocol                  = "tcp"
+  from_port                    = 5432
+  to_port                      = 5432
+  referenced_security_group_id = aws_security_group.rds.id
+  description                  = "Haystack RDS FDW to SoR RDS"
+}
+
 # --- neo4j ---
 resource "aws_vpc_security_group_ingress_rule" "neo4j_bolt_from_haystack" {
   security_group_id            = aws_security_group.neo4j.id
