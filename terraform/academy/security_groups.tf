@@ -154,6 +154,24 @@ resource "aws_vpc_security_group_ingress_rule" "rest_from_alb" {
   referenced_security_group_id = aws_security_group.alb_rest.id
 }
 
+resource "aws_vpc_security_group_egress_rule" "rest_to_alb" {
+  security_group_id            = aws_security_group.rest.id
+  ip_protocol                  = "tcp"
+  from_port                    = 8080
+  to_port                      = 8080
+  referenced_security_group_id = aws_security_group.alb_rest.id
+  description                  = "REST to REST ALB"
+}
+
+resource "aws_vpc_security_group_ingress_rule" "rest_from_rds" {
+  security_group_id            = aws_security_group.rest.id
+  ip_protocol                  = "tcp"
+  from_port                    = 5432
+  to_port                      = 5432
+  referenced_security_group_id = aws_security_group.rds.id
+  description                  = "RDS Postgres to REST"
+}
+
 resource "aws_vpc_security_group_egress_rule" "rest_to_rds" {
   security_group_id            = aws_security_group.rest.id
   ip_protocol                  = "tcp"
@@ -267,6 +285,15 @@ resource "aws_vpc_security_group_ingress_rule" "rds_from_haystack" {
   from_port                    = 5432
   to_port                      = 5432
   referenced_security_group_id = aws_security_group.haystack.id
+}
+
+resource "aws_vpc_security_group_egress_rule" "rds_to_rest" {
+  security_group_id            = aws_security_group.rds.id
+  ip_protocol                  = "tcp"
+  from_port                    = 5432
+  to_port                      = 5432
+  referenced_security_group_id = aws_security_group.rest.id
+  description                  = "RDS Postgres to REST"
 }
 
 # --- neo4j ---

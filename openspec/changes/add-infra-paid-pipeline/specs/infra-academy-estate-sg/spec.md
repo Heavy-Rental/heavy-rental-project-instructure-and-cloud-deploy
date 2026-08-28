@@ -24,9 +24,9 @@ Security groups implement AWS study §6.2 with ADR 0018: public ALBs are the por
 Terraform SHALL encode:
 
 - portal :80 from `sg-alb-public`
-- REST :8080 from the internet (`0.0.0.0/0`) and from `sg-portal` (via `sg-alb-rest`); egress 5432 to `sg-rds` and 8000 to `sg-alb-haystack`; no egress 7687
+- REST :8080 from the internet (`0.0.0.0/0`) and from `sg-portal` (via `sg-alb-rest`); instance SG ingress TCP 8080 from `sg-alb-rest` and egress TCP 8080 to `sg-alb-rest`; ingress TCP 5432 from `sg-rds`; egress 5432 to `sg-rds` and 8000 to `sg-alb-haystack`; no egress 7687; no instance-SG pairing with `sg-portal`
 - Haystack :8000 from `sg-alb-haystack`; egress 5432 to `sg-rds` and 7687 to `sg-neo4j`
-- RDS :5432 from `sg-rest` and `sg-haystack` only
+- RDS :5432 from `sg-rest` and `sg-haystack` only; egress 5432 to `sg-rest`
 - Neo4j :7687 from `sg-haystack` only
 
 #### Scenario: Portal cannot reach RDS
@@ -35,8 +35,23 @@ Terraform SHALL encode:
 - THEN `sg-portal` is not a source
 - AND `0.0.0.0/0` is not a source on 5432
 
+#### Scenario: REST and RDS pair on :5432 by security-group id
+- GIVEN the estate is applied
+- WHEN `sg-rest` and `sg-rds` rules are listed
+- THEN `sg-rest` allows ingress TCP 5432 from `sg-rds` and egress TCP 5432 to `sg-rds`
+- AND `sg-rds` allows ingress TCP 5432 from `sg-rest` and egress TCP 5432 to `sg-rest`
+- AND neither rule uses `0.0.0.0/0` on 5432
+
 #### Scenario: REST ALB still accepts portal
 - GIVEN the estate is applied
 - WHEN `sg-alb-rest` ingress is listed
 - THEN TCP 8080 from `sg-portal` is present
 - AND TCP 8080 from `0.0.0.0/0` is present
+
+#### Scenario: REST pairs with REST ALB on :8080 by security-group id
+- GIVEN the estate is applied
+- WHEN `sg-rest` rules are listed
+- THEN ingress TCP 8080 from `sg-alb-rest` is present
+- AND egress TCP 8080 to `sg-alb-rest` is present
+- AND neither rule uses `0.0.0.0/0` on 8080
+- AND `sg-portal` is not a source or destination on `sg-rest`
