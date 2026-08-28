@@ -266,6 +266,33 @@ resource "aws_vpc_security_group_ingress_rule" "haystack_from_alb" {
   referenced_security_group_id = aws_security_group.alb_haystack.id
 }
 
+resource "aws_vpc_security_group_ingress_rule" "haystack_from_rds" {
+  security_group_id            = aws_security_group.haystack.id
+  ip_protocol                  = "tcp"
+  from_port                    = 5432
+  to_port                      = 5432
+  referenced_security_group_id = aws_security_group.rds.id
+  description                  = "RDS Postgres to Haystack"
+}
+
+resource "aws_vpc_security_group_ingress_rule" "haystack_from_neo4j_bolt" {
+  security_group_id            = aws_security_group.haystack.id
+  ip_protocol                  = "tcp"
+  from_port                    = 7687
+  to_port                      = 7687
+  referenced_security_group_id = aws_security_group.neo4j.id
+  description                  = "Neo4j Bolt to Haystack"
+}
+
+resource "aws_vpc_security_group_ingress_rule" "haystack_from_neo4j_browser" {
+  security_group_id            = aws_security_group.haystack.id
+  ip_protocol                  = "tcp"
+  from_port                    = 7474
+  to_port                      = 7474
+  referenced_security_group_id = aws_security_group.neo4j.id
+  description                  = "Neo4j Browser to Haystack"
+}
+
 resource "aws_vpc_security_group_egress_rule" "haystack_to_rds" {
   security_group_id            = aws_security_group.haystack.id
   ip_protocol                  = "tcp"
@@ -332,6 +359,15 @@ resource "aws_vpc_security_group_egress_rule" "rds_to_rest" {
   description                  = "RDS Postgres to REST"
 }
 
+resource "aws_vpc_security_group_egress_rule" "rds_to_haystack" {
+  security_group_id            = aws_security_group.rds.id
+  ip_protocol                  = "tcp"
+  from_port                    = 5432
+  to_port                      = 5432
+  referenced_security_group_id = aws_security_group.haystack.id
+  description                  = "RDS Postgres to Haystack"
+}
+
 # --- neo4j ---
 resource "aws_vpc_security_group_ingress_rule" "neo4j_bolt_from_haystack" {
   security_group_id            = aws_security_group.neo4j.id
@@ -366,6 +402,24 @@ resource "aws_vpc_security_group_ingress_rule" "neo4j_browser_from_haystack" {
   from_port                    = 7474
   to_port                      = 7474
   referenced_security_group_id = aws_security_group.haystack.id
+}
+
+resource "aws_vpc_security_group_egress_rule" "neo4j_to_haystack_bolt" {
+  security_group_id            = aws_security_group.neo4j.id
+  ip_protocol                  = "tcp"
+  from_port                    = 7687
+  to_port                      = 7687
+  referenced_security_group_id = aws_security_group.haystack.id
+  description                  = "Neo4j Bolt to Haystack"
+}
+
+resource "aws_vpc_security_group_egress_rule" "neo4j_to_haystack_browser" {
+  security_group_id            = aws_security_group.neo4j.id
+  ip_protocol                  = "tcp"
+  from_port                    = 7474
+  to_port                      = 7474
+  referenced_security_group_id = aws_security_group.haystack.id
+  description                  = "Neo4j Browser to Haystack"
 }
 
 resource "aws_vpc_security_group_egress_rule" "neo4j_https" {

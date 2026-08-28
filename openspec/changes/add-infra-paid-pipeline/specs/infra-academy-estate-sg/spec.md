@@ -26,9 +26,9 @@ Terraform SHALL encode:
 - portal :80 from `sg-alb-public`
 - REST :8080 from the internet (`0.0.0.0/0`) and from `sg-portal` (via `sg-alb-rest`); instance SG ingress TCP 8080 from `sg-alb-rest` and egress TCP 8080 to `sg-alb-rest`; ingress TCP 5432 from `sg-rds`; egress 5432 to `sg-rds`; ingress and egress TCP 8000 with `sg-alb-haystack`; no egress 7687; no instance-SG pairing with `sg-portal` or `sg-haystack`
 - Haystack ALB :8000 from `sg-rest` and from `sg-alb-haystack`; egress TCP 8000 to `sg-rest`, `sg-alb-haystack`, and `sg-haystack`; not public
-- Haystack :8000 from `sg-alb-haystack`; egress 5432 to `sg-rds` and 7687 to `sg-neo4j`
-- RDS :5432 from `sg-rest` and `sg-haystack` only; egress 5432 to `sg-rest`
-- Neo4j :7687 from `sg-haystack` only
+- Haystack :8000 from `sg-alb-haystack`; ingress and egress TCP 5432 with `sg-rds`; ingress and egress TCP 7687 and 7474 with `sg-neo4j`
+- RDS :5432 from `sg-rest` and `sg-haystack` only; egress 5432 to `sg-rest` and `sg-haystack`
+- Neo4j :7687 from `sg-haystack` (and Bolt NLB / VPC CIDR); egress TCP 7687 and 7474 to `sg-haystack`
 
 #### Scenario: Portal cannot reach RDS
 - GIVEN the estate is applied
@@ -65,3 +65,18 @@ Terraform SHALL encode:
 - AND `sg-alb-haystack` allows ingress TCP 8000 from `sg-alb-haystack` and egress TCP 8000 to `sg-alb-haystack`
 - AND `sg-haystack` is not a source or destination on `sg-rest`
 - AND `0.0.0.0/0` is not a source on 8000
+
+#### Scenario: Haystack pairs with RDS on :5432 by security-group id
+- GIVEN the estate is applied
+- WHEN `sg-haystack` and `sg-rds` rules are listed
+- THEN `sg-haystack` allows ingress TCP 5432 from `sg-rds` and egress TCP 5432 to `sg-rds`
+- AND `sg-rds` allows ingress TCP 5432 from `sg-haystack` and egress TCP 5432 to `sg-haystack`
+- AND neither rule uses `0.0.0.0/0` on 5432
+
+#### Scenario: Haystack pairs with Neo4j on :7687 and :7474 by security-group id
+- GIVEN the estate is applied
+- WHEN `sg-haystack` and `sg-neo4j` rules are listed
+- THEN `sg-haystack` allows ingress and egress TCP 7687 and 7474 with `sg-neo4j`
+- AND `sg-neo4j` allows ingress and egress TCP 7687 and 7474 with `sg-haystack`
+- AND `sg-neo4j` still allows Bolt :7687 from the VPC CIDR
+- AND neither 7687 nor 7474 uses `0.0.0.0/0`
