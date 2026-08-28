@@ -180,6 +180,15 @@ resource "aws_vpc_security_group_egress_rule" "rest_to_rds" {
   referenced_security_group_id = aws_security_group.rds.id
 }
 
+resource "aws_vpc_security_group_ingress_rule" "rest_from_haystack_alb" {
+  security_group_id            = aws_security_group.rest.id
+  ip_protocol                  = "tcp"
+  from_port                    = 8000
+  to_port                      = 8000
+  referenced_security_group_id = aws_security_group.alb_haystack.id
+  description                  = "Haystack ALB to REST"
+}
+
 resource "aws_vpc_security_group_egress_rule" "rest_to_haystack_alb" {
   security_group_id            = aws_security_group.rest.id
   ip_protocol                  = "tcp"
@@ -211,6 +220,33 @@ resource "aws_vpc_security_group_ingress_rule" "alb_haystack_from_rest" {
   from_port                    = 8000
   to_port                      = 8000
   referenced_security_group_id = aws_security_group.rest.id
+}
+
+resource "aws_vpc_security_group_ingress_rule" "alb_haystack_health" {
+  security_group_id            = aws_security_group.alb_haystack.id
+  ip_protocol                  = "tcp"
+  from_port                    = 8000
+  to_port                      = 8000
+  referenced_security_group_id = aws_security_group.alb_haystack.id
+  description                  = "Haystack ALB same-subnet health / hairpin"
+}
+
+resource "aws_vpc_security_group_egress_rule" "alb_haystack_to_rest" {
+  security_group_id            = aws_security_group.alb_haystack.id
+  ip_protocol                  = "tcp"
+  from_port                    = 8000
+  to_port                      = 8000
+  referenced_security_group_id = aws_security_group.rest.id
+  description                  = "Haystack ALB to REST"
+}
+
+resource "aws_vpc_security_group_egress_rule" "alb_haystack_to_self" {
+  security_group_id            = aws_security_group.alb_haystack.id
+  ip_protocol                  = "tcp"
+  from_port                    = 8000
+  to_port                      = 8000
+  referenced_security_group_id = aws_security_group.alb_haystack.id
+  description                  = "Haystack ALB to Haystack ALB"
 }
 
 resource "aws_vpc_security_group_egress_rule" "alb_haystack_to_haystack" {

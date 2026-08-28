@@ -24,7 +24,8 @@ Security groups implement AWS study §6.2 with ADR 0018: public ALBs are the por
 Terraform SHALL encode:
 
 - portal :80 from `sg-alb-public`
-- REST :8080 from the internet (`0.0.0.0/0`) and from `sg-portal` (via `sg-alb-rest`); instance SG ingress TCP 8080 from `sg-alb-rest` and egress TCP 8080 to `sg-alb-rest`; ingress TCP 5432 from `sg-rds`; egress 5432 to `sg-rds` and 8000 to `sg-alb-haystack`; no egress 7687; no instance-SG pairing with `sg-portal`
+- REST :8080 from the internet (`0.0.0.0/0`) and from `sg-portal` (via `sg-alb-rest`); instance SG ingress TCP 8080 from `sg-alb-rest` and egress TCP 8080 to `sg-alb-rest`; ingress TCP 5432 from `sg-rds`; egress 5432 to `sg-rds`; ingress and egress TCP 8000 with `sg-alb-haystack`; no egress 7687; no instance-SG pairing with `sg-portal` or `sg-haystack`
+- Haystack ALB :8000 from `sg-rest` and from `sg-alb-haystack`; egress TCP 8000 to `sg-rest`, `sg-alb-haystack`, and `sg-haystack`; not public
 - Haystack :8000 from `sg-alb-haystack`; egress 5432 to `sg-rds` and 7687 to `sg-neo4j`
 - RDS :5432 from `sg-rest` and `sg-haystack` only; egress 5432 to `sg-rest`
 - Neo4j :7687 from `sg-haystack` only
@@ -55,3 +56,12 @@ Terraform SHALL encode:
 - AND egress TCP 8080 to `sg-alb-rest` is present
 - AND neither rule uses `0.0.0.0/0` on 8080
 - AND `sg-portal` is not a source or destination on `sg-rest`
+
+#### Scenario: REST pairs with Haystack ALB on :8000 by security-group id
+- GIVEN the estate is applied
+- WHEN `sg-rest` and `sg-alb-haystack` rules are listed
+- THEN `sg-rest` allows ingress TCP 8000 from `sg-alb-haystack` and egress TCP 8000 to `sg-alb-haystack`
+- AND `sg-alb-haystack` allows ingress TCP 8000 from `sg-rest` and egress TCP 8000 to `sg-rest`
+- AND `sg-alb-haystack` allows ingress TCP 8000 from `sg-alb-haystack` and egress TCP 8000 to `sg-alb-haystack`
+- AND `sg-haystack` is not a source or destination on `sg-rest`
+- AND `0.0.0.0/0` is not a source on 8000
