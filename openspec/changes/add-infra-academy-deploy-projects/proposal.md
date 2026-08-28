@@ -10,7 +10,7 @@
 - That action is a **later run** after a successful `apply` or `configure-only`. It is not chained onto those actions.
 - Image preflight on the runner, then `playbooks/site.yml` over SSM.
 - OpenSpec capability, OpenSPDD REASONS, ADR 0014.
-- Infra Haystack role matches app CD (env aliases + `uv run` sidecars).
+- Infra Haystack role matches app CD (env aliases + workers; later ADR 0020 / 0011: dedicated images + scripts, not `uv run` `-m`).
 
 ## Capabilities
 

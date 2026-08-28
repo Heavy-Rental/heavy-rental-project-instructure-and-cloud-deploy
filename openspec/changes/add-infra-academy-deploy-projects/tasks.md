@@ -16,5 +16,5 @@
 
 ## 3. Ansible
 
-- [x] 3.1 Haystack aliases + `uv run` sidecars (match app CD)
+- [x] 3.1 Haystack aliases + workers (match app CD; later ADR 0020 scripts, not `uv run` `-m`)
 - [x] 3.2 `site.yml` header: invoked only by `deploy-projects`

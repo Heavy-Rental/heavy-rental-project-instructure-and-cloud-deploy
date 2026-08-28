@@ -1,6 +1,6 @@
 ---
 # Keep in sync with haystack-fast-api-pipeline deploy-pipeline haystack role
-# (env aliases + uv sidecars). deploy-projects uses this contract.
+# (env aliases + ADR 0020 workers). deploy-projects uses this contract.
 - name: Haystack image is required
   ansible.builtin.assert:
     that:

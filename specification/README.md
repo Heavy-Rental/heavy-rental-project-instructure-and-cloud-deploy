@@ -51,5 +51,6 @@ Conflict order: **OpenSpec scenarios → OpenSPDD Safeguards → ADR → YAML / 
 | [`../openspec/changes/add-infra-academy-observe/`](../openspec/changes/add-infra-academy-observe/) | CloudWatch + CloudTrail on apply (LabRole, S3 trail) |
 | [`../openspec/changes/add-infra-paid-profile/`](../openspec/changes/add-infra-paid-profile/) | Dual profile isolation (OIDC vs Vocareum, `-actual` state, `hr-paid-*`). One Action is **superseded** by `add-infra-paid-pipeline` |
 | [`../openspec/changes/add-infra-paid-pipeline/`](../openspec/changes/add-infra-paid-pipeline/) | Dedicated paid Action + public REST ALB; separate job graphs (ADRs 0017–0019) |
+| [`../openspec/changes/add-infra-haystack-workers/`](../openspec/changes/add-infra-haystack-workers/) | Haystack sync/populate workers + `sg-rds` FDW (ADR 0020) |
 
-SPDD: [`../spdd/analysis/`](../spdd/analysis/). ADRs 0001–0019: [`../docs/adr/`](../docs/adr/).
+SPDD: [`../spdd/analysis/`](../spdd/analysis/). ADRs 0001–0020: [`../docs/adr/`](../docs/adr/).

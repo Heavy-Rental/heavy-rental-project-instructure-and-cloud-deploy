@@ -133,14 +133,14 @@ Terraform in `terraform/academy/` (see [`ARCHITECTURE.md`](ARCHITECTURE.md) and 
    | --- | --- |
    | `heavy-rental/portal` | `REST_BASE_URL`, `STRIPE_PUBLISHABLE_KEY`, `VITE_STRIPE_PUBLISHABLE_KEY` (same `pk_`) |
    | `heavy-rental/rest` | `POSTGRES_*` / `SPRING_DATASOURCE_*` plus app aliases, `HAYSTACK_BASE_URL`, `APP_CORS_ALLOWED_ORIGINS` (`http://<portal_alb>,http://<rest_alb>:8080`, ADR 0018), Stripe trio, `APP_JWT_SECRET`, optional OneMap |
-   | `heavy-rental/haystack` | Haystack RDS `POSTGRES_*` / aliases / `DATABASE_URL`, `SOURCE_*` (SoR), `TARGET_*` (Haystack RDS), `NEO4J_URI` / user / password, `NEO4J_POPULATE_URL` (`http://neo4j-populate:8089/v1/populate`), `FLEET_BACKEND=sql`, `NEO4J_BACKEND=bolt`, optional `LLM_API_KEY` |
+   | `heavy-rental/haystack` | Haystack RDS `POSTGRES_*` / aliases / `DATABASE_URL`, `SOURCE_*` (SoR), `TARGET_*` (Haystack RDS), `NEO4J_URI` / user / password, `NEO4J_POPULATE_URL` (`http://neo4j-populate:8089/v1/populate`, Compose-only), `FLEET_BACKEND=sql`, `NEO4J_BACKEND=bolt`, optional `LLM_API_KEY`. Ansible aliases `SOURCE_USER` / `PG*` / `NEO4J_POPULATE_TRIGGER_URL` at compose |
    | `heavy-rental/neo4j` | `NEO4J_USER`, `NEO4J_PASSWORD` |
 
    Fail if host, database, password, port, or `REST_BASE_URL` is empty. **Never** write Vocareum AWS keys into SM.
 
 2. **`sync-ssh-keys`:** after InService only. PEMs → `heavy-rental/ssh/*`. Public keys via SSM.
 
-3. **Ansible** (`ANSIBLE-PROCESS.md`): SSM inventory `portal` / `rest` / `haystack` / `neo4j`; Docker; `get-secret-value` → `.env`; CI image load/pull; compose with §6.4a limits; portal nginx `/api` → `REST_BASE_URL`; Haystack must not start `neo4j`; RDS logical via `delegate_to` rest or haystack. `site.yml` waits for REST `:8080/actuator/health` **2xx** and Haystack `:8000/health` **2xx** (ALB `tg-rest` / `tg-haystack`).
+3. **Ansible** (`ANSIBLE-PROCESS.md`): SSM inventory `portal` / `rest` / `haystack` / `neo4j`; Docker; `get-secret-value` → `.env`; CI image load/pull; compose with §6.4a limits; portal nginx `/api` → `REST_BASE_URL`; Haystack must not start `neo4j`; Haystack workers are `postgres:17` + `python:3.12-slim` scripts (ADR 0020), not uvicorn `-m`; RDS logical `vector` + `postgres_fdw` via a haystack guest. `site.yml` waits for REST `:8080/actuator/health` **2xx** and Haystack `:8000/health` **2xx** (ALB `tg-rest` / `tg-haystack`). Worker crash does not fail that wait.
 
 4. **`stop`:** ASG desired=0 (all four) + `rds stop-db-instance` on both RDS. NAT Gateways **cannot** be stopped — they bill until `destroy`.
 

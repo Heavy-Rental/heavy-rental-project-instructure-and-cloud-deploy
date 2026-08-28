@@ -7,7 +7,7 @@
 
 ## Context
 
-`postgres-haystack-sync` on `asg-haystack` copies SoR (`heavy_rental`) to Haystack RDS. Terraform creates **two** RDS instances; it does not write connection JSON. App CD must not invent hostnames or run Terraform.
+`postgres-haystack-sync` on `asg-haystack` copies SoR (`heavy_rental`) to Haystack RDS. Runtime is `sync-from-primary.sh` on `postgres:17` (ADR 0020), not `python -m` on uvicorn. Terraform creates **two** RDS instances; it does not write connection JSON. App CD must not invent hostnames or run Terraform.
 
 ## Decision
 

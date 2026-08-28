@@ -1,6 +1,7 @@
 # Delta for infra-academy-estate-sg
 
-> **Later modified by** [`add-infra-paid-pipeline`](../../../add-infra-paid-pipeline/specs/infra-academy-estate-sg/spec.md) / [ADR 0018](../../../../../docs/adr/0018-public-rest-alb.md): `sg-alb-rest` allows TCP 8080 from `0.0.0.0/0`. Portal ALB (`sg-alb-public`) stays the only public TCP 80. Haystack / RDS / Bolt stay private.
+> **Later modified by** [`add-infra-paid-pipeline`](../../../add-infra-paid-pipeline/specs/infra-academy-estate-sg/spec.md) / [ADR 0018](../../../../../docs/adr/0018-public-rest-alb.md): `sg-alb-rest` allows TCP 8080 from `0.0.0.0/0`. Portal ALB (`sg-alb-public`) stays the only public TCP 80. Haystack / RDS / Bolt stay private.  
+> **Later modified by** [`add-infra-haystack-workers`](../../../add-infra-haystack-workers/specs/infra-academy-estate-sg/spec.md) / [ADR 0020](../../../../../docs/adr/0020-haystack-devcontainer-workers.md): `sg-rds` allows TCP 5432 to/from itself for Haystack RDS `postgres_fdw`.
 
 ## Purpose
 

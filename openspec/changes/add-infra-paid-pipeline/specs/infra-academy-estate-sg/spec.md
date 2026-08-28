@@ -1,5 +1,7 @@
 # Delta for infra-academy-estate-sg (public REST ALB)
 
+> **Later modified by** [`add-infra-haystack-workers`](../../../add-infra-haystack-workers/specs/infra-academy-estate-sg/spec.md) / [ADR 0020](../../../../../docs/adr/0020-haystack-devcontainer-workers.md): `sg-rds` also pairs with itself on TCP 5432 for Haystack RDS `postgres_fdw`.
+
 ## Purpose
 
 Security groups implement AWS study §6.2 with ADR 0018: public ALBs are the portal on :80 and REST on :8080. Haystack, RDS, and Bolt stay off the internet.
