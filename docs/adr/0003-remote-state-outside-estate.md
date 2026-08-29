@@ -13,9 +13,9 @@ The GitHub runner is ephemeral. A local `terraform.tfstate` is gone when the job
 Use two Terraform roots:
 
 1. `terraform/backend/` — S3 bucket `heavy-rental-tfstate-<account>-academy`. Applied once with local state; object copied to `s3://…/backend/terraform.tfstate`.
-2. `terraform/academy/` — estate. Backend key `estate/terraform.tfstate`. Locking is S3 native (`use_lockfile = true`). Terraform 1.15 deprecated `dynamodb_table`.
+2. `terraform/academy/` — estate. Backend key `estate/terraform.tfstate`. Locking is S3 native (`use_lockfile = true`).
 
-An existing `heavy-rental-tfstate-lock-academy` table, if already created, is unused leftover. Do not require it.
+An existing `heavy-rental-tfstate-lock-<deployment>` DynamoDB table is unused leftover from the pre-1.15 lock. Do not require it. `sweep-estate-orphans.sh` deletes it if present.
 
 No `aws_iam_role` in either root on Academy.
 

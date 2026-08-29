@@ -208,6 +208,12 @@ Do not try to do step 3 and step 5 in one click. `deploy-projects` is not chaine
 
 **Success:** Job summary shows the plan. No new EC2.
 
+**Common problems:**
+
+| Symptom | What to do |
+| --- | --- |
+| `voc-cancel-cred` / `s3:CreateBucket` AccessDenied on **Ensure S3 state backend** | The lab session is cancelled. See [Plan or apply fails: Vocareum cancelled credentials](#plan-or-apply-fails-vocareum-cancelled-credentials-voc-cancel-cred). |
+
 **Do not:** Treat a green `plan` as “the lab is up.” You still need `apply`.
 
 ---
@@ -248,7 +254,7 @@ It does **not** pull portal, REST, or Haystack images. That is why apply no long
 | --- | --- |
 | Missing `SPRING_DATASOURCE_PASSWORD` / Stripe / Neo4j password | Add them on Environment `academy`, re-run |
 | `device index 0 … cannot be detached` | See [Apply fails: primary ENI](#apply-fails-device-index-0--cannot-be-detached) |
-| `voc-cancel-cred` / `Failed to persist state to backend` | See [Apply fails: Vocareum cancelled credentials](#apply-fails-vocareum-cancelled-credentials-voc-cancel-cred) |
+| `voc-cancel-cred` / `s3:CreateBucket` / `Failed to persist state to backend` | See [Plan or apply fails: Vocareum cancelled credentials](#plan-or-apply-fails-vocareum-cancelled-credentials-voc-cancel-cred) |
 | `AlreadyExists` / `RepositoryAlreadyExists` / secret already exists | See [Apply fails: named object already exists](#apply-fails-named-object-already-exists) |
 | Two VPCs named `heavy-rental-academy` | `destroy` (sweeps extras), then `apply`. Do not apply again until destroy finishes |
 | You expected the React portal to load | Run `deploy-projects` next. Apply is not a full deploy |
@@ -375,18 +381,23 @@ To wipe a half-applied estate instead: `destroy` (with `confirm_destroy=destroy`
 
 ---
 
-## Apply fails: Vocareum cancelled credentials (`voc-cancel-cred`)
+## Plan or apply fails: Vocareum cancelled credentials (`voc-cancel-cred`)
 
-Terraform created something in AWS (often RDS after ~15 minutes), then could not write `estate/terraform.tfstate` to S3. The deny is **not** a missing bucket policy. Vocareum attached identity policy `voc-cancel-cred` because the lab session ended, **End Lab** was clicked, credits ran out, or the Environment `AWS_*` secrets are from a previous Start Lab.
+Vocareum attached identity policy `voc-cancel-cred`. That is an **explicit deny** on the caller (not a missing bucket policy). `sts get-caller-identity` can still succeed, so **Assert AWS profile** may be green while **Ensure S3 state backend** fails on `s3:CreateBucket`.
 
-The GitHub runner’s `errored.tfstate` is **gone** when the job ends. Leftovers stay in AWS.
+Typical causes: the lab session ended, **End Lab** was clicked, credits ran out, or the Environment `AWS_*` secrets (or a partial Run form) are from a previous Start Lab.
 
-1. **Start Lab** again and paste **new** AWS Details on the Run form (do not reuse cancelled Environment `AWS_*` secrets).
+Two shapes:
+
+- **Plan / bootstrap / early apply:** HeadBucket returns 403, then Terraform tries to create `heavy-rental-tfstate-<account>-academy` and AWS denies `s3:CreateBucket`. Nothing was created yet. Start Lab and re-run the same `action`.
+- **Long apply:** Terraform created something (often RDS after ~15 minutes), then could not `PutObject` `estate/terraform.tfstate`. The runner’s `errored.tfstate` is **gone** when the job ends. Leftovers stay in AWS.
+
+1. **Start Lab** again and paste **new** AWS Details on the Run form (all three fields). Do not reuse cancelled Environment `AWS_*` secrets.
 2. Check Actions: no other infra run is still in the Terraform job. The next run deletes a leftover `estate/terraform.tfstate.tflock` automatically.
-3. **Re-run `action=apply`.** Before plan, the job imports named leftovers (ASGs, ECR, secrets, RDS, the estate VPC) so apply does not try to create them again.
+3. Re-run the same `action` (`plan`, `bootstrap`, or `apply`). For apply, the job imports named leftovers (ASGs, ECR, secrets, RDS, the estate VPC) so it does not try to create them again.
 4. If reconcile reports **two** VPCs named `heavy-rental-academy`, do **not** apply. Run `action=destroy` with `confirm_destroy=destroy` (that sweep deletes extra VPCs), then `apply` at the start of a long lab session.
 
-NAT Gateways and ALBs that already exist **keep billing** after the session ends, until `destroy`.
+NAT Gateways and ALBs that already exist **keep billing** after the session ends, until `destroy`. You cannot grant `s3:CreateBucket` yourself — Academy IAM is Vocareum-owned. Fresh Start Lab keys are the fix.
 
 ---
 

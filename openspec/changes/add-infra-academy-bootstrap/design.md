@@ -1,6 +1,6 @@
 # Design: Academy / Vocareum infra CD bootstrap
 
-> **As implemented:** S3 native `use_lockfile=true`. No DynamoDB lock table (ADR 0003). An existing `heavy-rental-tfstate-lock-academy` table, if present, is unused leftover.
+> **As implemented:** S3 native `use_lockfile=true` (ADR 0003). `sweep-estate-orphans.sh` deletes leftover `heavy-rental-tfstate-lock-<deployment>` if present.
 
 ## Context
 
