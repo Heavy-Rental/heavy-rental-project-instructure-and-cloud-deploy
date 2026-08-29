@@ -2,7 +2,7 @@
 
 Contract: `heavy-rental-project-pipeline-development/cloud-deployment-feasibility-studies/` — AWS study §4.3 / §6.1 / §6.4 / §6.4a / §7.1, `TERRAFORM-PROCESS.md`, `ANSIBLE-PROCESS.md`.
 
-Recorded **2026-08-25**. Terraform CLI **1.15.8** and Ansible **14.3.1** are live in `aws-infra-academy.yml` and `aws-infra-paid.yml` (separate job graphs).
+Toolchain recorded **2026-08-25**. Estate runtime updated **2026-08-29** (`hr-bastion` `t3.micro` x1; guest count **9**). Terraform CLI **1.15.8** and Ansible **14.3.1** are live in `aws-infra-academy.yml` and `aws-infra-paid.yml` (separate job graphs).
 
 ## Toolchain
 
@@ -30,8 +30,8 @@ Recorded **2026-08-25**. Terraform CLI **1.15.8** and Ansible **14.3.1** are liv
 | pgvector fallback | study §6.1 | `CREATE EXTENSION vector` on Haystack RDS; container only if that fails |
 | Portal | study §6.4a | Infra `group_vars` looks up Environment `PORTAL_IMAGE`. `deploy-projects` forbids stock `nginx`. Portal-only redeploy: `heavy-rental-web-portal-pipeline/deploy-pipeline/` (same compose contract). |
 | Docker Compose | AL2023 | Try `docker-compose-plugin` RPM; else GitHub **v2.39.2** CLI plugin |
-| Instance types | study §6.4 | NAT Gateway **x2** (not EC2); portal `t3.micro` **x2**; rest/haystack `t3.small` **x2**; neo4j `t3.large` **x2** (8 EC2) |
-| ASG health | ADR 0008 | `health_check_type = EC2` on all four ASGs. Compose did **not** switch to ELB instance replacement. |
+| Instance types | study §6.4 | NAT Gateway **x2** (not EC2); portal `t3.micro` **x2**; rest/haystack `t3.small` **x2**; neo4j `t3.large` **x2**; bastion `t3.micro` **x1** (9 EC2) |
+| ASG health | ADR 0008 | `health_check_type = EC2` on the four app ASGs. Compose did **not** switch to ELB instance replacement. `hr-bastion` is a single instance (not an ASG). |
 | ALB `tg-rest` | `alb.tf` | `GET <instance>:8080/actuator/health`, matcher **`200-299`** (2xx). Not `GET /` (Spring 401). |
 | ALB `tg-haystack` | `alb.tf` | `GET <instance>:8000/health`, matcher **`200-299`** (2xx). Not `/` or `/docs`. |
 | ALB `tg-portal` | `alb.tf` | `GET <instance>:80/`, matcher `200-399`. |

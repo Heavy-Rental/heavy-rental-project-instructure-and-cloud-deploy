@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Pause: ASG desired=0 (keep max=2) + stop both RDS. NAT Gateways stay and still bill.
+# Pause: ASG desired=0 (max=2) + stop hr-bastion + stop both RDS.
+# NAT Gateways stay and still bill.
 #
 # RDS identifiers are Terraform names (heavy-rental-academy,
 # heavy-rental-haystack-academy) on academy and paid. Do not rename them
@@ -22,6 +23,19 @@ for asg in "${ASGS[@]}"; do
     echo "${asg}: missing, skipped."
   fi
 done
+
+mapfile -t BASTION_IDS < <(aws ec2 describe-instances \
+  --filters \
+    "Name=tag:Role,Values=bastion" \
+    "Name=instance-state-name,Values=pending,running" \
+  --query 'Reservations[].Instances[].InstanceId' --output text 2>/dev/null \
+  | tr '\t' '\n' | awk 'NF')
+if [ "${#BASTION_IDS[@]}" -gt 0 ]; then
+  aws ec2 stop-instances --instance-ids "${BASTION_IDS[@]}" >/dev/null
+  echo "hr-bastion: stop requested (${BASTION_IDS[*]})."
+else
+  echo "hr-bastion: missing or already stopped, skipped."
+fi
 
 for id in "${RDS_IDS[@]}"; do
   status="$(aws rds describe-db-instances --db-instance-identifier "${id}" \

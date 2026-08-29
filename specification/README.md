@@ -4,17 +4,17 @@ This folder is the **human index** for the estate in `heavy-rental-project-instr
 
 **Terraform** creates AWS architecture and resources. **Ansible** only configures guests that already exist. App CD (Haystack / REST / portal images) is not specified here — it lives in `heavy-rental-project-pipeline-development`.
 
-Reference studies: `heavy-rental-project-pipeline-development/cloud-deployment-feasibility-studies/` (`AWS-INFRASTRUCTURE-FEASIBILITY.md`, `TERRAFORM-PROCESS.md`, `ANSIBLE-PROCESS.md`).
+Reference studies: `heavy-rental-project-pipeline-development/cloud-deployment-feasibility-studies/` (`AWS-INFRASTRUCTURE-FEASIBILITY.md`, `TERRAFORM-PROCESS.md`, `ANSIBLE-PROCESS.md`). Those studies describe the original **8-EC2** compose estate (four ASGs at desired=2). The **live** estate is **9 EC2**: those eight app guests plus single jump host `hr-bastion` (ADR 0021). If a study and this folder disagree, this folder wins.
 
 ## Pipeline boundaries
 
 | Concern | This repo? |
 | --- | --- |
-| VPC, subnets, NAT Gateways, ASGs, ALBs, RDS, NLB, SM shells | Yes — Terraform |
-| Fill SM JSON, guest Docker / `.env` / compose, PEMs after InService | Yes — scripts + Ansible (configuration) |
+| VPC, subnets, NAT Gateways, four app ASGs, `hr-bastion` (single EC2), ALBs, RDS, NLB, SM shells | Yes — Terraform |
+| Fill SM JSON, guest Docker / `.env` / compose, PEMs after InService + hop key on `hr-bastion` | Yes — scripts + Ansible (configuration). Ansible does not compose onto the bastion |
 | Redeploy a new portal / REST / Haystack CI image | Day-to-day: app CD. Optional first-compose: `action=deploy-projects` (after apply) |
 | Public AWS | Yes — `aws-infra-paid.yml`, Environment `AWS_ACTUAL`, OIDC (ADR 0017) |
-| Operate after go-live | SSM, `stop`, `destroy` |
+| Operate after go-live | SSM, break-glass SSH via `hr-bastion`, `stop`, `destroy` |
 | Monitor (CloudWatch / CloudTrail) | Yes — Terraform on `apply` (ADR 0015). Trail and flow logs are S3-only. Academy: LabRole only. Paid trail/dashboard `heavy-rental-actual`. |
 
 ## How to read the three frameworks
@@ -23,7 +23,7 @@ Reference studies: `heavy-rental-project-pipeline-development/cloud-deployment-f
 | --- | --- | --- |
 | **OpenSpec** | [`../openspec/`](../openspec/) | Observable behavior: SHALL + GIVEN/WHEN/THEN |
 | **OpenSPDD** | [`../spdd/`](../spdd/) | REASONS Canvas (how to implement, what not to invent) |
-| **ADR** | [`../docs/adr/`](../docs/adr/) | Why: Vocareum-only, two Actions, public REST ALB, two NAT Gateways, SSM |
+| **ADR** | [`../docs/adr/`](../docs/adr/) | Why: Vocareum-only, two Actions, public REST ALB, two NAT Gateways, SSM, `hr-bastion` |
 
 Conflict order: **OpenSpec scenarios → OpenSPDD Safeguards → ADR → YAML / Terraform**. If code cannot satisfy a scenario without breaking a safeguard, update the spec first.
 
@@ -52,5 +52,6 @@ Conflict order: **OpenSpec scenarios → OpenSPDD Safeguards → ADR → YAML / 
 | [`../openspec/changes/add-infra-paid-profile/`](../openspec/changes/add-infra-paid-profile/) | Dual profile isolation (OIDC vs Vocareum, `-actual` state, `hr-paid-*`). One Action is **superseded** by `add-infra-paid-pipeline` |
 | [`../openspec/changes/add-infra-paid-pipeline/`](../openspec/changes/add-infra-paid-pipeline/) | Dedicated paid Action + public REST ALB; separate job graphs (ADRs 0017–0019) |
 | [`../openspec/changes/add-infra-haystack-workers/`](../openspec/changes/add-infra-haystack-workers/) | Haystack sync/populate workers + `sg-rds` FDW (ADR 0020) |
+| [`../openspec/changes/add-infra-bastion/`](../openspec/changes/add-infra-bastion/) | Maintenance SSH bastion `hr-bastion` single EC2, not an ASG (ADR 0021) |
 
-SPDD: [`../spdd/analysis/`](../spdd/analysis/). ADRs 0001–0020: [`../docs/adr/`](../docs/adr/).
+SPDD: [`../spdd/analysis/`](../spdd/analysis/). ADRs 0001–0021: [`../docs/adr/`](../docs/adr/).

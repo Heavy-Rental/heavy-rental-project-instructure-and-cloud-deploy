@@ -2,6 +2,7 @@
 # health_check_type = EC2 (ADR 0008). Not switched to ELB after compose.
 # Portal (React/nginx), REST (Spring Boot), Haystack: one guest per app AZ.
 # ALBs already span both app (or public) subnets.
+# hr-bastion (ADR 0021): single public-subnet jump host. Not an ASG. Not composed.
 
 resource "aws_launch_template" "portal" {
   name_prefix   = "lt-portal-"
@@ -272,4 +273,40 @@ resource "aws_autoscaling_group" "neo4j" {
     value               = "asg-neo4j"
     propagate_at_launch = true
   }
+}
+
+# Maintenance jump host. One EC2 so the Vocareum 9-EC2 cap still holds
+# (8 app guests + this). Public subnet for optional CIDR SSH + SSM via IGW.
+# No ASG, no ALB. Ansible does not compose onto this instance (ADR 0021).
+resource "aws_instance" "bastion" {
+  ami                         = local.ami_id
+  instance_type               = "t3.micro"
+  subnet_id                   = aws_subnet.public[0].id
+  associate_public_ip_address = true
+  vpc_security_group_ids      = [aws_security_group.bastion.id]
+  iam_instance_profile        = local.bastion_instance_profile_name
+
+  metadata_options {
+    http_endpoint = "enabled"
+    http_tokens   = "required"
+  }
+
+  root_block_device {
+    volume_size           = local.root_volume_gb
+    volume_type           = "gp3"
+    delete_on_termination = true
+    encrypted             = true
+  }
+
+  tags = {
+    Name  = "hr-bastion"
+    Role  = "bastion"
+    Stack = "estate"
+  }
+}
+
+# apply starts the instance after action=stop (stop-instances is out of band).
+resource "aws_ec2_instance_state" "bastion" {
+  instance_id = aws_instance.bastion.id
+  state       = "running"
 }

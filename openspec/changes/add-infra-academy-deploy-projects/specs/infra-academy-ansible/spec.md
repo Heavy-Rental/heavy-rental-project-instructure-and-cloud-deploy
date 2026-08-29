@@ -1,5 +1,7 @@
 # Delta for infra-academy-ansible (`deploy-projects`)
 
+> **Later modified by** [`add-infra-bastion`](../../../add-infra-bastion/specs/infra-academy-bastion/spec.md) / [ADR 0021](../../../../../docs/adr/0021-maintenance-bastion-ssh.md): `site.yml` still targets `portal` / `rest` / `haystack` / `neo4j` only. Inventory may list `bastion`; compose SHALL NOT.
+
 ## Purpose
 
 Apply and configure-only stay on `configure.yml`. Only `deploy-projects` may invoke `site.yml`.

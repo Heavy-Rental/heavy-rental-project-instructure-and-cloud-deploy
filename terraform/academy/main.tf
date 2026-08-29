@@ -9,3 +9,4 @@
 # AWS_ACTUAL: iam.tf creates hr-paid-* instance profiles.
 # NAT is two aws_nat_gateway (one per public AZ), not an aws_instance.
 # REST ALB is internet-facing in public subnets (ADR 0018). Haystack stays internal.
+# hr-bastion (ADR 0021) is a single EC2 SSH jump; no ASG; no :22 from 0.0.0.0/0.

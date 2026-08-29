@@ -12,7 +12,7 @@ This repo has **two Actions**: **AWS infrastructure (Academy)** (`aws-infra-acad
    - `AWS_SECRET_ACCESS_KEY`
    - `AWS_SESSION_TOKEN`
 3. **Required secrets for `apply` / `configure-only`:** `SPRING_DATASOURCE_PASSWORD` (≥ 8), `NEO4J_PASSWORD`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_API_KEY` (`sk_…`), `STRIPE_WEBHOOK_SECRET`. **Not** workflow inputs. Do not add `VITE_STRIPE_PUBLISHABLE_KEY` (copied from the publishable key). Optional: `APP_JWT_SECRET` (≥ 32 chars, HS256). If unset, `sync-secrets` reuses the value already in `heavy-rental/rest` or generates one. Set it if you need the same JWT secret after `destroy` + `apply`. Optional OneMap: `ONEMAP_EMAIL` and `ONEMAP_PASSWORD` (both or neither). `APP_CORS_ALLOWED_ORIGINS` is **not** a GitHub secret — `sync-secrets` sets it to `http://<portal_alb_dns>,http://<rest_alb_dns>:8080` (portal origin plus the public REST ALB). Fields: [`../specification/pipelines/infra-secrets.md`](../specification/pipelines/infra-secrets.md). Optional pricing **variables** (not secrets): `DYNAMIC_PRICING_ENABLED`, `PRICING_DEFAULT_DISTANCE_KM`, `PRICING_ORIGIN_POSTAL_CODE`, `PRICING_DISTANCE_LOOKUP_ENABLED`. Empty = omit (Spring defaults). REST CD Environment `academy` can overlay the same names without a new infra run.
-4. Variable: `AWS_REGION` = `us-east-1`. Optional: `ALARM_EMAIL` for CloudWatch SNS (confirm the AWS mail).
+4. Variable: `AWS_REGION` = `us-east-1`. Optional: `ALARM_EMAIL` for CloudWatch SNS (confirm the AWS mail). Optional: `BASTION_SSH_CIDRS` (your public IPv4 `/32`, comma-separated). Empty = SSM onto `hr-bastion`, then SSH to guests. **Not** `0.0.0.0/0`.
 5. Image **variables** (not secrets) on this repo’s Environment `academy` — not the app-repo Environments: `PORTAL_IMAGE` (ECR or public GHCR tag; **required** for `deploy-projects`, stock `nginx` forbidden on that action), `REST_IMAGE`, `HAYSTACK_IMAGE`. Do **not** set `IMAGE_HTTP_URL` for `deploy-projects` (one tar cannot satisfy three images). `image_ref` on the Run form is REST/Haystack fallback only. `ansible/inventory/group_vars/all.yml` looks these up from the runner env. `apply` / `configure-only` still do **not** compose portal/REST/Haystack (`configure.yml`).
 6. GitHub cannot create Environments from git. For public AWS: follow [`OIDC-PAID.md`](OIDC-PAID.md) (AWS OIDC provider + role, then Environment **`AWS_ACTUAL`** variable **or** secret `AWS_ROLE_TO_ASSUME`). Same app secrets as academy, **no** `AWS_ACCESS_KEY_ID`. Run **AWS infrastructure (paid)**, not the academy Action. See ADR 0017.
 
@@ -26,10 +26,10 @@ Vocareum tokens **expire when the session ends**.
 4. Set `aws_environment` = `academy`. For billed AWS use workflow **AWS infrastructure (paid)** instead.
 5. Choose `action`:
    - **`plan`** — import any named leftovers into state, then show the estate (no apply). Works without `SPRING_DATASOURCE_PASSWORD` (uses a plan-only placeholder).
-   - **`apply`** — same import, then create or update the estate (Terraform), then `sync-secrets` → `sync-ssh-keys` → Ansible **`configure.yml`** (Docker + Compose on all guests; **Neo4j only**). Does **not** pull portal/REST/Haystack images. Needs `SPRING_DATASOURCE_PASSWORD`, `NEO4J_PASSWORD`, Stripe trio. Guest count is **8 EC2**. Also creates CloudTrail (S3 only), VPC flow logs, ALB access logs, CloudWatch alarms + dashboard `heavy-rental-academy`. Guests use **LabRole**. NAT Gateways bill until `destroy`. Safe to re-run after a failed apply.
-   - **`configure-only`** — **no Terraform apply**. Same Ansible as apply: Docker + Compose on all guests; Neo4j compose only. Portal / REST / Haystack **images** are not pulled.
+   - **`apply`** — same import, then create or update the estate (Terraform), then `sync-secrets` → `sync-ssh-keys` → Ansible **`configure.yml`** (Docker + Compose on app guests; **Neo4j only**). Does **not** pull portal/REST/Haystack images. Does **not** compose onto `hr-bastion`. Needs `SPRING_DATASOURCE_PASSWORD`, `NEO4J_PASSWORD`, Stripe trio. Guest count is **9 EC2** (8 app ASG + `hr-bastion`). Also creates CloudTrail (S3 only), VPC flow logs, ALB access logs, CloudWatch alarms + dashboard `heavy-rental-academy`. Guests use **LabRole**. NAT Gateways bill until `destroy`. Safe to re-run after a failed apply.
+   - **`configure-only`** — **no Terraform apply**. Same Ansible as apply: Docker + Compose on app guests; Neo4j compose only. Portal / REST / Haystack **images** are not pulled. `hr-bastion` gets hop keys only (no Docker).
    - **`deploy-projects`** — **later run** after a successful `apply` or `configure-only` (new workflow run; not chained). Preflights public GHCR or ECR tags, then `site.yml` (portal + REST + Haystack + Neo4j + `rds_logical`). Needs `PORTAL_IMAGE` / `REST_IMAGE` / `HAYSTACK_IMAGE`. Day-to-day single-image rolls stay app CD.
-   - **`stop`** — ASG desired=0 + stop both RDS. **NAT Gateways and ALBs still bill.**
+   - **`stop`** — four app ASGs desired=0, `stop-instances` on `hr-bastion`, stop both RDS. **NAT Gateways and ALBs still bill.**
    - **`destroy`** — wipe the estate. Set **both** `action=destroy` **and** `confirm_destroy=destroy`. Imports leftovers, terminates EC2, destroys state, then sweeps named orphans and extra estate VPCs. **Keeps** the state bucket.
    - **`bootstrap`** — state bucket only (S3 native lockfile).
 
@@ -73,13 +73,14 @@ To wipe the whole half-applied estate instead: `action=destroy` with `confirm_de
 | Check | Expect |
 | --- | --- |
 | `describe-auto-scaling-groups --auto-scaling-group-names asg-portal asg-rest asg-haystack asg-neo4j` | All four exist |
+| `describe-instances --filters Name=tag:Name,Values=hr-bastion` | One running jump host |
 | Public portal ALB DNS (job summary) | Resolves; **502** on `:80` until `deploy-projects` or portal app CD |
 | Public REST ALB DNS (job summary) | `http://<dns>:8080` after compose; **502** until `tg-rest` sees **2xx** on `<instance>:8080/actuator/health` |
 | Internal Haystack ALB | Healthy after compose when `tg-haystack` sees **2xx** on `<instance>:8000/health` |
 | `describe-secret --secret-id heavy-rental/portal` | Has `REST_BASE_URL=http://<rest-alb>:8080` after `sync-secrets` |
-| `configure-only` | Fills SM + PEMs. Docker + Compose on all guests. Composes **Neo4j only**. |
+| `configure-only` | Fills SM + PEMs (including hop key on `hr-bastion`). Docker + Compose on app guests. Composes **Neo4j only**. Not on `hr-bastion`. |
 | `deploy-projects` | After apply/configure-only. Composes portal + REST + Haystack. |
-| `stop` | ASGs desired=0; both RDS stopped; Gateways still bill |
+| `stop` | App ASGs desired=0; `hr-bastion` stopped; both RDS stopped; Gateways still bill |
 
 ## Actions
 
@@ -89,14 +90,16 @@ To wipe the whole half-applied estate instead: `action=destroy` with `confirm_de
 | `bootstrap` | assert-lab → ensure backend only |
 | `apply` | assert-lab → ensure backend → import leftovers → terraform apply → sync-secrets → sync-ssh-keys → Ansible `configure.yml` |
 | `destroy` | assert-lab → import leftovers → terminate estate EC2 → `terraform destroy` → sweep orphans (needs `confirm_destroy=destroy`). Does **not** create a backend or run estate plan/apply. |
-| `configure-only` | assert-lab → sync-secrets → sync-ssh-keys → Ansible `configure.yml` (Docker + Compose on all guests; Neo4j compose; no app images) |
+| `configure-only` | assert-lab → sync-secrets → sync-ssh-keys → Ansible `configure.yml` (Docker + Compose on app guests; Neo4j compose; no app images; hop keys on `hr-bastion`) |
 | `deploy-projects` | assert-lab → sync-secrets → sync-ssh-keys → image preflight → Ansible `site.yml`. Separate run after apply or configure-only. |
-| `stop` | assert-lab → ASG desired=0 + stop both RDS |
+| `stop` | assert-lab → app ASG desired=0 + `stop-instances` on `hr-bastion` + stop both RDS |
 
 ## What this must not do
 
 - Create IAM roles or an OIDC provider on the **academy** Action (`LabInstanceProfile` only). Paid creates `hr-paid-*` and assumes an out-of-band OIDC role.
 - Create a NAT **instance** or Marketplace Neo4j. Outbound is two NAT Gateways (ADR 0010).
+- Open SSH `:22` from `0.0.0.0/0` on portal / REST / Haystack / Neo4j. Break-glass SSH is `hr-bastion` only (ADR 0021).
+- Wrap `hr-bastion` in an Auto Scaling group.
 - Write Vocareum keys into Secrets Manager or onto EC2
 - Put `SPRING_DATASOURCE_PASSWORD` on the Run form
 - Echo Vocareum keys in job logs (`env:` / `${{ inputs.aws_* }}`)

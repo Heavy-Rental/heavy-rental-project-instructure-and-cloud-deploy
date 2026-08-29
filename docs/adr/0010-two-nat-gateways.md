@@ -4,6 +4,7 @@
 - **Date:** 2026-08-17
 - **Branch:** `HR-161-implement-aws-infrastructure-academy-by-building-resources`
 - **Supersedes:** [0004](0004-nat-instance-not-gateway.md)
+- **Related:** [0021](0021-maintenance-bastion-ssh.md) later uses the 9th EC2 slot for `hr-bastion`; NAT stays Gateways.
 
 ## Context
 
@@ -15,7 +16,7 @@ The operator accepted 24/7 NAT Gateway credit burn in exchange for same-AZ outbo
 
 Create **two public NAT Gateways**, one in each public subnet, each with a VPC Elastic IP. Split private-app and private-data route tables **per AZ** so `0.0.0.0/0` targets the Gateway in that AZ. Keep the free S3 gateway endpoint on all four private tables.
 
-Do **not** keep `aws_instance.nat`. Do **not** add a 9th EC2. Guest count is **8**.
+Do **not** keep `aws_instance.nat`. NAT is not an EC2, so this decision left guest count at **8**. [0021](0021-maintenance-bastion-ssh.md) later uses the 9th Vocareum slot for `hr-bastion`. Live guest count is **9**. Do not add a 10th instance while that estate is running.
 
 `action=stop` cannot pause a NAT Gateway. Only `action=destroy` stops the charge. Vocareum session end does not stop Gateways.
 

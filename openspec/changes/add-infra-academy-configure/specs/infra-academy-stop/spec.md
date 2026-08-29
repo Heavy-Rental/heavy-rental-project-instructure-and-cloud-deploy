@@ -1,5 +1,7 @@
 # Delta for infra-academy-stop
 
+> **Later modified by** [`add-infra-bastion`](../../../add-infra-bastion/specs/infra-academy-stop/spec.md) / [ADR 0021](../../../../../docs/adr/0021-maintenance-bastion-ssh.md): `stop` also `stop-instances` on `hr-bastion`. App ASGs stay max=2.
+
 ## Purpose
 
 `action=stop` pauses compute and both RDS. It is not destroy.

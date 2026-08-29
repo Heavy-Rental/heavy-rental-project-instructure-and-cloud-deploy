@@ -1,6 +1,7 @@
 ---
 # configure-only: Docker + Compose on every guest. App images are project CD.
 # Neo4j has no app CD — compose it here.
+# hr-bastion is in inventory but not a compose host (ADR 0021).
 - name: Docker and Compose plugin
   hosts: portal:rest:haystack:neo4j
   become: true

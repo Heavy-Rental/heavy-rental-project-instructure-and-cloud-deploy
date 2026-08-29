@@ -4,8 +4,8 @@ context: |
   This repository specifies GitHub Actions that create and operate the
   estate on AWS Academy / Vocareum and on a billed AWS account.
   Terraform creates architecture and resources (VPC, two NAT Gateways,
-  four ASGs, ALBs, two Multi-AZ RDS, Bolt NLB, empty SM shells,
-  CloudWatch alarms/dashboard, CloudTrail to S3).
+  four app ASGs plus hr-bastion (single EC2), ALBs, two Multi-AZ RDS, Bolt NLB,
+  empty SM shells, CloudWatch alarms/dashboard, CloudTrail to S3).
   Ansible only configures existing guests (Docker, .env, compose).
   Changes include add-infra-paid-pipeline (dedicated aws-infra-paid.yml OIDC
   Action with its own jobs; academy.yml is Vocareum-only with its own jobs).
@@ -25,3 +25,5 @@ context: |
   Haystack workers (ADR 0020): postgres:17 + sync-from-primary.sh and
   python:3.12-slim + populate_neo4j.py. Not uvicorn -m. Compose :8089 only.
   sg-rds allows :5432 to itself for postgres_fdw.
+  Maintenance bastion hr-bastion (ADR 0021): single EC2 in a public
+  subnet; SSH to app guests from sg-bastion only; no :22 from 0.0.0.0/0.

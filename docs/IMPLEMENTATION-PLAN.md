@@ -3,7 +3,7 @@
 **Repo:** this tree (`heavy-rental-project-instructure-and-cloud-deploy`).  
 **Contract:** `heavy-rental-project-pipeline-development/cloud-deployment-feasibility-studies/` — especially `AWS-INFRASTRUCTURE-FEASIBILITY.md` §8, `TERRAFORM-PROCESS.md`, `ANSIBLE-PROCESS.md`, `aws-infra-pipeline.example.yml`.
 
-**Status:** Delivered. Branches 1–3 (estate + configure), `deploy-projects`, observe, and the paid infra Action + public REST ALB (`add-infra-paid-pipeline`, ADRs 0017–0019). Layout: [`ARCHITECTURE.md`](ARCHITECTURE.md). This file is the delivery record — live operate notes are [`BOOTSTRAP.md`](BOOTSTRAP.md) and [`../OPERATOR-GUIDE.md`](../OPERATOR-GUIDE.md).
+**Status:** Delivered. Branches 1–3 (estate + configure), `deploy-projects`, observe, the paid infra Action + public REST ALB (`add-infra-paid-pipeline`, ADRs 0017–0019), Haystack workers (ADR 0020), and maintenance bastion `hr-bastion` (`add-infra-bastion`, ADR 0021). Layout: [`ARCHITECTURE.md`](ARCHITECTURE.md). This file is the delivery record — live operate notes are [`BOOTSTRAP.md`](BOOTSTRAP.md) and [`../OPERATOR-GUIDE.md`](../OPERATOR-GUIDE.md). Later waves (public REST ALB, paid Action, workers, bastion) are folded into the live layout below even when they landed after the original three branches.
 
 **Split:** Terraform creates AWS architecture and resources. Ansible only configures existing guests. App CD (portal / REST / Haystack images, academy **and** paid callers) is in `heavy-rental-project-pipeline-development` `deploy-pipeline/` trees and must not run Terraform.
 
@@ -100,9 +100,9 @@ Start Lab → Run workflow → paste the three keys (or Environment fallback) �
 Terraform in `terraform/academy/` (see [`ARCHITECTURE.md`](ARCHITECTURE.md) and AWS study §8.1):
 
 - VPC, IGW, public / private-app / private-data subnets (**2 AZs**)
-- **Two NAT Gateways** (one per public AZ) + EIP each. Per-AZ private route tables. Guest count **8 EC2**. Gateways bill until `destroy`.
-- Security groups (portal :80 from public ALB; REST ALB :8080 from the internet **and** portal, ADR 0018; Haystack :8000 from rest; RDS :5432 from rest+haystack; Bolt :7687 from haystack / NLB)
-- Four launch templates + ASGs with **`LabInstanceProfile` → `LabRole`**. Portal (React), REST (Spring Boot), Haystack **desired=2** (one per app AZ, ALBs span both). `asg-neo4j` **desired=2** (one per data AZ)
+- **Two NAT Gateways** (one per public AZ) + EIP each. Per-AZ private route tables. Guest count **9 EC2** (8 app + `hr-bastion`). Gateways bill until `destroy`.
+- Security groups (portal :80 from public ALB; REST ALB :8080 from the internet **and** portal, ADR 0018; Haystack :8000 from rest; RDS :5432 from rest+haystack; Bolt :7687 from haystack / NLB; app `:22` from `sg-bastion` only, ADR 0021)
+- Four app launch templates + ASGs with **`LabInstanceProfile` → `LabRole`**. Portal (React), REST (Spring Boot), Haystack **desired=2** (one per app AZ, ALBs span both). `asg-neo4j` **desired=2** (one per data AZ). **`hr-bastion`** is a single public-subnet EC2 (maintenance SSH jump; not an ASG)
 - Public portal ALB + `tg-portal` :80; REST ALB internet-facing :8080 (ADR 0018) with `tg-rest` health `GET <instance>:8080/actuator/health` matcher **`200-299`**; internal Haystack ALB with `tg-haystack` health `GET <instance>:8000/health` matcher **`200-299`**
 - Internal **Bolt NLB** + `tg-neo4j` :7687
 - Two **Multi-AZ** RDS (`heavy_rental` SoR + `haystack`). No third RDS for db-sync
@@ -138,17 +138,17 @@ Terraform in `terraform/academy/` (see [`ARCHITECTURE.md`](ARCHITECTURE.md) and 
 
    Fail if host, database, password, port, or `REST_BASE_URL` is empty. **Never** write Vocareum AWS keys into SM.
 
-2. **`sync-ssh-keys`:** after InService only. PEMs → `heavy-rental/ssh/*`. Public keys via SSM.
+2. **`sync-ssh-keys`:** after the four app ASGs are InService and `hr-bastion` is running. PEMs → `heavy-rental/ssh/{portal,rest,haystack,neo4j,bastion}`. Public keys via SSM on app guests. Hop **private** key on `hr-bastion` only, plus Host aliases (`hr-ssh-config`).
 
 3. **Ansible** (`ANSIBLE-PROCESS.md`): SSM inventory `portal` / `rest` / `haystack` / `neo4j`; Docker; `get-secret-value` → `.env`; CI image load/pull; compose with §6.4a limits; portal nginx `/api` → `REST_BASE_URL`; Haystack must not start `neo4j`; Haystack workers are `postgres:17` + `python:3.12-slim` scripts (ADR 0020), not uvicorn `-m`; RDS logical `vector` + `postgres_fdw` via a haystack guest. `site.yml` waits for REST `:8080/actuator/health` **2xx** and Haystack `:8000/health` **2xx** (ALB `tg-rest` / `tg-haystack`). Worker crash does not fail that wait.
 
-4. **`stop`:** ASG desired=0 (all four) + `rds stop-db-instance` on both RDS. NAT Gateways **cannot** be stopped — they bill until `destroy`.
+4. **`stop`:** four app ASGs desired=0 + `stop-instances` on `hr-bastion` + `rds stop-db-instance` on both RDS. NAT Gateways **cannot** be stopped — they bill until `destroy`. The next `apply` starts `hr-bastion` (`aws_ec2_instance_state`).
 
 5. **`destroy`:** already on branch 2 (`confirm_destroy=destroy`). Branch 3 must keep the same confirm gate.
 
 ### Done when
 
-`configure-only` refills SM + PEMs, installs Docker + Compose on all guests, and composes Neo4j only. `deploy-projects` is a later run that first-composes portal + REST + Haystack via `site.yml`. Day-to-day image rolls are app CD. `stop` pauses compute/RDS (Gateways still bill). `destroy` empties the estate state.
+`configure-only` refills SM + PEMs (including hop key on `hr-bastion`), installs Docker + Compose on app guests, and composes Neo4j only. `deploy-projects` is a later run that first-composes portal + REST + Haystack via `site.yml`. Day-to-day image rolls are app CD. `stop` pauses app ASGs + `hr-bastion` + RDS (Gateways still bill). `destroy` empties the estate state.
 
 ---
 
@@ -160,6 +160,7 @@ Terraform in `terraform/academy/` (see [`ARCHITECTURE.md`](ARCHITECTURE.md) and 
 | REST app CD | **Shipped** in `heavy-rental-rest-api/deploy-pipeline/` (discover + compose) | Reuses this repo’s `guest_base` + `rest`. Does not create the estate. |
 | Haystack app CD | **Shipped** in `haystack-fast-api-pipeline/deploy-pipeline/` (discover + compose) | Reuses this repo’s `guest_base` + `haystack`. No Neo4j container. |
 | Paid infra | **Shipped** as `aws-infra-paid.yml` (`add-infra-paid-pipeline`, ADRs 0017–0019) | Separate account, OIDC, Environment `AWS_ACTUAL`, **no** Vocareum form keys. REST ALB internet-facing :8080. |
+| Maintenance bastion | **Shipped** as `hr-bastion` (`add-infra-bastion`, ADR 0021) | Single public-subnet EC2 (not an ASG). Guest count **9**. SSH from `sg-bastion` only. |
 
 Infra `configure-only` installs Docker + Compose and composes Neo4j. Infra `deploy-projects` (later run after apply/configure-only) first-composes all three apps. Portal / REST / Haystack image updates after that use those app CD pipelines (academy **and** paid callers).
 

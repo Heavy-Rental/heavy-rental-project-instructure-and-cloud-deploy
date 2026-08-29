@@ -59,6 +59,13 @@ resource "aws_security_group" "neo4j" {
   tags        = { Name = "sg-neo4j" }
 }
 
+resource "aws_security_group" "bastion" {
+  name        = "hr-bastion"
+  description = "hr-bastion maintenance SSH jump"
+  vpc_id      = aws_vpc.academy.id
+  tags        = { Name = "sg-bastion" }
+}
+
 # --- public ALB ---
 resource "aws_vpc_security_group_ingress_rule" "alb_public_http" {
   security_group_id = aws_security_group.alb_public.id
@@ -455,6 +462,102 @@ resource "aws_vpc_security_group_egress_rule" "neo4j_http" {
   from_port         = 80
   to_port           = 80
   cidr_ipv4         = "0.0.0.0/0"
+}
+
+# --- bastion (maintenance SSH jump). No :22 from 0.0.0.0/0 (ADR 0012 / 0021). ---
+resource "aws_vpc_security_group_ingress_rule" "bastion_ssh" {
+  for_each          = toset(var.bastion_ssh_cidrs)
+  security_group_id = aws_security_group.bastion.id
+  ip_protocol       = "tcp"
+  from_port         = 22
+  to_port           = 22
+  cidr_ipv4         = each.value
+  description       = "Operator SSH to maintenance bastion"
+}
+
+resource "aws_vpc_security_group_egress_rule" "bastion_https" {
+  security_group_id = aws_security_group.bastion.id
+  ip_protocol       = "tcp"
+  from_port         = 443
+  to_port           = 443
+  cidr_ipv4         = "0.0.0.0/0"
+  description       = "SSM / package repos via IGW"
+}
+
+resource "aws_vpc_security_group_egress_rule" "bastion_http" {
+  security_group_id = aws_security_group.bastion.id
+  ip_protocol       = "tcp"
+  from_port         = 80
+  to_port           = 80
+  cidr_ipv4         = "0.0.0.0/0"
+}
+
+resource "aws_vpc_security_group_egress_rule" "bastion_ssh_to_portal" {
+  security_group_id            = aws_security_group.bastion.id
+  ip_protocol                  = "tcp"
+  from_port                    = 22
+  to_port                      = 22
+  referenced_security_group_id = aws_security_group.portal.id
+}
+
+resource "aws_vpc_security_group_egress_rule" "bastion_ssh_to_rest" {
+  security_group_id            = aws_security_group.bastion.id
+  ip_protocol                  = "tcp"
+  from_port                    = 22
+  to_port                      = 22
+  referenced_security_group_id = aws_security_group.rest.id
+}
+
+resource "aws_vpc_security_group_egress_rule" "bastion_ssh_to_haystack" {
+  security_group_id            = aws_security_group.bastion.id
+  ip_protocol                  = "tcp"
+  from_port                    = 22
+  to_port                      = 22
+  referenced_security_group_id = aws_security_group.haystack.id
+}
+
+resource "aws_vpc_security_group_egress_rule" "bastion_ssh_to_neo4j" {
+  security_group_id            = aws_security_group.bastion.id
+  ip_protocol                  = "tcp"
+  from_port                    = 22
+  to_port                      = 22
+  referenced_security_group_id = aws_security_group.neo4j.id
+}
+
+resource "aws_vpc_security_group_ingress_rule" "portal_ssh_from_bastion" {
+  security_group_id            = aws_security_group.portal.id
+  ip_protocol                  = "tcp"
+  from_port                    = 22
+  to_port                      = 22
+  referenced_security_group_id = aws_security_group.bastion.id
+  description                  = "Maintenance SSH from bastion"
+}
+
+resource "aws_vpc_security_group_ingress_rule" "rest_ssh_from_bastion" {
+  security_group_id            = aws_security_group.rest.id
+  ip_protocol                  = "tcp"
+  from_port                    = 22
+  to_port                      = 22
+  referenced_security_group_id = aws_security_group.bastion.id
+  description                  = "Maintenance SSH from bastion"
+}
+
+resource "aws_vpc_security_group_ingress_rule" "haystack_ssh_from_bastion" {
+  security_group_id            = aws_security_group.haystack.id
+  ip_protocol                  = "tcp"
+  from_port                    = 22
+  to_port                      = 22
+  referenced_security_group_id = aws_security_group.bastion.id
+  description                  = "Maintenance SSH from bastion"
+}
+
+resource "aws_vpc_security_group_ingress_rule" "neo4j_ssh_from_bastion" {
+  security_group_id            = aws_security_group.neo4j.id
+  ip_protocol                  = "tcp"
+  from_port                    = 22
+  to_port                      = 22
+  referenced_security_group_id = aws_security_group.bastion.id
+  description                  = "Maintenance SSH from bastion"
 }
 
 

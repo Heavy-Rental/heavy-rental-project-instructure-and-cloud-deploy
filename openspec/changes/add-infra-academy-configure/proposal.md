@@ -8,7 +8,7 @@ Branch 2 (`HR-161`) creates the estate. Guests have no containers, Secrets Manag
 
 - OpenSpec, OpenSPDD, ADRs 0011–0012.
 - `sync-secrets` + `sync-ssh-keys` + Ansible on `action=apply` and `action=configure-only`.
-- `action=stop`: ASG desired=0 + stop both RDS. NAT Gateways keep billing.
+- `action=stop`: four app ASGs desired=0 + stop both RDS. NAT Gateways keep billing. **Current:** also `stop-instances` on `hr-bastion` ([`add-infra-bastion`](../add-infra-bastion/proposal.md) / ADR 0021).
 - `destroy` stays as branch 2 (`confirm_destroy=destroy`).
 
 ## Capabilities

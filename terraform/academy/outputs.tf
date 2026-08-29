@@ -72,6 +72,16 @@ output "asg_names" {
   }
 }
 
+output "bastion_instance_id" {
+  value       = aws_instance.bastion.id
+  description = "Maintenance jump host (single EC2, public subnet). Helper: scripts/bastion-connect.sh."
+}
+
+output "bastion_public_ip" {
+  value       = aws_instance.bastion.public_ip
+  description = "Public IP on hr-bastion. Empty until the instance is running."
+}
+
 output "nat_gateway_ids" {
   value       = aws_nat_gateway.this[*].id
   description = "One NAT Gateway per public AZ. Private subnets use the Gateway in the same AZ."
@@ -106,8 +116,8 @@ output "deployment" {
 }
 
 output "guest_instance_profiles" {
-  value       = local.instance_profile_name
-  description = "Instance profile name per app ASG."
+  value       = merge(local.instance_profile_name, { bastion = local.bastion_instance_profile_name })
+  description = "Instance profile name per app ASG and the maintenance bastion."
 }
 
 output "observe_bucket" {

@@ -1,13 +1,16 @@
 # Delta for infra-academy-ansible
 
+> **Later modified by** [`add-infra-academy-deploy-projects`](../../../add-infra-academy-deploy-projects/specs/infra-academy-ansible/spec.md): apply / configure-only stay on `configure.yml` (Docker + Neo4j). Missing REST/Haystack images do **not** fail those actions. `site.yml` is only `deploy-projects`.  
+> **Later modified by** [`add-infra-bastion`](../../../add-infra-bastion/specs/infra-academy-bastion/spec.md) / [ADR 0021](../../../../../docs/adr/0021-maintenance-bastion-ssh.md): inventory may list group `bastion`; `configure.yml` and `site.yml` SHALL NOT target it. Compose groups stay `portal` / `rest` / `haystack` / `neo4j`.
+
 ## Purpose
 
-Guest **configuration** only on ASGs Terraform already created. Infra CD (`apply` and `configure-only`) SHALL run `playbooks/configure.yml`: Docker + Compose plugin on all groups and Neo4j compose only. It SHALL NOT invoke `site.yml` (full portal/REST/Haystack compose). Ansible SHALL NOT create or destroy VPC, ASGs, ALBs, or RDS. App CD composes portal/REST/Haystack and SHALL NOT run Terraform.
+Guest **configuration** only on guests Terraform already created. Infra CD (`apply` and `configure-only`) SHALL run `playbooks/configure.yml`: Docker + Compose plugin on the four app groups and Neo4j compose only. It SHALL NOT invoke `site.yml` (full portal/REST/Haystack compose). Ansible SHALL NOT create or destroy VPC, ASGs, ALBs, or RDS. App CD composes portal/REST/Haystack and SHALL NOT run Terraform. **Current:** `hr-bastion` is inventoried but not composed (banner).
 
 ## ADDED Requirements
 
-### Requirement: SSM inventory of four groups
-Ansible SHALL inventory InService + SSM Online instances for `portal`, `rest`, `haystack`, and `neo4j`. Connection SHALL be AWS SSM. RDS SHALL NOT be an inventory host.
+### Requirement: SSM inventory of four app groups
+Ansible SHALL inventory InService + SSM Online instances for `portal`, `rest`, `haystack`, and `neo4j`. Connection SHALL be AWS SSM. RDS SHALL NOT be an inventory host. **Current:** inventory may also list `bastion` (banner); compose playbooks do not target it.
 
 #### Scenario: Desired=2 discovers two guests per group
 - GIVEN each ASG has two InService guests Online in SSM

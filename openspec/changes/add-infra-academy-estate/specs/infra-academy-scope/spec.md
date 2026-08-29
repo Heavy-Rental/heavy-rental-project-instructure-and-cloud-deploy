@@ -1,8 +1,12 @@
 # Delta for infra-academy-scope (branch 2)
 
+> **Later modified by** [`add-infra-academy-configure`](../../../add-infra-academy-configure/specs/infra-academy-scope/spec.md): `configure-only` and `stop` run; `destroy` is the confirm gate.  
+> **Later modified by** [`add-infra-academy-deploy-projects`](../../../add-infra-academy-deploy-projects/specs/infra-academy-scope/spec.md): `deploy-projects` is in scope.  
+> **Later modified by** [`add-infra-paid-pipeline`](../../../add-infra-paid-pipeline/specs/infra-academy-scope/spec.md): paid is a different Action (`aws-infra-paid.yml`).
+
 ## Purpose
 
-Estate apply is in scope. Guest configure, stop, destroy, paid, and app CD are not.
+This delta: estate apply is in scope. Guest configure, stop, destroy, paid, and app CD were not. **Current:** those later changes added them (banners).
 
 ## MODIFIED Requirements
 

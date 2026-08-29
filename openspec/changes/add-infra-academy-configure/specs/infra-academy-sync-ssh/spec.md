@@ -1,5 +1,7 @@
 # Delta for infra-academy-sync-ssh
 
+> **Later modified by** [`add-infra-bastion`](../../../add-infra-bastion/specs/infra-academy-sync-ssh/spec.md) / [ADR 0021](../../../../../docs/adr/0021-maintenance-bastion-ssh.md): also `heavy-rental/ssh/bastion`; hop **private** key on `hr-bastion` only; Host aliases. App guests still never receive a PEM.
+
 ## Purpose
 
 Break-glass PEMs exist only after ASG guests are InService. Everyday operate is SSM.

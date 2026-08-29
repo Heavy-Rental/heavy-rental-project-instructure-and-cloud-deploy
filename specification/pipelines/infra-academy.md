@@ -7,7 +7,7 @@
 
 | Tool | Owns |
 | --- | --- |
-| **Terraform** | Architecture and cloud **resources**: VPC, subnets, IGW, two NAT Gateways, four ASGs + LTs, public portal ALB, **internet-facing REST ALB :8080**, internal Haystack ALB, Bolt NLB, two Multi-AZ RDS, SM **shells**, S3 state, CloudTrail (S3), VPC flow logs (S3), ALB access logs, CloudWatch alarms + dashboard. Guests use **LabRole** / `LabInstanceProfile` only |
+| **Terraform** | Architecture and cloud **resources**: VPC, subnets, IGW, two NAT Gateways, four app ASGs + LTs, **`hr-bastion`** (single EC2), public portal ALB, **internet-facing REST ALB :8080**, internal Haystack ALB, Bolt NLB, two Multi-AZ RDS, SM **shells**, S3 state, CloudTrail (S3), VPC flow logs (S3), ALB access logs, CloudWatch alarms + dashboard. Guests use **LabRole** / `LabInstanceProfile` only |
 | **Ansible** | Guest **configuration** only: Docker/Compose, map SM → `.env`, pull/load a CI image, compose, portal nginx `/api`, RDS *logical* grants/extensions. **No** `terraform apply`, no create-ASG, no create-RDS |
 
 `sync-secrets` and `sync-ssh-keys` are shell wrappers (not Terraform). They write JSON / PEMs into shells Terraform already created.
@@ -22,7 +22,7 @@ workflow_dispatch (Environment academy)
       ├── apply             Import leftovers → Terraform estate → sync-secrets → sync-ssh-keys → Ansible configure.yml
       ├── configure-only    No Terraform apply. sync-secrets + PEMs → same Ansible configure.yml
       ├── deploy-projects   Later run after apply or configure-only. Preflight images → site.yml
-      ├── stop              ASG desired=0 + stop both RDS. NAT Gateways still bill
+      ├── stop              App ASG desired=0 + stop hr-bastion + stop both RDS. NAT Gateways still bill
       └── destroy           Import leftovers → terraform destroy → sweep orphans. Keeps state bucket
 ```
 
@@ -51,7 +51,7 @@ Do not put `ghcr.io` paths in git. Public GHCR or ECR tags only; private GHCR fa
 
 ## First compose vs app CD
 
-On `apply` and `configure-only`, Ansible runs `configure.yml` only (Docker + Compose plugin on all guests; compose **Neo4j**). It does **not** pull portal / REST / Haystack images.
+On `apply` and `configure-only`, Ansible runs `configure.yml` only (Docker + Compose plugin on app guests; compose **Neo4j**). It does **not** pull portal / REST / Haystack images. It does **not** compose onto `hr-bastion`.
 
 `action=deploy-projects` is a **later** `workflow_dispatch` after a successful apply or configure-only (ADR 0014). It is not chained onto those actions. Preflight requires public GHCR or ECR tags (no stock `nginx`, no `image_http_url`), then runs `site.yml`. Re-running it resets all three apps to the infra Environment tags.
 
@@ -76,6 +76,6 @@ Layout table: [`../../docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md). ASGs s
 
 - OpenSpec: bootstrap / estate / configure / deploy-projects / paid-pipeline changes under [`../../openspec/changes/`](../../openspec/changes/)
 - OpenSPDD: [`../../spdd/`](../../spdd/)
-- ADRs: [`../../docs/adr/`](../../docs/adr/) (0014 = `deploy-projects`; 0017 = academy file is Vocareum-only again; 0018 = public REST ALB; 0019 = this file owns its jobs)
+- ADRs: [`../../docs/adr/`](../../docs/adr/) (0014 = `deploy-projects`; 0017 = academy file is Vocareum-only again; 0018 = public REST ALB; 0019 = this file owns its jobs; 0021 = `hr-bastion` single EC2 jump host)
 - Secrets: [`infra-secrets.md`](infra-secrets.md)
 - Paid: [`infra-paid.md`](infra-paid.md)

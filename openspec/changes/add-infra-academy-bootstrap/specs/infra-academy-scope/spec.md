@@ -1,8 +1,12 @@
 # Delta for infra-academy-scope
 
+> **Later modified by** [`add-infra-academy-estate`](../../../add-infra-academy-estate/specs/infra-academy-scope/spec.md) then [`add-infra-academy-configure`](../../../add-infra-academy-configure/specs/infra-academy-scope/spec.md): `apply` / `configure-only` / `stop` / `destroy` run.  
+> **Later modified by** [`add-infra-academy-deploy-projects`](../../../add-infra-academy-deploy-projects/specs/infra-academy-scope/spec.md): `deploy-projects` is in scope.  
+> **Later modified by** [`add-infra-paid-pipeline`](../../../add-infra-paid-pipeline/specs/infra-academy-scope/spec.md): paid is `aws-infra-paid.yml` (OIDC).
+
 ## Purpose
 
-Branch 1 only bootstraps Academy CD. It does not operate the estate, deploy apps, or target paid AWS.
+This delta: branch 1 only bootstraps Academy CD. It does not operate the estate, deploy apps, or target paid AWS. **Current:** later changes added those (banners).
 
 ## ADDED Requirements
 

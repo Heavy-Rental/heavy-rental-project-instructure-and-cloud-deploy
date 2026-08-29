@@ -10,17 +10,18 @@ Delivered on this repo. Operator walkthrough: [`OPERATOR-GUIDE.md`](OPERATOR-GUI
   - **AWS infrastructure (Academy)** — `aws-infra-academy.yml`, Environment `academy`, Vocareum keys
   - **AWS infrastructure (paid)** — `aws-infra-paid.yml`, Environment `AWS_ACTUAL`, GitHub OIDC (`AWS_ROLE_TO_ASSUME`)
 - `action`: `bootstrap`, `plan`, `apply`, `configure-only`, `deploy-projects`, `stop`, `destroy`
-- `apply` / `configure-only` run Ansible `configure.yml` (Docker + Neo4j only)
+- `apply` / `configure-only` run Ansible `configure.yml` (Docker + Neo4j on app guests only; hop keys on `hr-bastion`)
 - `deploy-projects` is a later run of `site.yml` (portal + REST + Haystack first-compose)
 - Day-to-day image rolls: app CD academy **and** paid callers in `heavy-rental-project-pipeline-development`
 
 ### Estate
 
-- Two NAT Gateways (one per public AZ). Guest count **8 EC2**. No NAT instance (ADR 0010)
+- Two NAT Gateways (one per public AZ). Guest count **9 EC2** (8 app + `hr-bastion`). No NAT instance (ADR 0010)
+- Maintenance bastion `hr-bastion` (ADR 0021): single EC2 in a public subnet (not an ASG); SSH to app guests from `sg-bastion` only; no `:22` from `0.0.0.0/0`. On the bastion, `hr-ssh-config` writes Host aliases (`ssh portal`, `ssh rest-2`, …). Helper `scripts/bastion-connect.sh`
 - Public portal ALB `:80` and internet-facing REST ALB `:8080` (ADR 0018). Haystack ALB, Bolt NLB, RDS stay internal
 - `APP_CORS_ALLOWED_ORIGINS` includes portal origin and `http://<rest_alb_dns>:8080`
 - Remote Terraform state: S3 `use_lockfile=true`. Academy `assert-lab` / `ensure-backend` fail closed on `voc-cancel-cred` (HeadBucket 403 is not treated as a missing bucket)
-- Academy guests: `LabInstanceProfile` / `LabRole` only. Paid guests: `hr-paid-*`
+- Academy guests: `LabInstanceProfile` / `LabRole` only. Paid guests: `hr-paid-{portal,rest,haystack,neo4j,bastion}`
 - Observe: CloudTrail + flow logs + ALB access logs to S3; dashboard `heavy-rental-academy` or `heavy-rental-actual`. No CloudTrail → CloudWatch Logs. Guest Docker stdout uses the `awslogs` driver into `/heavy-rental/{app}` when the instance profile allows it (paid IAM; Academy LabRole probe)
 - ASG health stays `EC2` (ADR 0008) — unhealthy ALB targets do not replace instances
 - ALB `tg-rest` waits for `GET <instance>:8080/actuator/health` matcher **`200-299`** (2xx). `GET /` is Spring 401 and is not healthy
@@ -32,4 +33,5 @@ Delivered on this repo. Operator walkthrough: [`OPERATOR-GUIDE.md`](OPERATOR-GUI
 
 - Portal / REST HTTPS (ACM)
 - Marketplace Neo4j, EKS, NAT instance
+- Wrapping `hr-bastion` in an Auto Scaling group
 - Authoring app CD YAML in this repo

@@ -220,9 +220,12 @@ jobs:
       - name: Resolve optional alarm email
         env:
           ALARM_EMAIL: ${{ vars.ALARM_EMAIL }}
+          BASTION_SSH_CIDRS: ${{ vars.BASTION_SSH_CIDRS }}
         run: |
           set -euo pipefail
           echo "TF_VAR_alarm_email=${ALARM_EMAIL}" >> "$GITHUB_ENV"
+          chmod +x scripts/tf-var-bastion-cidrs.sh
+          scripts/tf-var-bastion-cidrs.sh >> "$GITHUB_ENV"
 
       - name: Preflight Vocareum data sources
         run: |
@@ -400,6 +403,7 @@ jobs:
             echo "- RDS SoR (\`heavy_rental\`): \`$(terraform output -raw rds_endpoint)\`"
             echo "- RDS Haystack (\`haystack\`): \`$(terraform output -raw rds_haystack_endpoint)\`"
             echo "- Neo4j Bolt NLB: \`$(terraform output -raw neo4j_uri)\`"
+            echo "- maintenance bastion: \`$(terraform output -raw bastion_instance_id)\` (\`$(terraform output -raw bastion_public_ip)\`; \`scripts/bastion-connect.sh\`)"
             echo "- NAT Gateways: \`$(terraform output -json nat_gateway_ids)\`"
             echo "- instance profile: \`$(terraform output -raw lab_instance_profile)\`"
             echo "- IAM: \`$(terraform output -raw lab_role)\` (Vocareum LabRole; no new IAM)"
@@ -488,6 +492,10 @@ jobs:
           echo "::add-mask::${PASS}"
           echo "TF_VAR_db_master_password=${PASS}" >> "$GITHUB_ENV"
           echo "TF_VAR_alarm_email=${{ vars.ALARM_EMAIL }}" >> "$GITHUB_ENV"
+          BASTION_SSH_CIDRS="${{ vars.BASTION_SSH_CIDRS }}"
+          export BASTION_SSH_CIDRS
+          chmod +x scripts/tf-var-bastion-cidrs.sh
+          scripts/tf-var-bastion-cidrs.sh >> "$GITHUB_ENV"
 
       - name: terraform init
         env:

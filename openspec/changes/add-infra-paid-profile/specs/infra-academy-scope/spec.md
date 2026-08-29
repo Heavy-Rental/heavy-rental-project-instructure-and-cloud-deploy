@@ -1,5 +1,7 @@
 # Delta for infra-academy-scope
 
+> **Later modified by** [`add-infra-paid-pipeline`](../../../add-infra-paid-pipeline/specs/infra-academy-scope/spec.md) / [ADR 0017](../../../../../docs/adr/0017-two-actions-academy-paid.md): “Two profiles on one workflow” is **replaced**. Academy YAML is Vocareum-only; paid is `aws-infra-paid.yml`.
+
 ## MODIFIED Requirements
 
 ### Requirement: Two profiles on one workflow

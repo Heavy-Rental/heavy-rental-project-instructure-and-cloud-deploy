@@ -16,10 +16,10 @@ The estate exists. Shells are empty. Guests have no Docker compose. Operators ca
 | Ansible | Configures existing guests only. No VPC/ASG/RDS create. |
 | sync-secrets | `put-secret-value` from Terraform outputs + Environment app secrets, including Haystack `SOURCE_*` / `TARGET_*` |
 | sync-ssh-keys | PEMs after InService; public key via SSM |
-| Apply Ansible | `configure.yml`: Docker all guests; compose **Neo4j only** (same as configure-only). App images wait for `deploy-projects`. |
+| Apply Ansible | `configure.yml`: Docker on **app** guests (`portal`/`rest`/`haystack`/`neo4j`); compose **Neo4j only** (same as configure-only). App images wait for `deploy-projects`. `hr-bastion` is not a compose host (ADR 0021). |
 | configure-only | No Terraform apply. Same Ansible as apply. |
 | First compose | Later change: `action=deploy-projects` / `site.yml` |
-| stop | Pause: ASG desired=0 + stop both RDS. Not destroy |
+| stop | Pause: four app ASGs desired=0 + `stop-instances` on `hr-bastion` + stop both RDS. Not destroy. NAT Gateways still bill. |
 | Image | CI tar or registry tag. No `docker build` |
 
 ## Stakeholders
@@ -44,7 +44,7 @@ The estate exists. Shells are empty. Guests have no Docker compose. Operators ca
 ## Success
 
 - `apply` runs Terraform (architecture) then `sync-secrets` (including Haystack `SOURCE_*` / `TARGET_*`) then the **same** Ansible as configure-only (`configure.yml`).
-- `apply` and `configure-only` install Docker on all guests and compose **Neo4j only**. They do not pull portal/REST/Haystack images.
-- `stop` pauses ASGs + both RDS; Gateways remain.
+- `apply` and `configure-only` install Docker on app guests and compose **Neo4j only**. They do not pull portal/REST/Haystack images. They do not compose onto `hr-bastion`.
+- `stop` pauses app ASGs + `hr-bastion` + both RDS; Gateways remain.
 - `destroy` still requires `confirm_destroy=destroy`.
 - Ansible never creates VPC/ASG/RDS.

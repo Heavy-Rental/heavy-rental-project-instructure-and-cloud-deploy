@@ -1,8 +1,11 @@
 # Delta for infra-academy-paid-profile
 
+> **Later modified by** [`add-infra-paid-pipeline`](../../../add-infra-paid-pipeline/specs/infra-academy-paid-profile/spec.md) / [ADR 0017](../../../../../docs/adr/0017-two-actions-academy-paid.md): two Actions (`aws-infra-academy.yml` Vocareum, `aws-infra-paid.yml` OIDC). Isolation (OIDC vs Vocareum, `-actual` state, `hr-paid-*`) remains. One Action is retired.  
+> **Later modified by** [`add-infra-bastion`](../../../add-infra-bastion/specs/infra-academy-paid-profile/spec.md) / [ADR 0021](../../../../../docs/adr/0021-maintenance-bastion-ssh.md): paid also creates `hr-paid-bastion` (SSM + describe; no ECR / app secrets). App profiles stay `hr-paid-{portal,rest,haystack,neo4j}`.
+
 ## Purpose
 
-The same GitHub Action can target Vocareum (`academy`) or a billed account (`paid`) without mixing credentials or Terraform state.
+This delta put Vocareum (`academy`) and billed (`AWS_ACTUAL`) on one Action without mixing credentials or Terraform state. **Current:** two Actions (banner).
 
 ## ADDED Requirements
 

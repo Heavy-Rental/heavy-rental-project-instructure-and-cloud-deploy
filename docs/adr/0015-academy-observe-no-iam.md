@@ -20,7 +20,7 @@ AWS study §2.1 also says Vocareum **cannot** enable CloudWatch logging on the t
 2. CloudTrail `heavy-rental-academy` writes **only to S3** (bucket policy, CloudTrail service principal). Do **not** set `cloud_watch_logs_group_arn` or `cloud_watch_logs_role_arn`. Do **not** pass LabRole as the trail’s CloudWatch role. Paid (ADR 0017) names the trail `heavy-rental-actual`; the academy string is unchanged so apply does not replace it.
 3. VPC flow logs use **`log_destination_type = s3`**. Do **not** set `iam_role_arn` (including LabRole).
 4. ALB access logs use the same observe bucket (ELB service principal).
-5. CloudWatch **metric** alarms and a dashboard use the AWS/ApplicationELB, AWS/RDS, and AWS/AutoScaling namespaces. No extra role.
+5. CloudWatch **metric** alarms and a dashboard use the AWS/ApplicationELB, AWS/RDS, and AWS/AutoScaling namespaces, plus AWS/EC2 `StatusCheckFailed` on `hr-bastion` (ADR 0021). No extra role. No `GroupInServiceInstances` for a bastion ASG.
 6. Create log groups `/heavy-rental/{portal,rest,haystack,neo4j}`. Do **not** install the CloudWatch Agent. Guest Docker uses the **`awslogs` log driver** (dockerd on the host, instance profile) so container stdout lands in that app’s group. Ansible probes `logs:CreateLogStream` first; if LabRole denies it, guests stay on `json-file` so compose still starts. Paid `hr-paid-*` roles get `logs:CreateLogStream` / `logs:PutLogEvents` on their own group only. Still no new IAM on Academy.
 
 ## Consequences
