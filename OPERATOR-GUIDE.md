@@ -263,7 +263,7 @@ It does **not** pull portal, REST, or Haystack images. That is why apply no long
 
 **Billing:** NAT Gateways and ALBs start billing now. CloudTrail, VPC flow logs, and the observe bucket are small next to NAT. They keep billing after `stop` and after the Vocareum session ends, until `destroy`.
 
-**Watch the lab:** Console → CloudWatch → Dashboards → `heavy-rental-academy`. Trail files are in the observe bucket prefix `cloudtrail/`. If you set `ALARM_EMAIL`, confirm the AWS SNS mail. Guest app logs stay `docker logs` over SSM (ADR 0015).
+**Watch the lab:** Console → CloudWatch → Dashboards → `heavy-rental-academy`. Trail files are in the observe bucket prefix `cloudtrail/`. Guest Docker logs: CloudWatch → Logs → `/heavy-rental/{portal,rest,haystack,neo4j}` after `configure-only` / `deploy-projects` (or app CD) if the instance profile can `PutLogEvents`. If LabRole denies that, use `docker logs` over SSM. If you set `ALARM_EMAIL`, confirm the AWS SNS mail.
 
 ---
 

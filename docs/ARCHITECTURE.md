@@ -125,7 +125,7 @@ Terraform target groups probe each **registered instance private IP**. Matcher *
 | VPC accept/reject | Flow logs → same bucket (`vpc-flow/`). S3 destination — **not** LabRole (wrong trust). |
 | ALB requests | Access logs on portal / REST / Haystack ALBs → `alb/` |
 | Health | Dashboard `heavy-rental-academy`; alarms on ALB 5xx / unhealthy, RDS CPU / storage, ASG InService |
-| Guest logs | `docker logs` over SSM. Log group shells `/heavy-rental/{app}` exist; no CloudWatch Agent. |
+| Guest logs | Docker `awslogs` driver → `/heavy-rental/{portal,rest,haystack,neo4j}` (instance profile). No CloudWatch Agent. If LabRole cannot `PutLogEvents`, guests stay on `json-file` and `docker logs` over SSM. |
 
 Optional Environment variable `ALARM_EMAIL` subscribes SNS topic `hr-academy-alarms` (confirm the AWS mail). Cost Explorer stays the Vocareum budget UI — not Terraform.
 

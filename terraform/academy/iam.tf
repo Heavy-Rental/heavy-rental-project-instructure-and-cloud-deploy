@@ -96,6 +96,20 @@ resource "aws_iam_role_policy" "guest_app" {
         Action   = ["s3:ListBucket"]
         Resource = aws_s3_bucket.ansible_ssm[0].arn
       },
+      {
+        Sid    = "CloudWatchLogs"
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "logs:DescribeLogStreams",
+          "logs:DescribeLogGroups",
+        ]
+        Resource = [
+          "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/heavy-rental/${each.key}",
+          "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/heavy-rental/${each.key}:*",
+        ]
+      },
     ]
   })
 }
