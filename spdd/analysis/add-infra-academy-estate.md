@@ -1,6 +1,6 @@
 # SPDD Analysis: add-infra-academy-estate
 
-**Status:** Active (NAT and data plane match ADRs 0010 / 0007; REST ALB scheme is later `add-infra-paid-pipeline` / ADR 0018)  
+**Status:** Active (NAT and data plane match ADRs 0010 / 0007; REST ALB scheme is later `add-infra-paid-pipeline` / ADR 0018; jump host is later `add-infra-bastion` / ADR 0021 — live guest count **9 EC2**)  
 **Audience:** Implementers of the Academy / Vocareum estate (`action=apply`)  
 **Companion:** [REASONS Canvas](../prompt/add-infra-academy-estate.md) · [OpenSpec change](../../openspec/changes/add-infra-academy-estate/proposal.md)
 
@@ -12,7 +12,7 @@ Branch 1 can `terraform plan` an empty estate. The class still cannot reach a po
 
 | Concept | Meaning here |
 | --- | --- |
-| Estate | Three-tier VPC + two NAT Gateways + four ASGs (desired=2) + three ALBs + two Multi-AZ RDS + Bolt NLB + SM shells + ECR |
+| Estate | Three-tier VPC + two NAT Gateways + four ASGs (desired=2) + three ALBs + two Multi-AZ RDS + Bolt NLB + SM shells + ECR. **Current:** plus single `hr-bastion` (ADR 0021); REST ALB internet-facing (ADR 0018) |
 | NAT Gateway | `aws_nat_gateway` + EIP in each public AZ; private route tables are per-AZ. **Not** a NAT instance (ADR 0010 supersedes 0004) |
 | LabInstanceProfile | Pre-created Vocareum profile; **never** create IAM |
 | Secret shell | `aws_secretsmanager_secret` with no version |

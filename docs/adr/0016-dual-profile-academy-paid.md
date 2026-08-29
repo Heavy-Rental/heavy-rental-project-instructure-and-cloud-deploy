@@ -11,9 +11,9 @@ ADR 0001 kept `aws-infra-academy.yml` Vocareum-only so lab session keys could no
 
 ## Decision
 
-1. The same workflow file accepts GitHub Environments **`academy`** and **`AWS_ACTUAL`** only.
+1. This delta: the same workflow file accepts GitHub Environments **`academy`** and **`AWS_ACTUAL`** only. **Retired by [0017](0017-two-actions-academy-paid.md)** — two files, same Environment names.
 2. **Academy:** form or Environment Vocareum keys. Guests **LabInstanceProfile** → **LabRole**. Terraform creates no IAM.
-3. **AWS_ACTUAL:** `configure-aws-credentials` with `role-to-assume` = Environment `AWS_ROLE_TO_ASSUME`. Guests use Terraform-created `hr-paid-{app}` instance profiles. Fail if form keys are set or if Environment `AWS_ACTUAL` has `AWS_ACCESS_KEY_ID`.
+3. **AWS_ACTUAL:** `configure-aws-credentials` with `role-to-assume` = Environment `AWS_ROLE_TO_ASSUME`. Guests use Terraform-created `hr-paid-*` instance profiles (`portal` / `rest` / `haystack` / `neo4j`; **current** also `bastion`, ADR 0021). Fail if form keys are set or if Environment `AWS_ACTUAL` has `AWS_ACCESS_KEY_ID`. **Current entry point:** paid is `aws-infra-paid.yml` (ADR 0017), not this Action.
 4. State bucket `heavy-rental-tfstate-<account>-academy` or `…-actual`. S3 names cannot contain uppercase, so Environment `AWS_ACTUAL` maps to deployment `actual`. Never one state for both.
 5. `var.deployment` (`academy` | `actual`) in the existing `terraform/academy` root switches data sources vs IAM resources.
 

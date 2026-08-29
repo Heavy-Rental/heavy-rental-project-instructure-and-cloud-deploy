@@ -87,6 +87,7 @@ locals {
     "heavy-rental/ssh/rest",
     "heavy-rental/ssh/haystack",
     "heavy-rental/ssh/neo4j",
+    "heavy-rental/ssh/bastion",
   ])
 
   ecr_repos = toset([

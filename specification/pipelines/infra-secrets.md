@@ -23,4 +23,11 @@ Empty RDS hostname, database, password, port, or `REST_BASE_URL` fails `sync-sec
 
 ## SSH PEMs
 
-`sync-ssh-keys` writes `heavy-rental/ssh/*` **after** instances are InService (ADR 0011). Not Terraform `tls_private_key`.
+`sync-ssh-keys` writes `heavy-rental/ssh/{portal,rest,haystack,neo4j,bastion}` after the four app ASGs are **InService** and `hr-bastion` is **running** (ADR 0011 / 0021). Not Terraform `tls_private_key`.
+
+| Secret id | Where the private key goes | Public key |
+| --- | --- | --- |
+| `heavy-rental/ssh/{portal,rest,haystack,neo4j}` | Secrets Manager only | App guests’ `authorized_keys` via SSM |
+| `heavy-rental/ssh/bastion` | Secrets Manager **and** `/home/ec2-user/.ssh/id_ed25519` on `hr-bastion` only | `hr-bastion` and all four app roles |
+
+On `hr-bastion`, `hr-ssh-config` writes Host aliases (`ssh portal`, `ssh rest-2`, `ssh haystack-1a`, `ssh neo4j`). App guests never receive a PEM. Optional Environment variable `BASTION_SSH_CIDRS` (never `0.0.0.0/0`) opens `:22` on `sg-bastion` only.

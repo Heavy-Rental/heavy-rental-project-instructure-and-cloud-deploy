@@ -1,10 +1,12 @@
 # Delta for infra-academy-estate-compute
 
-> **Later modified by** [`add-infra-paid-pipeline`](../../../add-infra-paid-pipeline/specs/infra-estate-rest-alb/spec.md) / [ADR 0018](../../../../../docs/adr/0018-public-rest-alb.md): `hr-alb-rest` is internet-facing in the **public** subnets. Haystack ALB stays internal. App ASGs stay in private-app subnets.
+> **Later modified by** [`add-infra-paid-pipeline`](../../../add-infra-paid-pipeline/specs/infra-estate-rest-alb/spec.md) / [ADR 0018](../../../../../docs/adr/0018-public-rest-alb.md): `hr-alb-rest` is internet-facing in the **public** subnets. Haystack ALB stays internal. App ASGs stay in private-app subnets.  
+> **Later modified by** [`add-infra-paid-profile`](../../../add-infra-paid-profile/specs/infra-academy-paid-profile/spec.md) / [`add-infra-paid-pipeline`](../../../add-infra-paid-pipeline/specs/infra-paid-pipeline/spec.md): when `deployment=actual`, Terraform creates `hr-paid-*` instance profiles. Academy still creates no IAM.  
+> **Later modified by** [`add-infra-bastion`](../../../add-infra-bastion/specs/infra-academy-estate-compute/spec.md) / [ADR 0021](../../../../../docs/adr/0021-maintenance-bastion-ssh.md): jump host is single EC2 `hr-bastion`, **not** a fifth ASG. Four app ASGs stay `desired=2`.
 
 ## Purpose
 
-Every compute role is a launch template + Auto Scaling group with `LabInstanceProfile`. No new IAM.
+This delta: the four app roles are launch templates + Auto Scaling groups with `LabInstanceProfile`. No new IAM on Academy. **Current:** `hr-bastion` is a single EC2 (not an ASG); paid IAM is later (banners).
 
 ## ADDED Requirements
 

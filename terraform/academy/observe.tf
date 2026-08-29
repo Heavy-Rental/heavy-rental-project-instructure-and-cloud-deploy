@@ -16,8 +16,11 @@ check "observe_uses_labrole" {
 
 check "paid_uses_created_profiles" {
   assert {
-    condition     = var.deployment != "actual" || length(aws_iam_instance_profile.guest) == 4
-    error_message = "AWS_ACTUAL deployment must create four hr-paid-* instance profiles. Do not use LabRole."
+    condition = var.deployment != "actual" || (
+      length(aws_iam_instance_profile.guest) == 4 &&
+      length(aws_iam_instance_profile.bastion) == 1
+    )
+    error_message = "AWS_ACTUAL deployment must create four hr-paid-* app instance profiles and hr-paid-bastion. Do not use LabRole."
   }
 }
 
@@ -349,6 +352,24 @@ resource "aws_cloudwatch_metric_alarm" "asg_inservice" {
 
   dimensions = {
     AutoScalingGroupName = each.value
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "bastion_status" {
+  alarm_name          = "hr-bastion-status"
+  alarm_description   = "EC2 status check failed on hr-bastion."
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "StatusCheckFailed"
+  namespace           = "AWS/EC2"
+  period              = 60
+  statistic           = "Maximum"
+  threshold           = 0
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = [aws_sns_topic.alarms.arn]
+
+  dimensions = {
+    InstanceId = aws_instance.bastion.id
   }
 }
 

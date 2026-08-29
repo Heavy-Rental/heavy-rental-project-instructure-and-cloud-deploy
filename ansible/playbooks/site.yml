@@ -1,5 +1,6 @@
 ---
 # Full first-compose of portal + REST + Haystack + Neo4j + rds_logical.
+# hr-bastion is in inventory but not a compose host (ADR 0021).
 # Invoked only by action=deploy-projects (a later workflow run after apply
 # or configure-only). apply / configure-only use configure.yml and never
 # call this file. Image tags come from group_vars (PORTAL_IMAGE / REST_IMAGE /

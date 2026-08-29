@@ -2,7 +2,7 @@
 
 GitHub Actions, Terraform, and Ansible that create and operate the estate on **AWS Academy / Vocareum** and on a **billed AWS** account.
 
-**Terraform** creates the architecture (VPC, NAT, ASGs, ALBs, RDS, secret shells, NLB).  
+**Terraform** creates the architecture (VPC, NAT, four app ASGs + `hr-bastion` single EC2, ALBs, RDS, secret shells, NLB).  
 **Ansible** only **configures** guests that Terraform already created (Docker, `.env` from Secrets Manager, compose). It does not create VPCs, ASGs, or RDS.
 
 **Start here if you are running the lab:** [`OPERATOR-GUIDE.md`](OPERATOR-GUIDE.md) (each GitHub Action `action`, first-time path, form fields). Specs: [`specification/README.md`](specification/README.md). Compact operate notes: [`docs/BOOTSTRAP.md`](docs/BOOTSTRAP.md). Layout: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
@@ -12,11 +12,11 @@ GitHub Actions, Terraform, and Ansible that create and operate the estate on **A
 | `specification/` | Human index and walkthroughs |
 | `openspec/` | OpenSpec behavior (SHALL + scenarios) |
 | `spdd/` | OpenSPDD analysis + REASONS Canvas |
-| `docs/adr/` | ADRs (Vocareum-only, two NAT Gateways, SSM, `SOURCE_*` / `TARGET_*`) |
+| `docs/adr/` | ADRs (Vocareum-only, two NAT Gateways, SSM, public REST ALB, `SOURCE_*` / `TARGET_*`, `hr-bastion`) |
 | `terraform/backend/` | Remote state bucket (bootstrap) |
 | `terraform/academy/` | Estate |
 | `ansible/` | Guest configuration only |
-| `scripts/` | `sync-secrets`, `sync-ssh-keys`, `stop-estate`, `estate-tf-init`, `estate-unlock`, `reconcile-estate`, `sweep-estate-orphans`, `bootstrap-github-oidc-paid` |
+| `scripts/` | `sync-secrets`, `sync-ssh-keys`, `stop-estate`, `estate-tf-init`, `estate-unlock`, `reconcile-estate`, `sweep-estate-orphans`, `bootstrap-github-oidc-paid`, `bastion-connect`, `bastion-hr-ssh-config` (installed on the bastion as `hr-ssh-config`) |
 
 ## Actions
 
@@ -32,7 +32,7 @@ Two operator workflows, **separate job graphs** (ADR 0019):
 | `bootstrap` | State bucket only | No |
 | `plan` | Show estate | No |
 | `apply` | Create/update estate | Same as configure-only (`configure.yml`) |
-| `configure-only` | No apply | Docker + Compose on all guests; **Neo4j only** |
+| `configure-only` | No apply | Docker + Compose on app guests; **Neo4j only**. Hop keys on `hr-bastion` |
 | `deploy-projects` | No | Later run after apply/configure-only: `site.yml` (all three apps) |
 | `stop` | No | Pause ASGs + stop both RDS (`scripts/stop-estate.sh`) |
 | `destroy` | Tear down estate | No |

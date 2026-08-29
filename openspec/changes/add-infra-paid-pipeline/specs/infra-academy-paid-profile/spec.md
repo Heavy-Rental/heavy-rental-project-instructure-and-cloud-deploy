@@ -1,5 +1,7 @@
 # Delta for infra-academy-paid-profile (two Actions)
 
+> **Later modified by** [`add-infra-bastion`](../../../add-infra-bastion/specs/infra-academy-paid-profile/spec.md) / [ADR 0021](../../../../../docs/adr/0021-maintenance-bastion-ssh.md): paid also creates `hr-paid-bastion`. App profiles stay `hr-paid-{portal,rest,haystack,neo4j}`.
+
 ## Purpose
 
 Isolation between Vocareum and billed AWS remains. The operator entry point is two Actions, not one workflow with two Environments.

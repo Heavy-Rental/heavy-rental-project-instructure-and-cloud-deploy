@@ -2,7 +2,7 @@
 
 **Region:** `us-east-1` (first two available AZs, usually `us-east-1a` + `us-east-1b`).  
 **IAM (academy):** every EC2 uses **`LabInstanceProfile`** → **`LabRole`**. No IAM create.  
-**IAM (AWS_ACTUAL):** Terraform creates `hr-paid-{portal,rest,haystack,neo4j}` instance profiles. Auth is GitHub OIDC (`AWS_ROLE_TO_ASSUME`). Separate state bucket suffix `-actual` (S3 cannot use uppercase `AWS_ACTUAL`).
+**IAM (AWS_ACTUAL):** Terraform creates `hr-paid-{portal,rest,haystack,neo4j,bastion}` instance profiles. Auth is GitHub OIDC (`AWS_ROLE_TO_ASSUME`). Separate state bucket suffix `-actual` (S3 cannot use uppercase `AWS_ACTUAL`).
 
 This is the live target for `terraform/academy/`. `postgres-haystack-sync` is a **container**, not a third RDS.
 
@@ -20,6 +20,7 @@ This is the live target for `terraform/academy/`. `postgres-haystack-sync` is a 
      |  10.0.0.0/24         10.0.1.0/24    |
      |  NAT GW + EIP        NAT GW + EIP   |
      |  portal ALB + REST ALB (public)     |
+     |  hr-bastion x1 (maintenance SSH)    |
      +------------------+------------------+
                         |
      +------------------+------------------+
@@ -47,6 +48,7 @@ flowchart TB
   browser[Browser] --> igw[IGW]
   igw --> albP[Public ALB portal :80]
   igw --> albR[Public ALB REST :8080]
+  igw --> bastion[hr-bastion public :22 optional]
   albP --> asgP0[asg-portal AZ-0]
   albP --> asgP1[asg-portal AZ-1]
   asgP0 --> albR
@@ -65,6 +67,10 @@ flowchart TB
   asgH1 --> nlbN
   nlbN --> n4j0[asg-neo4j AZ-0]
   nlbN --> n4j1[asg-neo4j AZ-1]
+  bastion -->|SSH :22| asgP0
+  bastion -->|SSH :22| asgR0
+  bastion -->|SSH :22| asgH0
+  bastion -->|SSH :22| n4j0
   asgP0 --> nat0[NAT GW AZ-0]
   asgR0 --> nat0
   asgH0 --> nat0
@@ -83,13 +89,14 @@ flowchart TB
 | --- | --- | --- |
 | Portal / REST / Haystack EC2 | 2 each (one per app AZ) | AZ loss keeps one guest behind the ALB. REST ALB is public :8080; guests stay private |
 | Neo4j EC2 | 2 (one per data AZ) | AZ loss keeps one guest behind the Bolt NLB. **Not** a causal cluster |
+| Maintenance bastion | 1 (`hr-bastion`, public subnet) | Single EC2 jump host for SSH to the eight app guests (ADR 0021). Not an ASG, not behind an ALB |
 | NAT | **2 Gateways** (one per public AZ) + EIP each | Same-AZ outbound for portal / REST / Haystack / Neo4j. Not an EC2 instance |
 | RDS `heavy_rental` | 1 Multi-AZ | Primary + standby |
 | RDS `haystack` | 1 Multi-AZ | Primary + standby |
 | `postgres-haystack-sync` | 0 RDS | Worker on `asg-haystack`: `postgres:17` + `sync-from-primary.sh` (60s). Not a third RDS |
 | `neo4j-populate` | 0 RDS | Same guest: `python:3.12-slim` + `populate_neo4j.py` (60s + compose `:8089`) |
 
-**Guest count:** 8 ASG instances + **0** NAT EC2 = **8** EC2 (Vocareum default cap is 9).
+**Guest count:** 8 app ASG instances + **1** bastion + **0** NAT EC2 = **9** EC2 (Vocareum default cap is 9). Do not add another instance while this estate is running.
 
 ## Traffic
 
@@ -98,6 +105,8 @@ Internet clients may also hit the REST ALB :8080 directly (`REST_BASE_URL`). `sy
 REST → internal Haystack ALB → Haystack → Haystack RDS + Bolt NLB → Neo4j.  
 On `asg-haystack`, `postgres-haystack-sync` merges SoR RDS → Haystack RDS (`postgres_fdw`, `sg-rds` self :5432). `neo4j-populate` reads Haystack RDS and writes Bolt (`NEO4J_URI`). HTTP `:8089` is Compose DNS only ([ADR 0020](adr/0020-haystack-devcontainer-workers.md)).  
 Private outbound HTTPS → the **NAT Gateway in the same AZ**. S3 via gateway endpoint (no NAT). If AZ-0 dies, AZ-1 guests keep outbound. NAT Gateways bill until `action=destroy`; session end and `action=stop` do not pause them.
+
+**Break-glass SSH:** operators SSM (or optional CIDR SSH from `BASTION_SSH_CIDRS`) onto `hr-bastion`, then `ssh portal` / `ssh rest-2` / `ssh haystack` / `ssh neo4j` (Host aliases from `hr-ssh-config`). App SGs allow `:22` only from `sg-bastion`, never from `0.0.0.0/0`. Helper: [`../scripts/bastion-connect.sh`](../scripts/bastion-connect.sh).
 
 ## ALB / NLB health checks
 
@@ -114,8 +123,8 @@ Terraform target groups probe each **registered instance private IP**. Matcher *
 
 ## Terraform vs Ansible
 
-**Terraform** (`terraform/academy/`) creates the architecture: VPC, two NAT Gateways, four ASGs, ALBs (portal :80 and REST :8080 internet-facing; Haystack internal), two Multi-AZ RDS, Bolt NLB, empty SM shells, and Monitor (CloudTrail + CloudWatch + S3 logs). Academy guests use **`LabInstanceProfile` → `LabRole`** (no IAM create). AWS_ACTUAL guests use Terraform `hr-paid-*` profiles.  
-**Ansible** only configures guests that already exist: Docker, SM → `.env`, compose, portal `/api`. It does not create or destroy VPC/ASG/RDS.
+**Terraform** (`terraform/academy/`) creates the architecture: VPC, two NAT Gateways, four app ASGs + **`hr-bastion`** (single EC2), ALBs (portal :80 and REST :8080 internet-facing; Haystack internal), two Multi-AZ RDS, Bolt NLB, empty SM shells, and Monitor (CloudTrail + CloudWatch + S3 logs). Academy guests use **`LabInstanceProfile` → `LabRole`** (no IAM create). AWS_ACTUAL guests use Terraform `hr-paid-*` profiles (including `hr-paid-bastion`).  
+**Ansible** only configures guests that already exist: Docker, SM → `.env`, compose, portal `/api`. It does not create or destroy VPC/ASG/RDS and does **not** compose onto `hr-bastion`.
 
 ## Monitor (apply)
 
@@ -124,14 +133,14 @@ Terraform target groups probe each **registered instance private IP**. Matcher *
 | API audit | CloudTrail `heavy-rental-academy` → observe S3 (`cloudtrail/`). **No** trail → CloudWatch Logs (Vocareum). |
 | VPC accept/reject | Flow logs → same bucket (`vpc-flow/`). S3 destination — **not** LabRole (wrong trust). |
 | ALB requests | Access logs on portal / REST / Haystack ALBs → `alb/` |
-| Health | Dashboard `heavy-rental-academy`; alarms on ALB 5xx / unhealthy, RDS CPU / storage, ASG InService |
+| Health | Dashboard `heavy-rental-academy`; alarms on ALB 5xx / unhealthy, RDS CPU / storage, four app ASG InService, `hr-bastion` `StatusCheckFailed` |
 | Guest logs | Docker `awslogs` driver → `/heavy-rental/{portal,rest,haystack,neo4j}` (instance profile). No CloudWatch Agent. If LabRole cannot `PutLogEvents`, guests stay on `json-file` and `docker logs` over SSM. |
 
 Optional Environment variable `ALARM_EMAIL` subscribes SNS topic `hr-academy-alarms` (confirm the AWS mail). Cost Explorer stays the Vocareum budget UI — not Terraform.
 
 ## Configure (Ansible)
 
-`action=apply` runs Terraform first, then `sync-secrets` → `sync-ssh-keys` → Ansible **`configure.yml`** (Docker + Compose on all guests; compose **Neo4j only**). `action=configure-only` does **not** run Terraform apply; Ansible is the **same** playbook. Neither action pulls portal / REST / Haystack images.
+`action=apply` runs Terraform first, then `sync-secrets` → `sync-ssh-keys` → Ansible **`configure.yml`** (Docker + Compose on app guests; compose **Neo4j only**; hop keys on `hr-bastion`). `action=configure-only` does **not** run Terraform apply; Ansible is the **same** playbook. Neither action pulls portal / REST / Haystack images. Neither composes onto `hr-bastion`.
 
 `action=deploy-projects` is a **later** workflow run after apply or configure-only (ADR 0014). It is not a job at the end of apply. Preflight requires public GHCR or ECR tags, then Ansible **`site.yml`**. Day-to-day single-image rolls stay app CD.
 

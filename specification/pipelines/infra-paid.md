@@ -13,7 +13,7 @@ Same Terraform root (`terraform/academy/`, `var.deployment=actual`) and the same
 | --- | --- | --- |
 | Action file | `aws-infra-academy.yml` | `aws-infra-paid.yml` |
 | Auth | Vocareum keys | OIDC `AWS_ROLE_TO_ASSUME` |
-| Guests | `LabRole` | `hr-paid-{portal,rest,haystack,neo4j}` |
+| Guests | `LabRole` | `hr-paid-{portal,rest,haystack,neo4j,bastion}` |
 | State bucket | `…-academy` | `…-actual` |
 | Ansible S3 | tfstate bucket | `heavy-rental-ssm-<account>-actual` |
 | Vocareum form keys | Required (or Environment fallback) | **Not declared** |
@@ -21,7 +21,7 @@ Same Terraform root (`terraform/academy/`, `var.deployment=actual`) and the same
 
 | Tool | Owns |
 | --- | --- |
-| **Terraform** | Architecture and cloud **resources**: VPC, subnets, IGW, two NAT Gateways, four ASGs + LTs, public portal ALB, **internet-facing REST ALB :8080**, internal Haystack ALB, Bolt NLB, two Multi-AZ RDS, SM **shells**, S3 state, CloudTrail (S3), VPC flow logs (S3), ALB access logs, CloudWatch alarms + dashboard, paid SSM bucket, `hr-paid-*` instance profiles |
+| **Terraform** | Architecture and cloud **resources**: VPC, subnets, IGW, two NAT Gateways, four app ASGs + LTs, **`hr-bastion`** (single EC2), public portal ALB, **internet-facing REST ALB :8080**, internal Haystack ALB, Bolt NLB, two Multi-AZ RDS, SM **shells**, S3 state, CloudTrail (S3), VPC flow logs (S3), ALB access logs, CloudWatch alarms + dashboard, paid SSM bucket, `hr-paid-*` instance profiles (apps + bastion) |
 | **Ansible** | Guest **configuration** only: Docker/Compose, map SM → `.env`, pull/load a CI image, compose, portal nginx `/api`, RDS *logical* grants/extensions. **No** `terraform apply`, no create-ASG, no create-RDS |
 
 `sync-secrets` and `sync-ssh-keys` are shell wrappers (not Terraform). They write JSON / PEMs into shells Terraform already created.
@@ -36,7 +36,7 @@ workflow_dispatch (Environment AWS_ACTUAL)
       ├── apply             Import leftovers → Terraform estate → sync-secrets → sync-ssh-keys → Ansible configure.yml
       ├── configure-only    No Terraform apply. sync-secrets + PEMs → same Ansible configure.yml
       ├── deploy-projects   Later run after apply or configure-only. Preflight images → site.yml
-      ├── stop              ASG desired=0 + stop both RDS. NAT Gateways still bill
+      ├── stop              App ASG desired=0 + stop hr-bastion + stop both RDS. NAT Gateways still bill
       └── destroy           Import leftovers → terraform destroy → sweep this DEPLOYMENT's leftovers.
                             Keeps state bucket. Observe names are heavy-rental-actual.
 ```
@@ -66,7 +66,7 @@ Do not put `ghcr.io` paths in git. Public GHCR or ECR tags only; private GHCR fa
 
 ## First compose vs app CD
 
-On `apply` and `configure-only`, Ansible runs `configure.yml` only (Docker + Compose plugin on all guests; compose **Neo4j**). It does **not** pull portal / REST / Haystack images.
+On `apply` and `configure-only`, Ansible runs `configure.yml` only (Docker + Compose plugin on app guests; compose **Neo4j**). It does **not** pull portal / REST / Haystack images. It does **not** compose onto `hr-bastion`.
 
 `action=deploy-projects` is a **later** `workflow_dispatch` after a successful apply or configure-only (ADR 0014). It is not chained onto those actions. Preflight requires public GHCR or ECR tags (no stock `nginx`, no `image_http_url`), then runs `site.yml`. Re-running it resets all three apps to the infra Environment `AWS_ACTUAL` tags.
 
@@ -90,5 +90,5 @@ Put the role ARN on Environment `AWS_ACTUAL` as **variable** or **secret** `AWS_
 
 - OpenSpec: [`../../openspec/changes/add-infra-paid-pipeline/`](../../openspec/changes/add-infra-paid-pipeline/)
 - OpenSPDD: [`../../spdd/analysis/add-infra-paid-pipeline.md`](../../spdd/analysis/add-infra-paid-pipeline.md), [`../../spdd/prompt/add-infra-paid-pipeline.md`](../../spdd/prompt/add-infra-paid-pipeline.md)
-- ADRs: [0017](../../docs/adr/0017-two-actions-academy-paid.md), [0018](../../docs/adr/0018-public-rest-alb.md), [0019](../../docs/adr/0019-separate-job-graphs.md)
+- ADRs: [0017](../../docs/adr/0017-two-actions-academy-paid.md), [0018](../../docs/adr/0018-public-rest-alb.md), [0019](../../docs/adr/0019-separate-job-graphs.md), [0021](../../docs/adr/0021-maintenance-bastion-ssh.md)
 - Secrets: [`infra-secrets.md`](infra-secrets.md)

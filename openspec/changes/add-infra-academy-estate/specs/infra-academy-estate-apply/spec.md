@@ -1,8 +1,11 @@
 # Delta for infra-academy-estate-apply
 
+> **Later modified by** [`add-infra-academy-configure`](../../../add-infra-academy-configure/specs/infra-academy-estate-apply/spec.md): apply continues to `sync-secrets` → `sync-ssh-keys` → Ansible `configure.yml`. `configure-only` and `stop` run. `destroy` uses `confirm_destroy=destroy` (not fail-closed).  
+> **Later modified by** [`add-infra-academy-deploy-projects`](../../../add-infra-academy-deploy-projects/specs/infra-academy-ansible/spec.md): apply Ansible does **not** compose portal/REST/Haystack and does **not** fail on missing app images. `site.yml` is a later `deploy-projects` run.
+
 ## Purpose
 
-The Academy workflow may now apply the estate. Configure, stop, and destroy wait for branch 3.
+This delta: the Academy workflow may apply the estate. **Current:** configure, stop, destroy, and later `deploy-projects` are implemented (banners).
 
 ## ADDED Requirements
 

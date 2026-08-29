@@ -1,5 +1,7 @@
 # Delta for infra-academy-observe (deployment-scoped names)
 
+> **Later modified by** [`add-infra-bastion`](../../../add-infra-bastion/specs/infra-academy-observe/spec.md) / [ADR 0021](../../../../../docs/adr/0021-maintenance-bastion-ssh.md): alarm `hr-bastion-status` on the single jump host. App ASG InService alarms are unchanged.
+
 ## MODIFIED Requirements
 
 ### Requirement: Apply creates S3-backed audit and access logs

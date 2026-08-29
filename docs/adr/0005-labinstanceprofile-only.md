@@ -1,6 +1,6 @@
 # ADR 0005: LabInstanceProfile only — never create IAM
 
-- **Status:** Accepted
+- **Status:** Accepted for **Academy**. Paid IAM is [0016](0016-dual-profile-academy-paid.md) / [0017](0017-two-actions-academy-paid.md) (`hr-paid-*` when `deployment=actual`, including `hr-paid-bastion` in [0021](0021-maintenance-bastion-ssh.md)). This file still forbids `aws_iam_role` on Vocareum.
 - **Date:** 2026-08-16
 - **Branch:** `feat/infra-academy-estate` (`HR-161`)
 
@@ -10,7 +10,7 @@ AWS Academy cannot create IAM users, groups, or roles. Vocareum pre-creates `Lab
 
 ## Decision
 
-Every launch template **data-source** `LabInstanceProfile` by name and **data-source** `LabRole`. Plan fails unless the profile’s role is `LabRole`. Terraform SHALL NOT contain `aws_iam_role` / `aws_iam_instance_profile` **resources**, or an OIDC provider. NAT Gateways have no instance profile.
+On Academy (`deployment=academy`), every launch template **data-source** `LabInstanceProfile` by name and **data-source** `LabRole`. Plan fails unless the profile’s role is `LabRole`. Academy Terraform SHALL NOT contain `aws_iam_role` / `aws_iam_instance_profile` **resources**, or an OIDC provider. NAT Gateways have no instance profile. Paid (`deployment=actual`) is the exception in ADR 0016 / 0017.
 
 ## Consequences
 

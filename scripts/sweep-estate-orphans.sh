@@ -32,7 +32,8 @@ exists_asg() {
 
 delete_asgs() {
   local asg
-  for asg in asg-portal asg-rest asg-haystack asg-neo4j; do
+  for asg in asg-portal asg-rest asg-haystack asg-neo4j asg-bastion; do
+    # asg-bastion is a leftover name from an earlier shape (now aws_instance).
     if exists_asg "${asg}"; then
       echo "Deleting ASG ${asg}."
       aws autoscaling update-auto-scaling-group \
@@ -98,7 +99,8 @@ delete_secrets_and_ecr() {
   local name
   for name in \
     heavy-rental/portal heavy-rental/rest heavy-rental/haystack heavy-rental/neo4j \
-    heavy-rental/ssh/portal heavy-rental/ssh/rest heavy-rental/ssh/haystack heavy-rental/ssh/neo4j
+    heavy-rental/ssh/portal heavy-rental/ssh/rest heavy-rental/ssh/haystack heavy-rental/ssh/neo4j \
+    heavy-rental/ssh/bastion
   do
     if aws secretsmanager describe-secret --secret-id "${name}" >/dev/null 2>&1; then
       echo "Deleting secret ${name}."
@@ -115,7 +117,7 @@ delete_secrets_and_ecr() {
 
 delete_launch_templates() {
   local prefix ids id
-  for prefix in lt-portal- lt-rest- lt-haystack- lt-neo4j-; do
+  for prefix in lt-portal- lt-rest- lt-haystack- lt-neo4j- lt-bastion-; do
     ids="$(aws ec2 describe-launch-templates --output json \
       | jq -r --arg p "${prefix}" '.LaunchTemplates[]? | select(.LaunchTemplateName | startswith($p)) | .LaunchTemplateId')"
     for id in ${ids}; do
@@ -229,6 +231,7 @@ delete_observe() {
     hr-alb-portal-unhealthy hr-alb-rest-unhealthy hr-alb-haystack-unhealthy \
     hr-rds-sor-cpu hr-rds-haystack-cpu hr-rds-sor-storage hr-rds-haystack-storage \
     hr-asg-portal-inservice hr-asg-rest-inservice hr-asg-haystack-inservice hr-asg-neo4j-inservice \
+    hr-asg-bastion-inservice hr-bastion-status \
     >/dev/null 2>&1 || true
 
   for name in portal rest haystack neo4j; do

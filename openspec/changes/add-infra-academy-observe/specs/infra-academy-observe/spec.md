@@ -1,5 +1,7 @@
 # Delta for infra-academy-observe
 
+> **Later modified by** [`add-infra-bastion`](../../../add-infra-bastion/specs/infra-academy-observe/spec.md) / [ADR 0021](../../../../../docs/adr/0021-maintenance-bastion-ssh.md): alarm `hr-bastion-status` (`StatusCheckFailed` on the single instance). No `GroupInServiceInstances` for a bastion ASG.
+
 ## Purpose
 
 `action=apply` provisions Academy Monitor resources (CloudWatch + CloudTrail + S3 logs). Operate (`stop` / `destroy` / SSM) is unchanged. Vocareum IAM stays `LabRole` only.

@@ -1,8 +1,10 @@
 # Spec: infra-paid-pipeline
 
+> **Later modified by** [`add-infra-bastion`](../../../add-infra-bastion/specs/infra-academy-paid-profile/spec.md) / [ADR 0021](../../../../../docs/adr/0021-maintenance-bastion-ssh.md): paid also creates `hr-paid-bastion`. App profiles stay `hr-paid-{portal,rest,haystack,neo4j}`.
+
 ## Purpose
 
-A dedicated GitHub Action applies the same estate to a billed account via OIDC. It never accepts Vocareum keys. Academy and paid share one job graph.
+A dedicated GitHub Action applies the same estate to a billed account via OIDC. It never accepts Vocareum keys. Academy and paid each own their jobs (ADR 0019); they SHALL NOT share `aws-infra-estate.yml` or `workflow_call`.
 
 ## ADDED Requirements
 
@@ -46,7 +48,7 @@ When `aws_environment` is not `AWS_ACTUAL`, or Environment `AWS_ACTUAL` has `AWS
 - AND terraform is not blocked for missing variable
 
 ### Requirement: Paid uses OIDC and created profiles
-Paid apply SHALL assume `AWS_ROLE_TO_ASSUME` (Environment **variable** or **secret**) with GitHub OIDC (`id-token: write` on `aws-infra-paid.yml` only). Guests SHALL use `hr-paid-{portal,rest,haystack,neo4j}`. State bucket SHALL end with `-actual`. Terraform SHALL NOT look up `LabRole` or `LabInstanceProfile` when `deployment` is `actual`. The OIDC provider and runner role SHALL be created out of band (`docs/OIDC-PAID.md`); estate apply SHALL NOT create them.
+Paid apply SHALL assume `AWS_ROLE_TO_ASSUME` (Environment **variable** or **secret**) with GitHub OIDC (`id-token: write` on `aws-infra-paid.yml` only). App guests SHALL use `hr-paid-{portal,rest,haystack,neo4j}`. **Current:** `hr-bastion` uses `hr-paid-bastion` (banner). State bucket SHALL end with `-actual`. Terraform SHALL NOT look up `LabRole` or `LabInstanceProfile` when `deployment` is `actual`. The OIDC provider and runner role SHALL be created out of band (`docs/OIDC-PAID.md`); estate apply SHALL NOT create them.
 
 #### Scenario: Paid apply creates instance profiles
 - GIVEN Environment `AWS_ACTUAL`, `AWS_ROLE_TO_ASSUME`, and no Vocareum keys

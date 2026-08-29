@@ -25,7 +25,7 @@ Related reference (more compact): [`docs/BOOTSTRAP.md`](docs/BOOTSTRAP.md). Spec
 
 | Tool | What it does | What it does not do |
 | --- | --- | --- |
-| **Terraform** | Creates AWS *architecture*: VPC, NAT Gateways, 8 EC2 in four Auto Scaling groups, load balancers, two RDS databases, empty Secrets Manager shells | Does not install Docker or start your apps |
+| **Terraform** | Creates AWS *architecture*: VPC, NAT Gateways, 8 app EC2 + 1 maintenance bastion, load balancers, two RDS databases, empty Secrets Manager shells | Does not install Docker or start your apps |
 | **Ansible** | Configures *existing* EC2: Docker, `.env` from Secrets Manager, compose | Does not create VPCs, ASGs, or RDS |
 | **This GitHub Action** | Runs Terraform and/or Ansible for you over SSM | Does not rebuild portal / REST / Haystack from source |
 
@@ -88,6 +88,7 @@ Do **not** add `VITE_STRIPE_PUBLISHABLE_KEY` (the pipeline copies it from the pu
 | --- | --- | --- |
 | `AWS_REGION` | `us-east-1` | Always |
 | `ALARM_EMAIL` | Your email | Optional. SNS confirms before alarm mail. Apply works if empty |
+| `BASTION_SSH_CIDRS` | Your public IPv4 `/32`, comma-separated | Optional. Empty = SSM onto `hr-bastion`, then SSH to guests. **Not** `0.0.0.0/0` |
 | `PORTAL_IMAGE` | Public GHCR or ECR tag | **Required** before `deploy-projects` |
 | `REST_IMAGE` | Public GHCR or ECR tag | **Required** before `deploy-projects` |
 | `HAYSTACK_IMAGE` | Public GHCR or ECR tag | **Required** before `deploy-projects` |
@@ -109,7 +110,7 @@ Do this once if you will run **AWS infrastructure (paid)**. Do **not** paste Voc
 1. In AWS, create the GitHub OIDC provider and role `github-actions-infra` (script: `GITHUB_ORG=YOUR_ORG ./scripts/bootstrap-github-oidc-paid.sh`). Copy the **role ARN**.
 2. **Settings → Environments → New environment** named exactly `AWS_ACTUAL`.
 3. Store the ARN as Environment **variable** `AWS_ROLE_TO_ASSUME` **or** Environment **secret** `AWS_ROLE_TO_ASSUME` (same name; either works). This is not an AWS access key.
-4. **Variable** `AWS_REGION` = `us-east-1`. Same optional image variables and `ALARM_EMAIL` as academy (this Environment’s copies, not academy’s).
+4. **Variable** `AWS_REGION` = `us-east-1`. Same optional image variables, `ALARM_EMAIL`, and `BASTION_SSH_CIDRS` as academy (this Environment’s copies, not academy’s).
 5. **Secrets:** same app set as academy (`SPRING_DATASOURCE_PASSWORD`, `NEO4J_PASSWORD`, Stripe trio, optional JWT / OneMap / `LLM_API_KEY`). **No** `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN`.
 
 Then: **Actions → AWS infrastructure (paid)** → `aws_environment` = `AWS_ACTUAL` → `plan`, then `apply`, then a **later** `deploy-projects`. Same action meanings as academy. Paid first-compose is this Action’s `deploy-projects`. Day-to-day portal / REST / Haystack rolls are app CD in `heavy-rental-project-pipeline-development` (academy **and** paid callers).
@@ -225,10 +226,10 @@ Do not try to do step 3 and step 5 in one click. `deploy-projects` is not chaine
 **What it does:**
 
 1. Confirms Environment `academy` and Vocareum keys
-2. `terraform apply` — VPC, two NAT Gateways, four ASGs (**8 EC2**), ALBs, two RDS, secret *shells*
+2. `terraform apply` — VPC, two NAT Gateways, four app ASGs + `hr-bastion` (**9 EC2**), ALBs, two RDS, secret *shells*
 3. Writes app secrets into Secrets Manager (`sync-secrets`)
 4. Writes break-glass SSH PEMs after instances are healthy (`sync-ssh-keys`)
-5. Ansible `configure.yml` — Docker + Compose on all guests, **Neo4j only**
+5. Ansible `configure.yml` — Docker + Compose on app guests (not `hr-bastion`), **Neo4j only**
 
 It does **not** pull portal, REST, or Haystack images. That is why apply no longer fails on private GHCR.
 
@@ -242,7 +243,7 @@ It does **not** pull portal, REST, or Haystack images. That is why apply no long
 
 **Success (about 20–40 minutes):**
 
-- Four ASGs exist: `asg-portal`, `asg-rest`, `asg-haystack`, `asg-neo4j`
+- Four ASGs exist: `asg-portal`, `asg-rest`, `asg-haystack`, `asg-neo4j`. Jump host `hr-bastion` (single EC2) is running.
 - Job summary shows the public portal ALB DNS
 - That URL **502**s on port 80 until `deploy-projects` (or portal app CD)
 - Secret `heavy-rental/portal` exists and has `REST_BASE_URL`
@@ -257,6 +258,7 @@ It does **not** pull portal, REST, or Haystack images. That is why apply no long
 | `voc-cancel-cred` / `s3:CreateBucket` / `Failed to persist state to backend` | See [Plan or apply fails: Vocareum cancelled credentials](#plan-or-apply-fails-vocareum-cancelled-credentials-voc-cancel-cred) |
 | `AlreadyExists` / `RepositoryAlreadyExists` / secret already exists | See [Apply fails: named object already exists](#apply-fails-named-object-already-exists) |
 | Two VPCs named `heavy-rental-academy` | `destroy` (sweeps extras), then `apply`. Do not apply again until destroy finishes |
+| `InstanceLimitExceeded` / Vocareum 9-EC2 cap while replacing the old `asg-bastion` | Scale `asg-bastion` to desired=0 first, then re-run `apply`. The jump host is now a single `hr-bastion` instance |
 | You expected the React portal to load | Run `deploy-projects` next. Apply is not a full deploy |
 
 **Re-run:** `apply` is safe to run again on the same lab. Before plan it **imports** named leftovers (ASGs, ECR, secrets, RDS, the estate VPC) that AWS still has but state lost. A healthy second apply is a no-op or a small update (for example scaling ASGs back to 2 after `stop`).
@@ -271,7 +273,7 @@ It does **not** pull portal, REST, or Haystack images. That is why apply no long
 
 **When:** The estate already exists (you already ran `apply`), the Vocareum session is new, and you need Docker / secrets / Neo4j refreshed. Typical: next lab session the same week.
 
-**What it does:** Same Ansible as apply (`configure.yml`): refill Secrets Manager, PEMs, Docker + Compose on all guests, compose **Neo4j only**. **No** `terraform apply`. **No** portal / REST / Haystack compose.
+**What it does:** Same Ansible as apply (`configure.yml`): refill Secrets Manager, PEMs (including hop key on `hr-bastion`), Docker + Compose on app guests, compose **Neo4j only**. **No** `terraform apply`. **No** portal / REST / Haystack compose. **No** Docker on `hr-bastion`.
 
 **Form:** Same as `apply`, but `action` = `configure-only`.
 
@@ -289,7 +291,7 @@ It does **not** pull portal, REST, or Haystack images. That is why apply no long
 
 1. Refreshes secrets and PEMs (same as configure-only)
 2. **Preflight on the runner** (fails *before* talking to EC2 if something is wrong):
-   - All four ASGs exist (otherwise: run `apply` first)
+   - App ASGs exist (`asg-portal`, `asg-rest`, `asg-haystack`, `asg-neo4j`; otherwise: run `apply` first). `hr-bastion` is also created by apply (SSH jump; not required to compose)
    - `PORTAL_IMAGE` is set and is **not** stock `nginx`
    - `REST_IMAGE` and `HAYSTACK_IMAGE` are set (or `image_ref` for those two)
    - Each `ghcr.io/…` tag is **publicly** readable
@@ -331,9 +333,9 @@ It does **not** pull portal, REST, or Haystack images. That is why apply no long
 
 ### `stop` — pause compute (still bills NAT)
 
-**When:** End of a lab day when you will come back, and you want EC2 and RDS stopped. Cheaper than leaving 8 instances running, **but not free**.
+**When:** End of a lab day when you will come back, and you want EC2 and RDS stopped. Cheaper than leaving 9 instances running, **but not free**.
 
-**What it does:** Sets all four ASGs to desired = 0. Stops both RDS instances. Does **not** destroy NAT Gateways or ALBs. Those **keep billing**.
+**What it does:** Sets the four app ASGs to desired = 0 (max stays 2). Stops `hr-bastion`. Stops both RDS instances. Does **not** destroy NAT Gateways or ALBs. Those **keep billing**.
 
 **Form:**
 
@@ -343,7 +345,7 @@ It does **not** pull portal, REST, or Haystack images. That is why apply no long
 
 **Success:** ASGs show desired 0. RDS status is stopped.
 
-**To resume:** Start Lab, then `apply` (imports the paused estate and sets ASG desired back to 2) or scale the ASGs yourself and run `configure-only`. Run `deploy-projects` again if the apps are gone after new instances launch.
+**To resume:** Start Lab, then `apply` (imports the paused estate, sets app ASG desired back to 2, and starts `hr-bastion`) or scale the ASGs yourself and run `configure-only`. Run `deploy-projects` again if the apps are gone after new instances launch.
 
 ---
 
@@ -414,6 +416,19 @@ AWS rejected a create because the name is already taken (`asg-portal`, `heavy-re
 
 ---
 
+## SSH to guests via the maintenance bastion
+
+App EC2 have no public IP. Do **not** open `:22` from the internet on portal / REST / Haystack / Neo4j.
+
+1. Run `apply` so `hr-bastion` exists, then `sync-ssh-keys` (part of apply / configure-only / deploy-projects).
+2. From a machine with lab AWS keys: `./scripts/bastion-connect.sh`
+3. **Default (no `BASTION_SSH_CIDRS`):** `aws ssm start-session --target <bastion-id>`, then `hr-ssh-targets` and `ssh portal` / `ssh rest-2` / `ssh haystack` / `ssh neo4j` (Host aliases for every app EC2).
+4. **Laptop ProxyJump:** set Environment variable `BASTION_SSH_CIDRS` to your public `/32` (not `0.0.0.0/0`), re-run `apply`, then use the `ssh -J` command the helper prints. PEM is `heavy-rental/ssh/bastion` — never echo it in logs.
+
+Ansible and app CD still use SSM. The bastion is break-glass only.
+
+---
+
 ## After the apps are up
 
 | You want to… | Use |
@@ -422,6 +437,7 @@ AWS rejected a create because the name is already taken (`asg-portal`, `heavy-re
 | Change only REST | REST app CD in `heavy-rental-rest-api` |
 | Change only Haystack | Haystack app CD in `haystack-fast-api-pipeline` |
 | Re-compose all three from infra tags | `deploy-projects` again (resets all three) |
+| SSH onto a private guest | Maintenance bastion — [SSH via hr-bastion](#ssh-to-guests-via-the-maintenance-bastion) |
 | Pause overnight | `stop` (NAT still bills) |
 | Stop NAT/ALB charges | `destroy` |
 
@@ -431,10 +447,11 @@ App CD workflows must **not** run Terraform. This repo owns the estate.
 
 ## What this workflow must never do
 
-- Create IAM roles or OIDC (guests use Vocareum `LabRole` / `LabInstanceProfile`)
+- Create IAM roles or OIDC on the **academy** Action (guests use Vocareum `LabRole` / `LabInstanceProfile`). Paid creates `hr-paid-*` and assumes an out-of-band OIDC role.
 - Attach LabRole to CloudTrail or VPC flow-log delivery (wrong trust; use S3)
 - Enable CloudTrail → CloudWatch Logs or RDS enhanced monitoring
 - Write Vocareum `AWS_*` keys into Secrets Manager or onto EC2
 - Put `SPRING_DATASOURCE_PASSWORD` on the Run form
 - Put a GitHub PAT on the guests to pull private GHCR
+- Open SSH `:22` from `0.0.0.0/0` on portal / REST / Haystack / Neo4j (use `hr-bastion`)
 - Target a billed account **with Vocareum keys** (use workflow **AWS infrastructure (paid)** and OIDC instead)

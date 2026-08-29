@@ -1,5 +1,7 @@
 # Design: Academy / Vocareum estate
 
+> **Later:** [`add-infra-paid-pipeline`](../add-infra-paid-pipeline/proposal.md) / ADR 0018 makes REST ALB internet-facing :8080. [`add-infra-bastion`](../add-infra-bastion/proposal.md) / ADR 0021 adds single `hr-bastion` (live guest count **9 EC2**). This file is the branch-2 estate delta.
+
 ## Context
 
 AWS study §6 / §8.1 and `TERRAFORM-PROCESS.md` define a three-tier VPC on Vocareum: two Multi-AZ RDS (`heavy_rental` + `haystack`), four ASGs at desired=2, `LabInstanceProfile` on every guest, **two NAT Gateways** (one per public AZ). The study’s internal REST ALB is **not** the live scheme — REST public :8080 is later [`add-infra-paid-pipeline`](../add-infra-paid-pipeline/proposal.md) / ADR 0018. Branch 1 left `terraform/academy/` as a placeholder so `plan` could succeed without spending credits.

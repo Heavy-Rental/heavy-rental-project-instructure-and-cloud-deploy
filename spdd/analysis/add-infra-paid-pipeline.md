@@ -54,7 +54,7 @@ Paid Ansible over SSM must not give guests write on `estate/terraform.tfstate`.
 - Academy Action refuses `AWS_ACTUAL` before Terraform. Academy YAML has no `id-token: write` and no `workflow_call`.
 - Paid Action has no Vocareum inputs and refuses `AWS_ACCESS_KEY_ID` or empty `AWS_ROLE_TO_ASSUME`.
 - `aws-infra-estate.yml` does not exist.
-- Paid apply creates `hr-paid-*`, `-actual` state, and `heavy-rental-ssm-<account>-actual`.
+- Paid apply creates `hr-paid-*` (apps; **current** also `hr-paid-bastion`, ADR 0021), `-actual` state, and `heavy-rental-ssm-<account>-actual`.
 - `hr-alb-rest` is internet-facing; REST instances stay private with NAT egress.
 - `heavy-rental/rest` CORS includes portal and REST ALB origins.
 - Academy trail remains `heavy-rental-academy` (no replace). Paid trail is `heavy-rental-actual`. Paid sweep does not query `heavy-rental-academy` trail/dashboard/flow.

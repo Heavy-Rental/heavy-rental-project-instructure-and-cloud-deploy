@@ -1,5 +1,7 @@
 # Delta for infra-academy-estate-secrets-shells
 
+> **Later modified by** [`add-infra-bastion`](../../../add-infra-bastion/specs/infra-academy-estate-secrets-shells/spec.md) / [ADR 0021](../../../../../docs/adr/0021-maintenance-bastion-ssh.md): Terraform also creates empty shell `heavy-rental/ssh/bastion`.
+
 ## Purpose
 
 Terraform creates Secrets Manager **shells**. Values are branch 3 (`sync-secrets` / `sync-ssh-keys`).

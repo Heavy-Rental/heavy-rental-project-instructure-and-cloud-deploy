@@ -20,6 +20,12 @@ locals {
       : aws_iam_instance_profile.guest[app].name
     )
   }
+
+  bastion_instance_profile_name = (
+    local.is_academy
+    ? data.aws_iam_instance_profile.lab[0].name
+    : aws_iam_instance_profile.bastion[0].name
+  )
 }
 
 data "aws_iam_policy_document" "guest_assume" {
@@ -118,4 +124,50 @@ resource "aws_iam_instance_profile" "guest" {
   for_each = local.paid_guest_apps
   name     = "hr-paid-${each.key}"
   role     = aws_iam_role.guest[each.key].name
+}
+
+# Maintenance bastion: SSM + describe hop targets. No ECR, no app secrets.
+resource "aws_iam_role" "bastion" {
+  count              = local.is_actual ? 1 : 0
+  name               = "hr-paid-bastion"
+  assume_role_policy = data.aws_iam_policy_document.guest_assume[0].json
+
+  tags = {
+    Name = "hr-paid-bastion"
+    Role = "bastion"
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "bastion_ssm" {
+  count      = local.is_actual ? 1 : 0
+  role       = aws_iam_role.bastion[0].name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+resource "aws_iam_role_policy" "bastion_app" {
+  count = local.is_actual ? 1 : 0
+  name  = "hr-paid-bastion-app"
+  role  = aws_iam_role.bastion[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "ListHopTargets"
+        Effect = "Allow"
+        Action = [
+          "ec2:DescribeInstances",
+          "ec2:DescribeTags",
+          "autoscaling:DescribeAutoScalingGroups",
+        ]
+        Resource = "*"
+      },
+    ]
+  })
+}
+
+resource "aws_iam_instance_profile" "bastion" {
+  count = local.is_actual ? 1 : 0
+  name  = "hr-paid-bastion"
+  role  = aws_iam_role.bastion[0].name
 }

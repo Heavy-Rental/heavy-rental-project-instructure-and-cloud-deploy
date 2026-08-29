@@ -24,7 +24,7 @@ Use the GitHub **org or user** that owns this repo (the part before `/heavy-rent
 3. Attaches **AdministratorAccess** to that **runner** role so first `terraform apply` is not `AccessDenied`
 4. Prints the role ARN
 
-EC2 guests do **not** use this role. Terraform later creates `hr-paid-{portal,rest,haystack,neo4j}` for them.
+EC2 guests do **not** use this role. Terraform later creates `hr-paid-{portal,rest,haystack,neo4j,bastion}` for them.
 
 ### Option B — AWS Console
 
@@ -62,7 +62,7 @@ GitHub **cannot** create Environments from git.
 
 Do **not** use repository-wide secrets for this. Use the **Environment** so academy Vocareum keys cannot mix with paid.
 
-4. Environment **variable** `AWS_REGION` = `us-east-1`
+4. Environment **variable** `AWS_REGION` = `us-east-1`. Optional (same names as academy, this Environment’s copies): `ALARM_EMAIL`, `BASTION_SSH_CIDRS` (your public IPv4 `/32`, comma-separated; empty = SSM onto `hr-bastion`; **not** `0.0.0.0/0`).
 5. Environment **secrets** (app data only — same names as academy):
 
    - `SPRING_DATASOURCE_PASSWORD` (≥ 8) — required for `apply`
@@ -100,4 +100,4 @@ Portal / REST / Haystack **images** are a later `deploy-projects`, not part of `
 - Sample trust + policy: [`samples/github-oidc-paid.json`](samples/github-oidc-paid.json)
 - Operator walkthrough: [`../OPERATOR-GUIDE.md`](../OPERATOR-GUIDE.md)
 - Paid pipeline spec: [`../specification/pipelines/infra-paid.md`](../specification/pipelines/infra-paid.md)
-- ADR [0017](adr/0017-two-actions-academy-paid.md), [0019](adr/0019-separate-job-graphs.md)
+- ADR [0017](adr/0017-two-actions-academy-paid.md), [0019](adr/0019-separate-job-graphs.md), [0021](adr/0021-maintenance-bastion-ssh.md) (`hr-paid-bastion`)

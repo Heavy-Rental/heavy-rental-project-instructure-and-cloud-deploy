@@ -63,3 +63,17 @@ variable "alarm_email" {
   default     = ""
   description = "Optional SNS email for CloudWatch alarms. Empty = topic only, no subscription. From Environment ALARM_EMAIL."
 }
+
+variable "bastion_ssh_cidrs" {
+  type        = list(string)
+  default     = []
+  description = "IPv4 CIDRs allowed to SSH to hr-bastion. Empty = SSM onto the bastion, then SSH to guests. Never 0.0.0.0/0. From Environment BASTION_SSH_CIDRS."
+
+  validation {
+    condition = alltrue([
+      for c in var.bastion_ssh_cidrs :
+      can(cidrhost(c, 0)) && !contains(["0.0.0.0/0", "::/0"], c)
+    ])
+    error_message = "bastion_ssh_cidrs must be IPv4 CIDR blocks and must not include 0.0.0.0/0."
+  }
+}

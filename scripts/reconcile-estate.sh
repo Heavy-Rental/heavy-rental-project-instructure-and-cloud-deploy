@@ -201,7 +201,8 @@ import_account_scoped() {
 
   for secret in \
     heavy-rental/portal heavy-rental/rest heavy-rental/haystack heavy-rental/neo4j \
-    heavy-rental/ssh/portal heavy-rental/ssh/rest heavy-rental/ssh/haystack heavy-rental/ssh/neo4j
+    heavy-rental/ssh/portal heavy-rental/ssh/rest heavy-rental/ssh/haystack heavy-rental/ssh/neo4j \
+    heavy-rental/ssh/bastion
   do
     if aws secretsmanager describe-secret --secret-id "${secret}" >/dev/null 2>&1; then
       restore_secret_if_deleted "${secret}"
@@ -267,6 +268,10 @@ import_observe() {
       import_one "aws_cloudwatch_metric_alarm.asg_inservice[\"${key}\"]" "hr-asg-${key}-inservice"
     fi
   done
+  if aws cloudwatch describe-alarms --alarm-names "hr-bastion-status" \
+    --query 'MetricAlarms[0].AlarmName' --output text 2>/dev/null | grep -q "hr-bastion-status"; then
+    import_one "aws_cloudwatch_metric_alarm.bastion_status" "hr-bastion-status"
+  fi
 
   flow="$(aws_text ec2 describe-flow-logs \
     --filter Name=tag:Name,Values="${OBSERVE_FLOW}" \
@@ -281,6 +286,11 @@ import_unique_regional() {
       import_one "aws_autoscaling_group.${name#asg-}" "${name}"
     fi
   done
+
+  import_one aws_instance.bastion "$(aws_text ec2 describe-instances \
+    --filters "Name=tag:Name,Values=hr-bastion" \
+      "Name=instance-state-name,Values=pending,running,stopping,stopped" \
+    --query 'Reservations[].Instances[].InstanceId | [0]')"
 
   if aws rds describe-db-subnet-groups --db-subnet-group-name heavy-rental-data >/dev/null 2>&1; then
     import_one aws_db_subnet_group.data heavy-rental-data
@@ -428,6 +438,7 @@ import_security_groups() {
     [haystack]=hr-haystack
     [rds]=hr-rds
     [neo4j]=hr-neo4j
+    [bastion]=hr-bastion
   )
   declare -A IDS=()
   for key in "${!NAMES[@]}"; do
@@ -503,6 +514,16 @@ aws_vpc_security_group_ingress_rule.neo4j_bolt_from_vpc|neo4j|0|tcp|7687|7687|ci
 aws_vpc_security_group_ingress_rule.neo4j_browser_from_haystack|neo4j|0|tcp|7474|7474|sg:haystack
 aws_vpc_security_group_egress_rule.neo4j_https|neo4j|1|tcp|443|443|cidr:0.0.0.0/0
 aws_vpc_security_group_egress_rule.neo4j_http|neo4j|1|tcp|80|80|cidr:0.0.0.0/0
+aws_vpc_security_group_egress_rule.bastion_https|bastion|1|tcp|443|443|cidr:0.0.0.0/0
+aws_vpc_security_group_egress_rule.bastion_http|bastion|1|tcp|80|80|cidr:0.0.0.0/0
+aws_vpc_security_group_egress_rule.bastion_ssh_to_portal|bastion|1|tcp|22|22|sg:portal
+aws_vpc_security_group_egress_rule.bastion_ssh_to_rest|bastion|1|tcp|22|22|sg:rest
+aws_vpc_security_group_egress_rule.bastion_ssh_to_haystack|bastion|1|tcp|22|22|sg:haystack
+aws_vpc_security_group_egress_rule.bastion_ssh_to_neo4j|bastion|1|tcp|22|22|sg:neo4j
+aws_vpc_security_group_ingress_rule.portal_ssh_from_bastion|portal|0|tcp|22|22|sg:bastion
+aws_vpc_security_group_ingress_rule.rest_ssh_from_bastion|rest|0|tcp|22|22|sg:bastion
+aws_vpc_security_group_ingress_rule.haystack_ssh_from_bastion|haystack|0|tcp|22|22|sg:bastion
+aws_vpc_security_group_ingress_rule.neo4j_ssh_from_bastion|neo4j|0|tcp|22|22|sg:bastion
 RULES
 }
 
