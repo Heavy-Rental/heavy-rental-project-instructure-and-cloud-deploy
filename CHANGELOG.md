@@ -19,7 +19,7 @@ Delivered on this repo. Operator walkthrough: [`OPERATOR-GUIDE.md`](OPERATOR-GUI
 - Two NAT Gateways (one per public AZ). Guest count **8 EC2**. No NAT instance (ADR 0010)
 - Public portal ALB `:80` and internet-facing REST ALB `:8080` (ADR 0018). Haystack ALB, Bolt NLB, RDS stay internal
 - `APP_CORS_ALLOWED_ORIGINS` includes portal origin and `http://<rest_alb_dns>:8080`
-- Remote Terraform state: S3 `use_lockfile=true` (no DynamoDB lock table)
+- Remote Terraform state: S3 `use_lockfile=true`. Academy `assert-lab` / `ensure-backend` fail closed on `voc-cancel-cred` (HeadBucket 403 is not treated as a missing bucket)
 - Academy guests: `LabInstanceProfile` / `LabRole` only. Paid guests: `hr-paid-*`
 - Observe: CloudTrail + flow logs + ALB access logs to S3; dashboard `heavy-rental-academy` or `heavy-rental-actual`. No CloudTrail → CloudWatch Logs
 - ASG health stays `EC2` (ADR 0008) — unhealthy ALB targets do not replace instances

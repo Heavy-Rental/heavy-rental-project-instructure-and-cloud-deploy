@@ -47,15 +47,15 @@ No Start Lab. No Vocareum keys.
 
 OIDC one-time: [`OIDC-PAID.md`](OIDC-PAID.md) ([sample JSON](samples/github-oidc-paid.json)). Guests use `hr-paid-*`. Ansible file transfer uses `heavy-rental-ssm-<account>-actual`, not the tfstate bucket.
 
-### Apply fails: `voc-cancel-cred` / failed to persist state
+### Plan or apply fails: `voc-cancel-cred` / CreateBucket / failed to persist state
 
-Vocareum cancelled the session (`policy/voc-cancel-cred`) after Terraform created resources (often the first Multi-AZ RDS). S3 `PutObject` on `estate/terraform.tfstate` is an explicit deny. The runner `errored.tfstate` is not kept.
+Vocareum cancelled the session (`policy/voc-cancel-cred`). That is an explicit deny. `sts` can still succeed. On **plan** / **bootstrap** the **Ensure S3 state backend** job then fails `s3:CreateBucket` for `heavy-rental-tfstate-<account>-academy`. On a long **apply**, S3 `PutObject` of `estate/terraform.tfstate` is denied after resources already exist. The runner `errored.tfstate` is not kept.
 
-1. Start Lab. Paste fresh AWS Details (do not reuse cancelled Environment `AWS_*` secrets).
-2. Re-run **`action=apply`**. The job clears a leftover lock file and **imports** named leftovers before plan.
+1. Start Lab. Paste fresh AWS Details (all three fields; do not reuse cancelled Environment `AWS_*` secrets).
+2. Re-run the same `action`. For apply, the job clears a leftover lock file and **imports** named leftovers before plan.
 3. If reconcile reports two `heavy-rental-academy` VPCs: **`destroy`** then **`apply`**.
 
-See [`../OPERATOR-GUIDE.md`](../OPERATOR-GUIDE.md) — *Apply fails: Vocareum cancelled credentials* and *named object already exists*.
+See [`../OPERATOR-GUIDE.md`](../OPERATOR-GUIDE.md) — *Plan or apply fails: Vocareum cancelled credentials* and *named object already exists*.
 
 ### Apply fails: `device index 0 … cannot be detached`
 

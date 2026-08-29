@@ -13,7 +13,14 @@ The workflow SHALL accept `aws_access_key_id`, `aws_secret_access_key`, and `aws
 - GIVEN a live Vocareum Start Lab
 - WHEN the operator runs the Academy workflow and pastes the three AWS Details values
 - THEN `assert-lab` calls `sts get-caller-identity` successfully
+- AND `assert-lab` probes a live service call (`ec2:DescribeAvailabilityZones`) so `voc-cancel-cred` fails this job instead of later `s3:CreateBucket`
 - AND job logs do not print the three values in plaintext (`***` after mask)
+
+#### Scenario: Cancelled Vocareum keys fail assert-lab
+- GIVEN `sts get-caller-identity` succeeds and identity policy `voc-cancel-cred` is attached
+- WHEN `assert-lab` runs
+- THEN the job fails with a message to Start Lab and paste fresh AWS Details
+- AND `ensure-backend` does not run
 
 #### Scenario: Empty form uses Environment
 - GIVEN Environment `academy` has the three secrets set

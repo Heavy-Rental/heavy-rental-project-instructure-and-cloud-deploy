@@ -139,7 +139,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   ensure-backend:
-    name: Ensure S3 + DynamoDB state backend
+    name: Ensure S3 state backend
     needs: [assert-lab]
     if: inputs.action == 'plan' || inputs.action == 'bootstrap' || inputs.action == 'apply'
     runs-on: ubuntu-latest
@@ -162,19 +162,7 @@ jobs:
       - name: Create backend if missing
         env:
           BUCKET: ${{ needs.assert-lab.outputs.bucket }}
-        working-directory: terraform/backend
-        run: |
-          set -euo pipefail
-          if aws s3api head-bucket --bucket "${BUCKET}" 2>/dev/null; then
-            echo "State bucket ${BUCKET} already exists (S3 native lockfile; no DynamoDB)."
-            exit 0
-          fi
-          echo "Creating state backend (bucket=${BUCKET} profile=${DEPLOYMENT})."
-          terraform init -input=false
-          terraform apply -auto-approve -input=false
-          if [ -f terraform.tfstate ]; then
-            aws s3 cp terraform.tfstate "s3://${BUCKET}/backend/terraform.tfstate"
-          fi
+        run: ./scripts/ensure-backend.sh "${BUCKET}"
 
   terraform:
     name: Terraform estate

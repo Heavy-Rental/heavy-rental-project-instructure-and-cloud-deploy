@@ -2,6 +2,7 @@
 # Delete estate leftovers that Terraform state cannot see (lost state,
 # cancelled credentials, or a second VPC from a failed re-apply). Idempotent.
 # Does not delete the S3 state bucket or Vocareum IAM.
+# Deletes leftover `heavy-rental-tfstate-lock-<deployment>` if present (unused).
 #
 # Requires DEPLOYMENT=academy|actual. Observe leftovers use that profile's
 # names. VPC tag and RDS identifiers stay Terraform names on both profiles.
@@ -254,6 +255,16 @@ delete_observe() {
   fi
 }
 
+delete_leftover_tfstate_lock() {
+  local table="heavy-rental-tfstate-lock-${DEPLOYMENT}"
+  if aws dynamodb describe-table --table-name "${table}" >/dev/null 2>&1; then
+    echo "Deleting leftover state lock table ${table}."
+    aws dynamodb delete-table --table-name "${table}" >/dev/null || true
+  else
+    echo "State lock table ${table}: already gone."
+  fi
+}
+
 delete_asgs
 delete_lbs_and_tgs
 
@@ -272,6 +283,7 @@ delete_rds
 delete_secrets_and_ecr
 delete_launch_templates
 delete_observe
+delete_leftover_tfstate_lock
 
 for vpc in $(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=heavy-rental-academy" \
   --query 'Vpcs[].VpcId' --output text 2>/dev/null | tr '\t' ' '); do
