@@ -20,6 +20,20 @@ On a successful `action=apply`, Terraform SHALL create a CloudTrail named `heavy
 ### Requirement: CloudWatch alarms and dashboard
 Apply SHALL create CloudWatch metric alarms for public and internal ALB 5xx and unhealthy hosts, both RDS CPU and free storage, and `GroupInServiceInstances` on `asg-portal`, `asg-rest`, `asg-haystack`, and `asg-neo4j`. Apply SHALL create dashboard `heavy-rental-academy`. RDS `monitoring_interval` SHALL remain `0`.
 
+### Requirement: Guest Docker logs to CloudWatch Logs
+Ansible `guest_base` SHALL probe `logs:CreateLogStream` on `/heavy-rental/{portal,rest,haystack,neo4j}` using the instance profile. When allowed, it SHALL set the Docker daemon log driver to `awslogs` for that group. It SHALL NOT install the CloudWatch Agent. It SHALL NOT create an IAM role on Academy. If the probe is denied, guests SHALL keep the `json-file` driver so compose still starts. Paid `hr-paid-*` roles SHALL allow `logs:CreateLogStream` and `logs:PutLogEvents` on their own log group.
+
+#### Scenario: Awslogs when PutLogEvents is allowed
+- GIVEN apply created `/heavy-rental/portal` and the guest instance profile can CreateLogStream
+- WHEN `configure-only` or `deploy-projects` runs `guest_base`
+- THEN `/etc/docker/daemon.json` uses `log-driver` `awslogs` and `awslogs-group` `/heavy-rental/portal`
+
+#### Scenario: Json-file when LabRole denies logs
+- GIVEN CreateLogStream on `/heavy-rental/neo4j` is denied
+- WHEN `guest_base` runs on a neo4j guest
+- THEN Ansible does not fail the play
+- AND the Docker log driver is not switched to `awslogs`
+
 #### Scenario: Dashboard and ALB 5xx alarm exist
 - GIVEN apply succeeded
 - WHEN the operator opens CloudWatch

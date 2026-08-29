@@ -20,7 +20,7 @@ Guests already run as **`LabInstanceProfile` → `LabRole`**. Observe must keep 
 - `aws_iam_role` / changing LabRole’s trust policy
 - CloudTrail `cloud_watch_logs_role_arn` (Vocareum deny + needs a role CloudTrail can assume; LabRole trusts EC2, not CloudTrail)
 - VPC flow logs → CloudWatch Logs (needs `vpc-flow-logs.amazonaws.com` trust; we cannot edit LabRole)
-- CloudWatch Agent / `awslogs` Docker driver (LabRole may lack `logs:PutLogEvents`; guests keep `docker logs` over SSM)
+- CloudWatch Agent (LabRole may lack `logs:PutLogEvents`). Docker `awslogs` is allowed via the instance profile; Ansible skips it if CreateLogStream is denied
 - RDS `monitoring_interval` / Performance Insights
 - X-Ray, AMP/Grafana, OpenSearch, GuardDuty, Config, AWS Budgets
 - A new workflow `action`
@@ -32,7 +32,7 @@ Guests already run as **`LabInstanceProfile` → `LabRole`**. Observe must keep 
 3. **VPC flow logs to S3** (`vpc-flow/`). S3 destination does not use `iam_role_arn`.
 4. **Alarms** on ALB 5xx / unhealthy hosts, RDS CPU / free storage, ASG `GroupInServiceInstances`. Standard 5-minute metrics.
 5. **Dashboard** `heavy-rental-academy` for the same signals (including p99 target response time).
-6. **Log group shells** `/heavy-rental/{portal,rest,haystack,neo4j}` only. No agent.
+6. **Log groups** `/heavy-rental/{portal,rest,haystack,neo4j}`. Docker `awslogs` (no CloudWatch Agent). Ansible probes LabRole / `hr-paid-*` before switching the daemon log driver.
 7. **`LabRole` check:** Terraform continues to data-source `LabRole` / `LabInstanceProfile` and fails plan unless the profile’s role is `LabRole`. Observe creates no other role.
 8. **Conflict order:** OpenSpec → OpenSPDD Safeguards → ADR 0005 + 0015 → `.tf` / YAML.
 
