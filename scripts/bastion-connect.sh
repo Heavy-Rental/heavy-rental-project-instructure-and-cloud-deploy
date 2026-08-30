@@ -30,11 +30,15 @@ echo "  region:     ${REGION}"
 echo
 echo "1) SSM onto the bastion (works with empty BASTION_SSH_CIDRS):"
 echo "     aws ssm start-session --target ${id} --region ${REGION}"
+echo "   The session becomes ec2-user (private keys + Host aliases). Do not write SSH config."
+echo "   Secrets Manager private_key_pem is the *private* key, not the public .pub line."
 echo "   Then on the bastion:"
 echo "     hr-ssh-targets          # refresh + list Host aliases"
 echo "     ssh portal              # or rest, haystack, neo4j"
 echo "     ssh rest-2              # second guest of that role"
 echo "     ssh haystack-1a         # by AZ suffix"
+echo "     hr-ssh portal           # same hop if the shell is still ssm-user"
+echo "     hr-ssh-pull-keys        # re-read private keys from Secrets Manager"
 echo
 if [ -n "${public_ip}" ] && [ "${public_ip}" != "None" ]; then
   echo "2) ProxyJump from a laptop (requires BASTION_SSH_CIDRS to include your /32):"

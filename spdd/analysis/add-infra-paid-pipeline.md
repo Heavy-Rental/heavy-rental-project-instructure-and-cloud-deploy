@@ -10,7 +10,7 @@ Paid was selectable on the academy Action (ADR 0016), so Vocareum form keys exis
 
 A later shared `workflow_call` still ran one process for both profiles. Leftover scripts looked up `heavy-rental-academy` observe names on paid destroy.
 
-`hr-alb-rest` is internal, so Spring is not reachable from the internet (direct clients, mobile, webhooks). REST instances already have NAT egress.
+`hr-alb-rest` **was** internal, so Spring was not reachable from the internet (direct clients, mobile, webhooks). REST instances already had NAT egress.
 
 Paid Ansible over SSM must not give guests write on `estate/terraform.tfstate`.
 
@@ -56,5 +56,6 @@ Paid Ansible over SSM must not give guests write on `estate/terraform.tfstate`.
 - `aws-infra-estate.yml` does not exist.
 - Paid apply creates `hr-paid-*` (apps; **current** also `hr-paid-bastion`, ADR 0021), `-actual` state, and `heavy-rental-ssm-<account>-actual`.
 - `hr-alb-rest` is internet-facing; REST instances stay private with NAT egress.
+- Portal nginx `/api` hairpins to the public REST DNS via NAT; `sg-portal` egresses TCP 8080 to `0.0.0.0/0` as well as to `sg-alb-rest`.
 - `heavy-rental/rest` CORS includes portal and REST ALB origins.
 - Academy trail remains `heavy-rental-academy` (no replace). Paid trail is `heavy-rental-actual`. Paid sweep does not query `heavy-rental-academy` trail/dashboard/flow.

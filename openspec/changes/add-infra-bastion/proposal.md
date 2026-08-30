@@ -7,7 +7,7 @@ App guests have no public IP. Everyday operate is SSM. Operators still need a su
 ## What Changes
 
 - Terraform `hr-bastion` (single EC2) in a public subnet, `sg-bastion`, hop `:22` from that SG onto the four app SGs, SM shell `heavy-rental/ssh/bastion`, paid `hr-paid-bastion`.
-- `sync-ssh-keys` installs the bastion public key on all guests and the hop **private** key only on the bastion.
+- `sync-ssh-keys` writes `private_key_pem` (**private** key) + `public_key` to `heavy-rental/ssh/*`, installs the public key on all guests, and puts the hop **private** key plus copies of the four role private keys on the bastion.
 - `stop` / sweep / reconcile / destroy include `hr-bastion`.
 - Ansible compose playbooks do not target `bastion`.
 - ADR 0021, operator helper `scripts/bastion-connect.sh`.

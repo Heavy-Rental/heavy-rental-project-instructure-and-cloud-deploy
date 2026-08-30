@@ -11,7 +11,7 @@ Reference studies: `heavy-rental-project-pipeline-development/cloud-deployment-f
 | Concern | This repo? |
 | --- | --- |
 | VPC, subnets, NAT Gateways, four app ASGs, `hr-bastion` (single EC2), ALBs, RDS, NLB, SM shells | Yes — Terraform |
-| Fill SM JSON, guest Docker / `.env` / compose, PEMs after InService + hop key on `hr-bastion` | Yes — scripts + Ansible (configuration). Ansible does not compose onto the bastion |
+| Fill SM JSON, guest Docker / `.env` / compose, SSH keys after InService (`private_key_pem` = private key; hop + role private keys on `hr-bastion` only) | Yes — scripts + Ansible (configuration). Ansible does not compose onto the bastion |
 | Redeploy a new portal / REST / Haystack CI image | Day-to-day: app CD. Optional first-compose: `action=deploy-projects` (after apply) |
 | Public AWS | Yes — `aws-infra-paid.yml`, Environment `AWS_ACTUAL`, OIDC (ADR 0017) |
 | Operate after go-live | SSM, break-glass SSH via `hr-bastion`, `stop`, `destroy` |
@@ -31,7 +31,7 @@ Conflict order: **OpenSpec scenarios → OpenSPDD Safeguards → ADR → YAML / 
 
 - Beginner walkthrough: [`../OPERATOR-GUIDE.md`](../OPERATOR-GUIDE.md)
 - Everyday run: [`../docs/BOOTSTRAP.md`](../docs/BOOTSTRAP.md)
-- Layout (including ALB health probes): [`../docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md)
+- Layout (ALB health, portal `/api` NAT hairpin, outbound-only NAT): [`../docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md)
 - Program plan: [`../docs/IMPLEMENTATION-PLAN.md`](../docs/IMPLEMENTATION-PLAN.md)
 
 ## Walkthroughs

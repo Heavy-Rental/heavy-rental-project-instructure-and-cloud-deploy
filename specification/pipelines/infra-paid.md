@@ -24,7 +24,7 @@ Same Terraform root (`terraform/academy/`, `var.deployment=actual`) and the same
 | **Terraform** | Architecture and cloud **resources**: VPC, subnets, IGW, two NAT Gateways, four app ASGs + LTs, **`hr-bastion`** (single EC2), public portal ALB, **internet-facing REST ALB :8080**, internal Haystack ALB, Bolt NLB, two Multi-AZ RDS, SM **shells**, S3 state, CloudTrail (S3), VPC flow logs (S3), ALB access logs, CloudWatch alarms + dashboard, paid SSM bucket, `hr-paid-*` instance profiles (apps + bastion) |
 | **Ansible** | Guest **configuration** only: Docker/Compose, map SM → `.env`, pull/load a CI image, compose, portal nginx `/api`, RDS *logical* grants/extensions. **No** `terraform apply`, no create-ASG, no create-RDS |
 
-`sync-secrets` and `sync-ssh-keys` are shell wrappers (not Terraform). They write JSON / PEMs into shells Terraform already created.
+`sync-secrets` and `sync-ssh-keys` are shell wrappers (not Terraform). They write JSON / SSH key material into shells Terraform already created. `private_key_pem` is the **private** OpenSSH key (not the public `.pub`). Bastion gets hop + role private keys; app guests get public keys only. Paid `hr-paid-bastion` may `GetSecretValue` `heavy-rental/ssh/*` only.
 
 ## Actions
 
@@ -82,7 +82,7 @@ Put the role ARN on Environment `AWS_ACTUAL` as **variable** or **secret** `AWS_
 
 ## REST ALB
 
-`hr-alb-rest` is internet-facing on **:8080** (ADR 0018). `REST_BASE_URL=http://<rest_alb_dns>:8080`. `APP_CORS_ALLOWED_ORIGINS` is `http://<portal_alb_dns>,http://<rest_alb_dns>:8080`. Haystack stays internal. HTTPS is not this pipeline. This diverges from feasibility §6P (study said REST internal / no public 8080).
+`hr-alb-rest` is internet-facing on **:8080** (ADR 0018). `REST_BASE_URL=http://<rest_alb_dns>:8080`. `APP_CORS_ALLOWED_ORIGINS` is `http://<portal_alb_dns>,http://<rest_alb_dns>:8080`. Portal nginx `/api` hairpins to that public DNS via NAT; `sg-portal` egresses TCP 8080 to `0.0.0.0/0` as well as to `sg-alb-rest`. Haystack stays internal. HTTPS is not this pipeline. This diverges from feasibility §6P (study said REST internal / no public 8080).
 
 **Health:** `tg-rest` waits for `GET <instance-ip>:8080/actuator/health` matcher **`200-299`** (2xx). `GET /` is Spring 401 and is not healthy. `tg-haystack` waits for `GET <instance-ip>:8000/health` matcher **`200-299`**. Table: [`../../docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md). OpenSpec: [`../../openspec/changes/add-infra-paid-pipeline/specs/infra-estate-rest-alb/spec.md`](../../openspec/changes/add-infra-paid-pipeline/specs/infra-estate-rest-alb/spec.md).
 

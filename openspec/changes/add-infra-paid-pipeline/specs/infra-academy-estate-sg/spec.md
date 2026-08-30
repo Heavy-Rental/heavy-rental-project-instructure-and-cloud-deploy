@@ -25,7 +25,7 @@ Security groups implement AWS study §6.2 with ADR 0018: public ALBs are the por
 ### Requirement: East-west contract
 Terraform SHALL encode:
 
-- portal :80 from `sg-alb-public`
+- portal :80 from `sg-alb-public`; egress TCP 8080 to `sg-alb-rest` and to `0.0.0.0/0` (NAT hairpin to the public REST ALB DNS)
 - REST :8080 from the internet (`0.0.0.0/0`) and from `sg-portal` (via `sg-alb-rest`); instance SG ingress TCP 8080 from `sg-alb-rest` and egress TCP 8080 to `sg-alb-rest`; ingress TCP 5432 from `sg-rds`; egress 5432 to `sg-rds`; ingress and egress TCP 8000 with `sg-alb-haystack`; no egress 7687; no instance-SG pairing with `sg-portal` or `sg-haystack`
 - Haystack ALB :8000 from `sg-rest` and from `sg-alb-haystack`; egress TCP 8000 to `sg-rest`, `sg-alb-haystack`, and `sg-haystack`; not public
 - Haystack :8000 from `sg-alb-haystack`; ingress and egress TCP 5432 with `sg-rds`; ingress and egress TCP 7687 and 7474 with `sg-neo4j`
@@ -50,6 +50,12 @@ Terraform SHALL encode:
 - WHEN `sg-alb-rest` ingress is listed
 - THEN TCP 8080 from `sg-portal` is present
 - AND TCP 8080 from `0.0.0.0/0` is present
+
+#### Scenario: Portal hairpins to public REST ALB via NAT
+- GIVEN the estate is applied
+- WHEN `sg-portal` egress is listed
+- THEN TCP 8080 to `sg-alb-rest` is present
+- AND TCP 8080 to `0.0.0.0/0` is present
 
 #### Scenario: REST pairs with REST ALB on :8080 by security-group id
 - GIVEN the estate is applied

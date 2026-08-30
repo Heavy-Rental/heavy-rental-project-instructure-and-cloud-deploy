@@ -489,6 +489,7 @@ aws_vpc_security_group_ingress_rule.alb_public_http|alb_public|0|tcp|80|80|cidr:
 aws_vpc_security_group_egress_rule.alb_public_to_portal|alb_public|1|tcp|80|80|sg:portal
 aws_vpc_security_group_ingress_rule.portal_from_alb|portal|0|tcp|80|80|sg:alb_public
 aws_vpc_security_group_egress_rule.portal_to_rest_alb|portal|1|tcp|8080|8080|sg:alb_rest
+aws_vpc_security_group_egress_rule.portal_to_rest_public|portal|1|tcp|8080|8080|cidr:0.0.0.0/0
 aws_vpc_security_group_egress_rule.portal_https|portal|1|tcp|443|443|cidr:0.0.0.0/0
 aws_vpc_security_group_egress_rule.portal_http|portal|1|tcp|80|80|cidr:0.0.0.0/0
 aws_vpc_security_group_ingress_rule.alb_rest_from_portal|alb_rest|0|tcp|8080|8080|sg:portal

@@ -101,6 +101,17 @@ resource "aws_vpc_security_group_egress_rule" "portal_to_rest_alb" {
   referenced_security_group_id = aws_security_group.alb_rest.id
 }
 
+# Internet-facing REST ALB DNS resolves to public IPs. Private portal guests
+# hairpin via the same-AZ NAT Gateway; SG-to-SG does not match that dest.
+resource "aws_vpc_security_group_egress_rule" "portal_to_rest_public" {
+  security_group_id = aws_security_group.portal.id
+  ip_protocol       = "tcp"
+  from_port         = 8080
+  to_port           = 8080
+  cidr_ipv4         = "0.0.0.0/0"
+  description       = "Hairpin to internet-facing REST ALB :8080 via NAT"
+}
+
 resource "aws_vpc_security_group_egress_rule" "portal_https" {
   security_group_id = aws_security_group.portal.id
   ip_protocol       = "tcp"

@@ -13,7 +13,7 @@ When reality diverges, fix this prompt first — then update YAML / `.tf`.
 - Same Terraform root and Ansible playbooks. Same actions on both files.
 - Environment `AWS_ACTUAL` / state suffix `-actual`. Do not rename to `paid`.
 - Paid SSM bucket `heavy-rental-ssm-<account>-actual`; guests GetObject only. Academy keeps the tfstate bucket for SSM transfer.
-- REST ALB internet-facing :8080 in public subnets; REST instances private + NAT. Haystack / Bolt / RDS stay internal. Portal ALB stays public :80 only.
+- REST ALB internet-facing :8080 in public subnets; REST instances private + NAT. Portal nginx `/api` hairpins to the public REST DNS; `sg-portal` egresses TCP 8080 to `0.0.0.0/0` as well as to `sg-alb-rest`. Haystack / Bolt / RDS stay internal. Portal ALB stays public :80 only.
 - Academy still creates no `aws_iam_role`. Paid guests use `hr-paid-*`.
 - Observe trail/dashboard/flow-log leftover names follow `DEPLOYMENT` (`heavy-rental-academy` or `heavy-rental-actual`).
 - No HTTPS, no CloudTrail → Logs. This Action does not author portal/REST/Haystack **app** CD (those paid callers live in `heavy-rental-project-pipeline-development`).
