@@ -1,8 +1,8 @@
 # ADR 0015: Academy observe uses LabRole and S3 — no logging IAM
 
-- **Status:** Accepted (amended: guest Docker `awslogs`)
+- **Status:** Accepted (amended: guest Docker Engine `awslogs`)
 - **Date:** 2026-08-18
-- **Amended:** 2026-08-29
+- **Amended:** 2026-08-30
 - **Branch:** `HR-183-update-on-aws-infrastructure-pipeline-to-reuse-possible-aws-resource-during-creation`
 - **Related:** [0005](0005-labinstanceprofile-only.md), [0017](0017-two-actions-academy-paid.md)
 
@@ -21,11 +21,11 @@ AWS study §2.1 also says Vocareum **cannot** enable CloudWatch logging on the t
 3. VPC flow logs use **`log_destination_type = s3`**. Do **not** set `iam_role_arn` (including LabRole).
 4. ALB access logs use the same observe bucket (ELB service principal).
 5. CloudWatch **metric** alarms and a dashboard use the AWS/ApplicationELB, AWS/RDS, and AWS/AutoScaling namespaces, plus AWS/EC2 `StatusCheckFailed` on `hr-bastion` (ADR 0021). No extra role. No `GroupInServiceInstances` for a bastion ASG.
-6. Create log groups `/heavy-rental/{portal,rest,haystack,neo4j}`. Do **not** install the CloudWatch Agent. Guest Docker uses the **`awslogs` log driver** (dockerd on the host, instance profile) so container stdout lands in that app’s group. Ansible probes `logs:CreateLogStream` first; if LabRole denies it, guests stay on `json-file` so compose still starts. Paid `hr-paid-*` roles get `logs:CreateLogStream` / `logs:PutLogEvents` on their own group only. Still no new IAM on Academy.
+6. Create log groups `/heavy-rental/{portal,rest,haystack,neo4j}`. Do **not** install the CloudWatch Agent. Guest Docker uses the Docker Engine **`awslogs` log driver** (dockerd on the host, instance profile) so container stdout lands in that app’s group. Ansible probes `logs:CreateLogStream` first; if LabRole denies it, guests stay on `json-file` so compose still starts. `/etc/docker/daemon.json` uses Engine log-opts only (`awslogs-region`, `awslogs-group`, `tag`). Do **not** set ECS-only `awslogs-stream-prefix` — dockerd rejects that key and the unit fails to start. If dockerd still cannot start with the file, Ansible reverts to `json-file` and does **not** fail the play. Paid `hr-paid-*` roles get `logs:CreateLogStream` / `logs:PutLogEvents` on their own group only. Still no new IAM on Academy.
 
 ## Consequences
 
 - Apply works under the Vocareum federated user without CreateRole.
 - Audit and flow logs are in S3, not Logs Insights, until a paid account can attach a purpose-built role.
 - Operators watch the `heavy-rental-academy` dashboard and alarms (paid: `heavy-rental-actual`). Email needs `ALARM_EMAIL` plus a confirm click. Still no CloudTrail → CloudWatch Logs on either profile.
-- Guest app logs: CloudWatch Logs `/heavy-rental/{app}` when the instance profile can put events; otherwise `docker logs` over SSM. LabRole permissions stay whatever Vocareum attached.
+- Guest app logs: CloudWatch Logs `/heavy-rental/{app}` when the instance profile can `CreateLogStream` (probe) and `PutLogEvents` (driver delivery). Otherwise `docker logs` over SSM. LabRole permissions stay whatever Vocareum attached. A leftover invalid `daemon.json` is dropped before Docker starts so a re-run of `configure-only` / app CD can recover.

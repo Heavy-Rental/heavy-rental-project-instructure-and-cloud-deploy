@@ -1,6 +1,7 @@
 # Delta for infra-academy-ansible
 
 > **Later modified by** [`add-infra-academy-deploy-projects`](../../../add-infra-academy-deploy-projects/specs/infra-academy-ansible/spec.md): apply / configure-only stay on `configure.yml` (Docker + Neo4j). Missing REST/Haystack images do **not** fail those actions. `site.yml` is only `deploy-projects`.  
+> **Later modified by** [`add-infra-academy-observe`](../../../add-infra-academy-observe/specs/infra-academy-observe/spec.md) / [ADR 0015](../../../../../docs/adr/0015-academy-observe-no-iam.md): `guest_base` probes `logs:CreateLogStream` and may set Docker Engine `awslogs` (not ECS `awslogs-stream-prefix`). Denied probe or dockerd reject → `json-file`; the play SHALL NOT fail.  
 > **Later modified by** [`add-infra-bastion`](../../../add-infra-bastion/specs/infra-academy-bastion/spec.md) / [ADR 0021](../../../../../docs/adr/0021-maintenance-bastion-ssh.md): inventory may list group `bastion`; `configure.yml` and `site.yml` SHALL NOT target it. Compose groups stay `portal` / `rest` / `haystack` / `neo4j`.
 
 ## Purpose

@@ -8,7 +8,7 @@
 | Tool | Owns |
 | --- | --- |
 | **Terraform** | Architecture and cloud **resources**: VPC, subnets, IGW, two NAT Gateways, four app ASGs + LTs, **`hr-bastion`** (single EC2), public portal ALB, **internet-facing REST ALB :8080**, internal Haystack ALB, Bolt NLB, two Multi-AZ RDS, SM **shells**, S3 state, CloudTrail (S3), VPC flow logs (S3), ALB access logs, CloudWatch alarms + dashboard. Guests use **LabRole** / `LabInstanceProfile` only |
-| **Ansible** | Guest **configuration** only: Docker/Compose, map SM → `.env`, pull/load a CI image, compose, portal nginx `/api`, RDS *logical* grants/extensions. **No** `terraform apply`, no create-ASG, no create-RDS |
+| **Ansible** | Guest **configuration** only: Docker/Compose, map SM → `.env`, pull/load a CI image, compose, portal nginx `/api`, RDS *logical* grants/extensions. `guest_base` probes `logs:CreateLogStream` and may set Docker Engine `awslogs` (not ECS `awslogs-stream-prefix`); otherwise `json-file`. **No** `terraform apply`, no create-ASG, no create-RDS |
 
 `sync-secrets` and `sync-ssh-keys` are shell wrappers (not Terraform). They write JSON / SSH key material into shells Terraform already created. `private_key_pem` is the **private** OpenSSH key (not the public `.pub`). Bastion gets hop + role private keys; app guests get public keys only.
 
