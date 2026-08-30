@@ -52,7 +52,7 @@ The Spring Boot REST ALB is reachable from the internet on :8080. REST guests ke
 - AND TCP 8080 to `sg-alb-rest` is present
 
 ### Requirement: CORS includes the public REST origin
-`sync-secrets` SHALL set `APP_CORS_ALLOWED_ORIGINS` to the public portal origin and `http://<rest_alb_dns>:8080` so a browser can call the REST ALB directly as well as via portal `/api`.
+`sync-secrets` SHALL set `APP_CORS_ALLOWED_ORIGINS` to the public portal origin and `http://<rest_alb_dns>:8080` so a browser can call the REST ALB **directly**. Portal `/api` is same-origin; guest nginx SHALL omit `Origin` (`proxy_set_header Origin ""`) and SHALL NOT use this allow-list for the hairpin (ADR 0018 amendment 2026-08-30).
 
 #### Scenario: REST CORS includes both ALBs
 - GIVEN `sync-secrets` succeeded

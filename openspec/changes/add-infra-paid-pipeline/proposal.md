@@ -15,7 +15,7 @@ Paid Ansible over SSM must not reuse the Terraform state bucket: guests would be
 - No `aws-infra-estate.yml`. Leftover observe names follow `DEPLOYMENT`.
 - Paid-only SSM transfer bucket + guest `s3:GetObject` (Ansible over SSM must not use the tfstate bucket).
 - REST ALB is internet-facing in public subnets; TCP 8080 from `0.0.0.0/0`. Haystack stays internal. Portal `/api` still proxies to `REST_BASE_URL` (public DNS; hairpin via NAT). `sg-portal` egresses TCP 8080 to `0.0.0.0/0` as well as to `sg-alb-rest`.
-- `sync-secrets` CORS includes the public REST origin. Observe names are `heavy-rental-academy` or `heavy-rental-actual`.
+- `sync-secrets` CORS includes the public REST origin for **direct** REST ALB browser calls. Portal nginx `/api` omits `Origin`. Observe names are `heavy-rental-academy` or `heavy-rental-actual`.
 - OpenSpec, OpenSPDD, ADR 0017 (two Actions) and ADR 0018 (public REST ALB).
 
 ## Capabilities
@@ -30,7 +30,7 @@ Paid Ansible over SSM must not reuse the Terraform state bucket: guests would be
 - `infra-academy-scope`: academy workflow is Vocareum-only again; paid is a different file
 - `infra-academy-paid-profile`: isolation remains; “one Action, two profiles” is retired
 - `infra-academy-estate-sg`: REST ALB may accept internet :8080; `sg-portal` egress TCP 8080 to `0.0.0.0/0` for the NAT hairpin; still no public 8000/5432/7687
-- `infra-academy-sync-secrets`: `APP_CORS_ALLOWED_ORIGINS` includes portal and REST ALB origins
+- `infra-academy-sync-secrets`: `APP_CORS_ALLOWED_ORIGINS` includes portal and REST ALB origins (direct REST ALB callers; portal `/api` omits `Origin`)
 - `infra-academy-observe`: trail / dashboard / flow-log name follows `deployment` (`heavy-rental-academy` unchanged on academy)
 
 ## Impact

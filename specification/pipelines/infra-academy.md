@@ -74,7 +74,7 @@ Layout table: [`../../docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md). ASGs s
 
 ## REST ALB
 
-`hr-alb-rest` is internet-facing on **:8080** (ADR 0018). `REST_BASE_URL=http://<rest_alb_dns>:8080`. `APP_CORS_ALLOWED_ORIGINS` is `http://<portal_alb_dns>,http://<rest_alb_dns>:8080`. Portal nginx `/api` hairpins to that public DNS via NAT; `sg-portal` egresses TCP 8080 to `0.0.0.0/0` as well as to `sg-alb-rest`. Without the CIDR rule, `/api` returns **504**. Haystack stays internal. HTTPS is not this pipeline. Same contract as [`infra-paid.md`](infra-paid.md). Diagrams: [`../../docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md#portal-api-hairpin-through-nat).
+`hr-alb-rest` is internet-facing on **:8080** (ADR 0018). `REST_BASE_URL=http://<rest_alb_dns>:8080`. `APP_CORS_ALLOWED_ORIGINS` is `http://<portal_alb_dns>,http://<rest_alb_dns>:8080` for **direct** REST ALB browser calls. Portal nginx `/api` is same-origin: it hairpins to that public DNS via NAT, sets `Host $proxy_host`, and **omits `Origin`**. `sg-portal` egresses TCP 8080 to `0.0.0.0/0` as well as to `sg-alb-rest`. Without the CIDR rule, `/api` returns **504**. If nginx forwards `Origin` and the address bar is not exactly the portal origin, `GET /api/auth/getBearerToken` is 403 `Invalid CORS request` and login is 401. Haystack stays internal. HTTPS is not this pipeline. Same contract as [`infra-paid.md`](infra-paid.md). Diagrams: [`../../docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md#portal-api-hairpin-through-nat).
 
 ## Specs
 

@@ -132,7 +132,7 @@ Terraform in `terraform/academy/` (see [`ARCHITECTURE.md`](ARCHITECTURE.md) and 
    | Secret id | Required fields |
    | --- | --- |
    | `heavy-rental/portal` | `REST_BASE_URL`, `STRIPE_PUBLISHABLE_KEY`, `VITE_STRIPE_PUBLISHABLE_KEY` (same `pk_`) |
-   | `heavy-rental/rest` | `POSTGRES_*` / `SPRING_DATASOURCE_*` plus app aliases, `HAYSTACK_BASE_URL`, `APP_CORS_ALLOWED_ORIGINS` (`http://<portal_alb>,http://<rest_alb>:8080`, ADR 0018), Stripe trio, `APP_JWT_SECRET`, optional OneMap |
+   | `heavy-rental/rest` | `POSTGRES_*` / `SPRING_DATASOURCE_*` plus app aliases, `HAYSTACK_BASE_URL`, `APP_CORS_ALLOWED_ORIGINS` (`http://<portal_alb>,http://<rest_alb>:8080` for **direct** REST ALB callers; portal `/api` omits `Origin`, ADR 0018), Stripe trio, `APP_JWT_SECRET`, optional OneMap |
    | `heavy-rental/haystack` | Haystack RDS `POSTGRES_*` / aliases / `DATABASE_URL`, `SOURCE_*` (SoR), `TARGET_*` (Haystack RDS), `NEO4J_URI` / user / password, `NEO4J_POPULATE_URL` (`http://neo4j-populate:8089/v1/populate`, Compose-only), `FLEET_BACKEND=sql`, `NEO4J_BACKEND=bolt`, optional `LLM_API_KEY`. Ansible aliases `SOURCE_USER` / `PG*` / `NEO4J_POPULATE_TRIGGER_URL` at compose |
    | `heavy-rental/neo4j` | `NEO4J_USER`, `NEO4J_PASSWORD` |
 

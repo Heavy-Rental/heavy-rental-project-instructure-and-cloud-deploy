@@ -5,7 +5,7 @@
 ### Requirement: Required app fields
 On `action=apply` and `action=configure-only`, after Terraform has created the shells (or they already exist), the workflow SHALL `put-secret-value` for `heavy-rental/{portal,rest,haystack,neo4j}` with the fields in AWS study §8.2 as amended by ADR 0018.
 
-`heavy-rental/portal` SHALL contain `REST_BASE_URL` equal to `http://<rest_alb_dns>:8080` (internet-facing REST ALB). `heavy-rental/rest` SHALL contain `APP_CORS_ALLOWED_ORIGINS` equal to `http://<portal_alb_dns>,http://<rest_alb_dns>:8080`. This **replaces** the CORS clause that listed only the portal origin.
+`heavy-rental/portal` SHALL contain `REST_BASE_URL` equal to `http://<rest_alb_dns>:8080` (internet-facing REST ALB). `heavy-rental/rest` SHALL contain `APP_CORS_ALLOWED_ORIGINS` equal to `http://<portal_alb_dns>,http://<rest_alb_dns>:8080` for **direct** REST ALB browser calls. This **replaces** the CORS clause that listed only the portal origin. Portal nginx `/api` omits `Origin` and does not use that list (ADR 0018 amendment 2026-08-30).
 
 #### Scenario: Portal and REST URLs come from Terraform
 - GIVEN estate outputs exist

@@ -99,7 +99,7 @@ flowchart TB
 ## Traffic
 
 Browser → public portal ALB → portal → **NAT Gateway** → public REST ALB `:8080` → REST → SoR RDS.  
-Internet clients may also hit the REST ALB `:8080` directly (`REST_BASE_URL`). `sync-secrets` sets `APP_CORS_ALLOWED_ORIGINS` to the portal origin and `http://<rest_alb_dns>:8080` ([`../specification/pipelines/infra-secrets.md`](../specification/pipelines/infra-secrets.md)).  
+Internet clients may also hit the REST ALB `:8080` directly (`REST_BASE_URL`). `sync-secrets` sets `APP_CORS_ALLOWED_ORIGINS` to the portal origin and `http://<rest_alb_dns>:8080` for **those direct browser calls** ([`../specification/pipelines/infra-secrets.md`](../specification/pipelines/infra-secrets.md)). Portal `/api` does not use that allow-list.  
 REST → internal Haystack ALB → Haystack → Haystack RDS + Bolt NLB → Neo4j.  
 On `asg-haystack`, `postgres-haystack-sync` merges SoR RDS → Haystack RDS (`postgres_fdw`, `sg-rds` self :5432). `neo4j-populate` reads Haystack RDS and writes Bolt (`NEO4J_URI`). HTTP `:8089` is Compose DNS only ([ADR 0020](adr/0020-haystack-devcontainer-workers.md)).  
 Private outbound HTTPS → the **NAT Gateway in the same AZ**. S3 via gateway endpoint (no NAT). If AZ-0 dies, AZ-1 guests keep outbound. NAT Gateways bill until `action=destroy`; session end and `action=stop` do not pause them.
@@ -108,7 +108,7 @@ Private outbound HTTPS → the **NAT Gateway in the same AZ**. S3 via gateway en
 
 ### Portal `/api` hairpin through NAT
 
-The SPA calls same-origin `/api`. Guest nginx `proxy_pass`es to `REST_BASE_URL=http://<rest_alb_dns>:8080`. That DNS is the **internet-facing** REST ALB, so it resolves to **public** IPs. Portal guests have no public IP; the packet must leave through the same-AZ NAT Gateway and come back in as internet traffic on `:8080`.
+The SPA calls same-origin `/api`. Guest nginx `proxy_pass`es to `REST_BASE_URL=http://<rest_alb_dns>:8080` with **no trailing URI**, `Host $proxy_host`, and **`Origin` omitted** (`proxy_set_header Origin ""`). `fetch()` still sends `Origin`; forwarding it would make Spring CorsFilter 403 `Invalid CORS request` unless the address bar exactly matched `APP_CORS_ALLOWED_ORIGINS`. That DNS is the **internet-facing** REST ALB, so it resolves to **public** IPs. Portal guests have no public IP; the packet must leave through the same-AZ NAT Gateway and come back in as internet traffic on `:8080`.
 
 ```mermaid
 flowchart LR
@@ -148,7 +148,7 @@ sequenceDiagram
 
   B->>PA: GET /api/…
   PA->>N: same request
-  Note over N: proxy_pass REST_BASE_URL<br/>DNS = public IP
+  Note over N: proxy_pass REST_BASE_URL (no trailing URI)<br/>Host $proxy_host; Origin omitted
   N->>NAT: TCP :8080 to public REST IP
   NAT->>RA: source rewritten to NAT EIP
   RA->>S: forward to a healthy asg-rest

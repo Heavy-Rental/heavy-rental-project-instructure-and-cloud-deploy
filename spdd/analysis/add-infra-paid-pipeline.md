@@ -57,5 +57,5 @@ Paid Ansible over SSM must not give guests write on `estate/terraform.tfstate`.
 - Paid apply creates `hr-paid-*` (apps; **current** also `hr-paid-bastion`, ADR 0021), `-actual` state, and `heavy-rental-ssm-<account>-actual`.
 - `hr-alb-rest` is internet-facing; REST instances stay private with NAT egress.
 - Portal nginx `/api` hairpins to the public REST DNS via NAT; `sg-portal` egresses TCP 8080 to `0.0.0.0/0` as well as to `sg-alb-rest`.
-- `heavy-rental/rest` CORS includes portal and REST ALB origins.
+- `heavy-rental/rest` CORS includes portal and REST ALB origins for **direct** REST ALB browser calls. Portal nginx `/api` omits `Origin`.
 - Academy trail remains `heavy-rental-academy` (no replace). Paid trail is `heavy-rental-actual`. Paid sweep does not query `heavy-rental-academy` trail/dashboard/flow.
