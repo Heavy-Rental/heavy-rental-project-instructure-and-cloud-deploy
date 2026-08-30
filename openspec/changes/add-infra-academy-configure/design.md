@@ -12,7 +12,7 @@
 **Goals:**
 
 - Fill `heavy-rental/{portal,rest,haystack,neo4j}` from Terraform outputs + Environment app secrets.
-- After InService, write PEMs to `heavy-rental/ssh/*` and public keys via SSM. **Current:** also `heavy-rental/ssh/bastion` and hop private key on `hr-bastion` (ADR 0021).
+- After InService, write `private_key_pem` (**private** key) + `public_key` to `heavy-rental/ssh/*` and public keys via SSM. **Current:** also `heavy-rental/ssh/bastion`; hop private key **and** role private keys on `hr-bastion` (ADR 0021). App guests never get a private key.
 - This delta composed all four ASGs. **Current:** apply / configure-only compose Neo4j only; portal / REST / Haystack wait for `deploy-projects` (banner). Portal `/api` → `REST_BASE_URL`. Haystack must not start Neo4j.
 - `stop` sets four app ASGs desired=0 and stops both RDS. **Current:** also stops `hr-bastion` (banner).
 

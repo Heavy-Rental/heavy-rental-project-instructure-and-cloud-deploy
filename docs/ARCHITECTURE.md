@@ -51,8 +51,6 @@ flowchart TB
   igw --> bastion[hr-bastion public :22 optional]
   albP --> asgP0[asg-portal AZ-0]
   albP --> asgP1[asg-portal AZ-1]
-  asgP0 --> albR
-  asgP1 --> albR
   albR --> asgR0[asg-rest AZ-0]
   albR --> asgR1[asg-rest AZ-1]
   asgR0 --> albH[Internal ALB Haystack :8000]
@@ -71,11 +69,11 @@ flowchart TB
   bastion -->|SSH :22| asgR0
   bastion -->|SSH :22| asgH0
   bastion -->|SSH :22| n4j0
-  asgP0 --> nat0[NAT GW AZ-0]
+  asgP0 -->|outbound HTTPS + /api :8080| nat0[NAT GW AZ-0]
   asgR0 --> nat0
   asgH0 --> nat0
   n4j0 --> nat0
-  asgP1 --> nat1[NAT GW AZ-1]
+  asgP1 -->|outbound HTTPS + /api :8080| nat1[NAT GW AZ-1]
   asgR1 --> nat1
   asgH1 --> nat1
   n4j1 --> nat1
@@ -100,13 +98,80 @@ flowchart TB
 
 ## Traffic
 
-Browser → public portal ALB → portal → **internet-facing REST ALB :8080** → REST → SoR RDS.  
-Internet clients may also hit the REST ALB :8080 directly (`REST_BASE_URL`). `sync-secrets` sets `APP_CORS_ALLOWED_ORIGINS` to the portal origin and `http://<rest_alb_dns>:8080` ([`../specification/pipelines/infra-secrets.md`](../specification/pipelines/infra-secrets.md)).  
+Browser → public portal ALB → portal → **NAT Gateway** → public REST ALB `:8080` → REST → SoR RDS.  
+Internet clients may also hit the REST ALB `:8080` directly (`REST_BASE_URL`). `sync-secrets` sets `APP_CORS_ALLOWED_ORIGINS` to the portal origin and `http://<rest_alb_dns>:8080` ([`../specification/pipelines/infra-secrets.md`](../specification/pipelines/infra-secrets.md)).  
 REST → internal Haystack ALB → Haystack → Haystack RDS + Bolt NLB → Neo4j.  
 On `asg-haystack`, `postgres-haystack-sync` merges SoR RDS → Haystack RDS (`postgres_fdw`, `sg-rds` self :5432). `neo4j-populate` reads Haystack RDS and writes Bolt (`NEO4J_URI`). HTTP `:8089` is Compose DNS only ([ADR 0020](adr/0020-haystack-devcontainer-workers.md)).  
 Private outbound HTTPS → the **NAT Gateway in the same AZ**. S3 via gateway endpoint (no NAT). If AZ-0 dies, AZ-1 guests keep outbound. NAT Gateways bill until `action=destroy`; session end and `action=stop` do not pause them.
 
-**Break-glass SSH:** operators SSM (or optional CIDR SSH from `BASTION_SSH_CIDRS`) onto `hr-bastion`, then `ssh portal` / `ssh rest-2` / `ssh haystack` / `ssh neo4j` (Host aliases from `hr-ssh-config`). App SGs allow `:22` only from `sg-bastion`, never from `0.0.0.0/0`. Helper: [`../scripts/bastion-connect.sh`](../scripts/bastion-connect.sh).
+**Break-glass SSH:** operators SSM (or optional CIDR SSH from `BASTION_SSH_CIDRS`) onto `hr-bastion`. Interactive SSM becomes **ec2-user** — do not write SSH config. Then `ssh portal` / `ssh rest-2` / `ssh haystack` / `ssh neo4j` (Host aliases from `hr-ssh-config`, `IdentityFile` = role **private** key from SM `private_key_pem` plus hop key). If the shell is still `ssm-user`, `hr-ssh portal`. `hr-ssh-pull-keys` refreshes those private keys from Secrets Manager. App guests never get a private key. App SGs allow `:22` only from `sg-bastion`, never from `0.0.0.0/0`. Helper: [`../scripts/bastion-connect.sh`](../scripts/bastion-connect.sh).
+
+### Portal `/api` hairpin through NAT
+
+The SPA calls same-origin `/api`. Guest nginx `proxy_pass`es to `REST_BASE_URL=http://<rest_alb_dns>:8080`. That DNS is the **internet-facing** REST ALB, so it resolves to **public** IPs. Portal guests have no public IP; the packet must leave through the same-AZ NAT Gateway and come back in as internet traffic on `:8080`.
+
+```mermaid
+flowchart LR
+  browser[Browser]
+
+  subgraph public["Public subnets"]
+    igw[IGW]
+    albP["hr-alb-portal :80"]
+    albR["hr-alb-rest :8080"]
+    nat["NAT Gateway + EIP"]
+  end
+
+  subgraph app["Private app subnets — no public IP"]
+    portal["asg-portal nginx"]
+    rest["asg-rest Spring :8080"]
+  end
+
+  browser -->|"GET / and GET /api/*"| igw
+  igw --> albP
+  albP --> portal
+
+  portal -->|"1. dest = REST ALB public IP :8080"| nat
+  nat -->|"2. SNAT to NAT EIP"| igw
+  igw -->|"3. looks like internet :8080"| albR
+  albR -->|"4. private target"| rest
+  rest -->|"5. response back the same NAT mapping"| albR
+```
+
+```mermaid
+sequenceDiagram
+  participant B as Browser
+  participant PA as Portal ALB :80
+  participant N as Portal nginx
+  participant NAT as NAT Gateway
+  participant RA as REST ALB :8080
+  participant S as Spring :8080
+
+  B->>PA: GET /api/…
+  PA->>N: same request
+  Note over N: proxy_pass REST_BASE_URL<br/>DNS = public IP
+  N->>NAT: TCP :8080 to public REST IP
+  NAT->>RA: source rewritten to NAT EIP
+  RA->>S: forward to a healthy asg-rest
+  S-->>RA: HTTP response
+  RA-->>NAT: back through the NAT mapping
+  NAT-->>N: response
+  N-->>B: /api result
+```
+
+| Hop | What it is | Direction |
+| --- | --- | --- |
+| Browser → portal ALB | Public `:80` | Inbound to the SPA |
+| Portal → NAT | Private guest, no public IP | **Outbound** |
+| NAT → REST ALB | NAT EIP talks to the public `:8080` listener | Outbound, then inbound on the ALB |
+| REST ALB → Spring | Private target in `tg-rest` | East-west inside the VPC |
+
+`sg-portal` must egress TCP 8080 to **both** `sg-alb-rest` (private ENI) **and** `0.0.0.0/0` (`portal_to_rest_public`). The public REST DNS never matches the SG-to-SG rule. Without the CIDR rule, nginx waits for the default 60s `proxy_connect_timeout` and returns **504**. A laptop `GET http://<rest_alb>:8080/actuator/health` can still be 200.
+
+REST → Haystack does **not** use this path. `hr-alb-haystack` is internal; `HAYSTACK_BASE_URL` resolves to private IPs and SG-to-SG on `:8000` is enough.
+
+### NAT Gateways are outbound only
+
+The two NAT Gateways (`connectivity_type = public`, one EIP each) only forward connections **started by** private guests (SSM, ECR, yum, Secrets Manager, and the portal `/api` hairpin). The internet cannot open a new connection **to** a portal or REST instance through NAT. Return packets are allowed only for the NAT mapping the guest created. `action=stop` does not pause Gateways.
 
 ## ALB / NLB health checks
 
@@ -148,7 +213,7 @@ Optional Environment variable `ALARM_EMAIL` subscribes SNS topic `hr-academy-ala
 
 | Role | Image | Notes |
 | --- | --- | --- |
-| Portal | Env `PORTAL_IMAGE` or stock `nginx` | `/api` → `REST_BASE_URL`. ECR tags get `docker login` on the guest. Public GHCR pulls with no login. |
+| Portal | Env `PORTAL_IMAGE` or stock `nginx` | `/api` → `REST_BASE_URL` (public REST ALB DNS; NAT hairpin). ECR tags get `docker login` on the guest. Public GHCR pulls with no login. |
 | REST / Haystack | Env `REST_IMAGE` / `HAYSTACK_IMAGE` or Run `image_ref` | Fail if empty. Haystack compose has **no** `neo4j` service. Compose waits for REST `:8080/actuator/health` **2xx** and Haystack `:8000/health` **2xx**. |
 | Neo4j | `neo4j:5` | `/data` on extra EBS |
 

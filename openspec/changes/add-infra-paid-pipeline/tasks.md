@@ -9,7 +9,7 @@
 
 ## 2. Terraform
 
-- [x] 2.1 REST ALB internet-facing in public subnets; SG :8080 from internet; keep portal → REST
+- [x] 2.1 REST ALB internet-facing in public subnets; SG :8080 from internet; keep portal → REST; `sg-portal` egress TCP 8080 to `0.0.0.0/0` (NAT hairpin)
 - [x] 2.2 Paid SSM transfer bucket; guest GetObject/ListBucket; output name
 - [x] 2.3 CloudTrail / dashboard name `heavy-rental-${var.deployment}` (academy string unchanged)
 

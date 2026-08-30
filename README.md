@@ -16,7 +16,7 @@ GitHub Actions, Terraform, and Ansible that create and operate the estate on **A
 | `terraform/backend/` | Remote state bucket (bootstrap) |
 | `terraform/academy/` | Estate |
 | `ansible/` | Guest configuration only |
-| `scripts/` | `sync-secrets`, `sync-ssh-keys`, `stop-estate`, `estate-tf-init`, `estate-unlock`, `reconcile-estate`, `sweep-estate-orphans`, `bootstrap-github-oidc-paid`, `bastion-connect`, `bastion-hr-ssh-config` (installed on the bastion as `hr-ssh-config`) |
+| `scripts/` | `sync-secrets`, `sync-ssh-keys`, `stop-estate`, `estate-tf-init`, `estate-unlock`, `reconcile-estate`, `sweep-estate-orphans`, `bootstrap-github-oidc-paid`, `bastion-connect`, `bastion-hr-ssh-config` (installed as `hr-ssh-config`), `bastion-hr-ssh-pull-keys` (installed as `hr-ssh-pull-keys`) |
 
 ## Actions
 
@@ -39,9 +39,9 @@ Two operator workflows, **separate job graphs** (ADR 0019):
 
 Portal / REST / Haystack **first compose** on the estate: `action=deploy-projects` after apply. **Later** image redeploys are app CD in `heavy-rental-project-pipeline-development` (academy **and** paid callers). Paid first-compose is the same `deploy-projects` action on `aws-infra-paid.yml`.
 
-REST ALB (`hr-alb-rest`) is internet-facing on **:8080**. Haystack stays internal.
+REST ALB (`hr-alb-rest`) is internet-facing on **:8080**. Haystack stays internal. Portal nginx `/api` hairpins to that public REST DNS via the same-AZ NAT Gateway (`sg-portal` egress TCP 8080 to `0.0.0.0/0` plus SG-to-SG to `sg-alb-rest`). Without the CIDR rule, `/api` returns **504**. NAT Gateways are **outbound only**. Layout and diagrams: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#portal-api-hairpin-through-nat). Operator 504 vs 502: [`OPERATOR-GUIDE.md`](OPERATOR-GUIDE.md#portal-api-through-nat).
 
-ALB health (after compose): `tg-rest` waits for `GET <instance>:8080/actuator/health` **2xx** (`200-299`); `tg-haystack` waits for `GET <instance>:8000/health` **2xx**. Layout: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+ALB health (after compose): `tg-rest` waits for `GET <instance>:8080/actuator/health` **2xx** (`200-299`); `tg-haystack` waits for `GET <instance>:8000/health` **2xx**.
 
 ## Out of scope
 

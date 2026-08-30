@@ -37,13 +37,19 @@ The Spring Boot REST ALB is reachable from the internet on :8080. REST guests ke
 - AND TCP 8080 from `0.0.0.0/0` is not present on that group
 
 ### Requirement: REST guests still egress via NAT
-`asg-rest` SHALL remain in the private app subnets. Outbound HTTPS/HTTP to `0.0.0.0/0` SHALL stay on the REST instance SG (NAT Gateway). REST SHALL NOT receive a public IP. Private portal guests MAY reach the public REST DNS via NAT (hairpin).
+`asg-rest` SHALL remain in the private app subnets. Outbound HTTPS/HTTP to `0.0.0.0/0` SHALL stay on the REST instance SG (NAT Gateway). REST SHALL NOT receive a public IP. Private portal guests SHALL reach the public REST DNS via NAT (hairpin). `sg-portal` SHALL egress TCP 8080 to `0.0.0.0/0` in addition to `sg-alb-rest`.
 
 #### Scenario: REST instance is not public
 - GIVEN the estate is applied
 - WHEN an `asg-rest` instance is described
 - THEN it has no public IP
 - AND its subnet is an app subnet (`10.0.10.0/24` or `10.0.11.0/24`)
+
+#### Scenario: Portal SG allows NAT hairpin to REST :8080
+- GIVEN the estate is applied
+- WHEN `sg-portal` egress is listed
+- THEN TCP 8080 to `0.0.0.0/0` is present
+- AND TCP 8080 to `sg-alb-rest` is present
 
 ### Requirement: CORS includes the public REST origin
 `sync-secrets` SHALL set `APP_CORS_ALLOWED_ORIGINS` to the public portal origin and `http://<rest_alb_dns>:8080` so a browser can call the REST ALB directly as well as via portal `/api`.

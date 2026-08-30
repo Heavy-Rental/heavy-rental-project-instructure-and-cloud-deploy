@@ -17,8 +17,9 @@ Delivered on this repo. Operator walkthrough: [`OPERATOR-GUIDE.md`](OPERATOR-GUI
 ### Estate
 
 - Two NAT Gateways (one per public AZ). Guest count **9 EC2** (8 app + `hr-bastion`). No NAT instance (ADR 0010)
-- Maintenance bastion `hr-bastion` (ADR 0021): single EC2 in a public subnet (not an ASG); SSH to app guests from `sg-bastion` only; no `:22` from `0.0.0.0/0`. On the bastion, `hr-ssh-config` writes Host aliases (`ssh portal`, `ssh rest-2`, …). Helper `scripts/bastion-connect.sh`
+- Maintenance bastion `hr-bastion` (ADR 0021): single EC2 in a public subnet (not an ASG); SSH to app guests from `sg-bastion` only; no `:22` from `0.0.0.0/0`. Interactive SSM becomes `ec2-user` so hops need **no operator SSH config** (`ssh portal`, or `hr-ssh portal` if still `ssm-user`). Secrets Manager `heavy-rental/ssh/*` `private_key_pem` is the **private** key (not the public `.pub`). Bastion gets hop `id_ed25519` plus `id_{portal,rest,haystack,neo4j}`. `hr-ssh-pull-keys` re-reads SM. Helper `scripts/bastion-connect.sh`
 - Public portal ALB `:80` and internet-facing REST ALB `:8080` (ADR 0018). Haystack ALB, Bolt NLB, RDS stay internal
+- `sg-portal` egress TCP 8080 to `0.0.0.0/0` so private portal guests can hairpin to the public REST ALB DNS via NAT (nginx `/api` otherwise 504s)
 - `APP_CORS_ALLOWED_ORIGINS` includes portal origin and `http://<rest_alb_dns>:8080`
 - Remote Terraform state: S3 `use_lockfile=true`. Academy `assert-lab` / `ensure-backend` fail closed on `voc-cancel-cred` (HeadBucket 403 is not treated as a missing bucket)
 - Academy guests: `LabInstanceProfile` / `LabRole` only. Paid guests: `hr-paid-{portal,rest,haystack,neo4j,bastion}`

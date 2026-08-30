@@ -4,7 +4,7 @@
 
 ADR 0016 put academy (Vocareum) and paid (OIDC) on the same Action so operators could pick the Environment. Vocareum key inputs stay visible on that form (GitHub cannot hide them), so lab keys can be aimed at a billed account. Feasibility §6P specified a **second** workflow file (`aws-infra-paid.yml`) with OIDC only.
 
-The Spring Boot REST API and `hr-alb-rest` must be reachable from the internet (direct clients, mobile, Stripe webhooks). Today that ALB is internal in the app subnets. REST **instances** already have NAT egress on :80/:443.
+The Spring Boot REST API and `hr-alb-rest` must be reachable from the internet (direct clients, mobile, Stripe webhooks). At the time of this change that ALB was internal in the app subnets. REST **instances** already had NAT egress on :80/:443.
 
 Paid Ansible over SSM must not reuse the Terraform state bucket: guests would be able to write `estate/terraform.tfstate`.
 
@@ -14,7 +14,7 @@ Paid Ansible over SSM must not reuse the Terraform state bucket: guests would be
 - `aws-infra-academy.yml` is an academy-only Action with its own job graph (Vocareum keys; refuses non-`academy`; no `id-token: write`).
 - No `aws-infra-estate.yml`. Leftover observe names follow `DEPLOYMENT`.
 - Paid-only SSM transfer bucket + guest `s3:GetObject` (Ansible over SSM must not use the tfstate bucket).
-- REST ALB is internet-facing in public subnets; TCP 8080 from `0.0.0.0/0`. Haystack stays internal. Portal `/api` still proxies to `REST_BASE_URL`.
+- REST ALB is internet-facing in public subnets; TCP 8080 from `0.0.0.0/0`. Haystack stays internal. Portal `/api` still proxies to `REST_BASE_URL` (public DNS; hairpin via NAT). `sg-portal` egresses TCP 8080 to `0.0.0.0/0` as well as to `sg-alb-rest`.
 - `sync-secrets` CORS includes the public REST origin. Observe names are `heavy-rental-academy` or `heavy-rental-actual`.
 - OpenSpec, OpenSPDD, ADR 0017 (two Actions) and ADR 0018 (public REST ALB).
 
@@ -29,7 +29,7 @@ Paid Ansible over SSM must not reuse the Terraform state bucket: guests would be
 
 - `infra-academy-scope`: academy workflow is Vocareum-only again; paid is a different file
 - `infra-academy-paid-profile`: isolation remains; “one Action, two profiles” is retired
-- `infra-academy-estate-sg`: REST ALB may accept internet :8080; still no public 8000/5432/7687
+- `infra-academy-estate-sg`: REST ALB may accept internet :8080; `sg-portal` egress TCP 8080 to `0.0.0.0/0` for the NAT hairpin; still no public 8000/5432/7687
 - `infra-academy-sync-secrets`: `APP_CORS_ALLOWED_ORIGINS` includes portal and REST ALB origins
 - `infra-academy-observe`: trail / dashboard / flow-log name follows `deployment` (`heavy-rental-academy` unchanged on academy)
 

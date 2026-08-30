@@ -76,9 +76,10 @@ To wipe the whole half-applied estate instead: `action=destroy` with `confirm_de
 | `describe-instances --filters Name=tag:Name,Values=hr-bastion` | One running jump host |
 | Public portal ALB DNS (job summary) | Resolves; **502** on `:80` until `deploy-projects` or portal app CD |
 | Public REST ALB DNS (job summary) | `http://<dns>:8080` after compose; **502** until `tg-rest` sees **2xx** on `<instance>:8080/actuator/health` |
+| Portal `/` 200 but `/api` **504** after ~60s | `sg-portal` missing egress TCP 8080 to `0.0.0.0/0` (NAT hairpin). Re-run `apply`. Laptop `http://<rest_alb>:8080/actuator/health` can still be 200. Diagrams: [`ARCHITECTURE.md`](ARCHITECTURE.md#portal-api-hairpin-through-nat) |
 | Internal Haystack ALB | Healthy after compose when `tg-haystack` sees **2xx** on `<instance>:8000/health` |
 | `describe-secret --secret-id heavy-rental/portal` | Has `REST_BASE_URL=http://<rest-alb>:8080` after `sync-secrets` |
-| `configure-only` | Fills SM + PEMs (including hop key on `hr-bastion`). Docker + Compose on app guests. Composes **Neo4j only**. Not on `hr-bastion`. |
+| `configure-only` | Fills SM + SSH secrets (`private_key_pem` = **private** key). Bastion gets hop `id_ed25519` plus `id_{portal,rest,haystack,neo4j}`. Docker + Compose on app guests. Composes **Neo4j only**. Not on `hr-bastion`. |
 | `deploy-projects` | After apply/configure-only. Composes portal + REST + Haystack. |
 | `stop` | App ASGs desired=0; `hr-bastion` stopped; both RDS stopped; Gateways still bill |
 
@@ -98,7 +99,7 @@ To wipe the whole half-applied estate instead: `action=destroy` with `confirm_de
 
 - Create IAM roles or an OIDC provider on the **academy** Action (`LabInstanceProfile` only). Paid creates `hr-paid-*` and assumes an out-of-band OIDC role.
 - Create a NAT **instance** or Marketplace Neo4j. Outbound is two NAT Gateways (ADR 0010).
-- Open SSH `:22` from `0.0.0.0/0` on portal / REST / Haystack / Neo4j. Break-glass SSH is `hr-bastion` only (ADR 0021).
+- Open SSH `:22` from `0.0.0.0/0` on portal / REST / Haystack / Neo4j. Break-glass SSH is `hr-bastion` only (ADR 0021). Do not write `private_key_pem` onto app guest disks (`private_key_pem` is the private key, not the `.pub`).
 - Wrap `hr-bastion` in an Auto Scaling group.
 - Write Vocareum keys into Secrets Manager or onto EC2
 - Put `SPRING_DATASOURCE_PASSWORD` on the Run form

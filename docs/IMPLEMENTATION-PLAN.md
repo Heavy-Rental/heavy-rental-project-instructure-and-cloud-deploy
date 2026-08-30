@@ -101,7 +101,7 @@ Terraform in `terraform/academy/` (see [`ARCHITECTURE.md`](ARCHITECTURE.md) and 
 
 - VPC, IGW, public / private-app / private-data subnets (**2 AZs**)
 - **Two NAT Gateways** (one per public AZ) + EIP each. Per-AZ private route tables. Guest count **9 EC2** (8 app + `hr-bastion`). Gateways bill until `destroy`.
-- Security groups (portal :80 from public ALB; REST ALB :8080 from the internet **and** portal, ADR 0018; Haystack :8000 from rest; RDS :5432 from rest+haystack; Bolt :7687 from haystack / NLB; app `:22` from `sg-bastion` only, ADR 0021)
+- Security groups (portal :80 from public ALB; REST ALB :8080 from the internet **and** portal, ADR 0018; `sg-portal` egress TCP 8080 to `sg-alb-rest` **and** `0.0.0.0/0` so nginx `/api` can hairpin to the public REST DNS via NAT; Haystack :8000 from rest; RDS :5432 from rest+haystack; Bolt :7687 from haystack / NLB; app `:22` from `sg-bastion` only, ADR 0021)
 - Four app launch templates + ASGs with **`LabInstanceProfile` → `LabRole`**. Portal (React), REST (Spring Boot), Haystack **desired=2** (one per app AZ, ALBs span both). `asg-neo4j` **desired=2** (one per data AZ). **`hr-bastion`** is a single public-subnet EC2 (maintenance SSH jump; not an ASG)
 - Public portal ALB + `tg-portal` :80; REST ALB internet-facing :8080 (ADR 0018) with `tg-rest` health `GET <instance>:8080/actuator/health` matcher **`200-299`**; internal Haystack ALB with `tg-haystack` health `GET <instance>:8000/health` matcher **`200-299`**
 - Internal **Bolt NLB** + `tg-neo4j` :7687
@@ -138,7 +138,7 @@ Terraform in `terraform/academy/` (see [`ARCHITECTURE.md`](ARCHITECTURE.md) and 
 
    Fail if host, database, password, port, or `REST_BASE_URL` is empty. **Never** write Vocareum AWS keys into SM.
 
-2. **`sync-ssh-keys`:** after the four app ASGs are InService and `hr-bastion` is running. PEMs → `heavy-rental/ssh/{portal,rest,haystack,neo4j,bastion}`. Public keys via SSM on app guests. Hop **private** key on `hr-bastion` only, plus Host aliases (`hr-ssh-config`).
+2. **`sync-ssh-keys`:** after the four app ASGs are InService and `hr-bastion` is running. Secrets Manager `heavy-rental/ssh/{portal,rest,haystack,neo4j,bastion}` gets `private_key_pem` (**private** key) and `public_key`. Public keys via SSM on app guests. Bastion gets hop **private** key (`id_ed25519`) **and** role private keys (`id_portal` / `id_rest` / `id_haystack` / `id_neo4j`) plus Host aliases (`hr-ssh-config`). Interactive SSM becomes `ec2-user` so hops need no operator SSH config (`hr-ssh` if still `ssm-user`).
 
 3. **Ansible** (`ANSIBLE-PROCESS.md`): SSM inventory `portal` / `rest` / `haystack` / `neo4j`; Docker; `get-secret-value` → `.env`; CI image load/pull; compose with §6.4a limits; portal nginx `/api` → `REST_BASE_URL`; Haystack must not start `neo4j`; Haystack workers are `postgres:17` + `python:3.12-slim` scripts (ADR 0020), not uvicorn `-m`; RDS logical `vector` + `postgres_fdw` via a haystack guest. `site.yml` waits for REST `:8080/actuator/health` **2xx** and Haystack `:8000/health` **2xx** (ALB `tg-rest` / `tg-haystack`). Worker crash does not fail that wait.
 
@@ -148,7 +148,7 @@ Terraform in `terraform/academy/` (see [`ARCHITECTURE.md`](ARCHITECTURE.md) and 
 
 ### Done when
 
-`configure-only` refills SM + PEMs (including hop key on `hr-bastion`), installs Docker + Compose on app guests, and composes Neo4j only. `deploy-projects` is a later run that first-composes portal + REST + Haystack via `site.yml`. Day-to-day image rolls are app CD. `stop` pauses app ASGs + `hr-bastion` + RDS (Gateways still bill). `destroy` empties the estate state.
+`configure-only` refills SM + SSH secrets (`private_key_pem` = private key; hop + role private keys on `hr-bastion`), installs Docker + Compose on app guests, and composes Neo4j only. `deploy-projects` is a later run that first-composes portal + REST + Haystack via `site.yml`. Day-to-day image rolls are app CD. `stop` pauses app ASGs + `hr-bastion` + RDS (Gateways still bill). `destroy` empties the estate state.
 
 ---
 

@@ -31,6 +31,8 @@ Related reference (more compact): [`docs/BOOTSTRAP.md`](docs/BOOTSTRAP.md). Spec
 
 **Important:** `apply` does **not** start the three apps. After apply, the public portal URL returns **502** until you run **`deploy-projects`** in a **new** workflow run.
 
+How `/api` reaches Spring (NAT hairpin, 504 vs 502): [Portal `/api` through NAT](#portal-api-through-nat). Full diagrams: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#portal-api-hairpin-through-nat).
+
 ```
 First lab day
   bootstrap   (once — state bucket)
@@ -228,7 +230,7 @@ Do not try to do step 3 and step 5 in one click. `deploy-projects` is not chaine
 1. Confirms Environment `academy` and Vocareum keys
 2. `terraform apply` — VPC, two NAT Gateways, four app ASGs + `hr-bastion` (**9 EC2**), ALBs, two RDS, secret *shells*
 3. Writes app secrets into Secrets Manager (`sync-secrets`)
-4. Writes break-glass SSH PEMs after instances are healthy (`sync-ssh-keys`)
+4. Writes break-glass SSH secrets after instances are healthy (`sync-ssh-keys`: `private_key_pem` is the **private** key; public line on guests; hop + role private keys on `hr-bastion`)
 5. Ansible `configure.yml` — Docker + Compose on app guests (not `hr-bastion`), **Neo4j only**
 
 It does **not** pull portal, REST, or Haystack images. That is why apply no longer fails on private GHCR.
@@ -273,7 +275,7 @@ It does **not** pull portal, REST, or Haystack images. That is why apply no long
 
 **When:** The estate already exists (you already ran `apply`), the Vocareum session is new, and you need Docker / secrets / Neo4j refreshed. Typical: next lab session the same week.
 
-**What it does:** Same Ansible as apply (`configure.yml`): refill Secrets Manager, PEMs (including hop key on `hr-bastion`), Docker + Compose on app guests, compose **Neo4j only**. **No** `terraform apply`. **No** portal / REST / Haystack compose. **No** Docker on `hr-bastion`.
+**What it does:** Same Ansible as apply (`configure.yml`): refill Secrets Manager, SSH secrets (`private_key_pem` = private key; hop + role private keys on `hr-bastion`), Docker + Compose on app guests, compose **Neo4j only**. **No** `terraform apply`. **No** portal / REST / Haystack compose. **No** Docker on `hr-bastion`.
 
 **Form:** Same as `apply`, but `action` = `configure-only`.
 
@@ -289,7 +291,7 @@ It does **not** pull portal, REST, or Haystack images. That is why apply no long
 
 **What it does:**
 
-1. Refreshes secrets and PEMs (same as configure-only)
+1. Refreshes secrets and SSH keys (same as configure-only)
 2. **Preflight on the runner** (fails *before* talking to EC2 if something is wrong):
    - App ASGs exist (`asg-portal`, `asg-rest`, `asg-haystack`, `asg-neo4j`; otherwise: run `apply` first). `hr-bastion` is also created by apply (SSH jump; not required to compose)
    - `PORTAL_IMAGE` is set and is **not** stock `nginx`
@@ -317,6 +319,7 @@ It does **not** pull portal, REST, or Haystack images. That is why apply no long
 
 | Symptom | Cause |
 | --- | --- |
+| Portal `/` is 200 but `/api` is **504** after ~60s | Portal nginx could not open `:8080` to the public REST ALB through NAT. See [Portal `/api` through NAT](#portal-api-through-nat). Re-run infra `apply` so `portal_to_rest_public` exists. |
 | “run `apply` first” | ASGs missing. This action is not Terraform |
 | Stock nginx / empty `PORTAL_IMAGE` | Set a real portal CI tag on Environment `academy` |
 | Empty REST / Haystack | Set `REST_IMAGE` and `HAYSTACK_IMAGE` |
@@ -422,7 +425,7 @@ App EC2 have no public IP. Do **not** open `:22` from the internet on portal / R
 
 1. Run `apply` so `hr-bastion` exists, then `sync-ssh-keys` (part of apply / configure-only / deploy-projects).
 2. From a machine with lab AWS keys: `./scripts/bastion-connect.sh`
-3. **Default (no `BASTION_SSH_CIDRS`):** `aws ssm start-session --target <bastion-id>`, then `hr-ssh-targets` and `ssh portal` / `ssh rest-2` / `ssh haystack` / `ssh neo4j` (Host aliases for every app EC2).
+3. **Default (no `BASTION_SSH_CIDRS`):** `aws ssm start-session --target <bastion-id>`. The session becomes **ec2-user** (private keys + Host aliases). Do **not** write SSH config. Then `hr-ssh-targets` and `ssh portal` / `ssh rest-2` / `ssh haystack` / `ssh neo4j`. If the prompt is still `ssm-user`, use `hr-ssh portal` instead. `hr-ssh-pull-keys` re-reads `private_key_pem` from Secrets Manager onto the bastion (`id_ed25519` + `id_portal` / `id_rest` / `id_haystack` / `id_neo4j`). That field is the **private** key, not the public `.pub` line.
 4. **Laptop ProxyJump:** set Environment variable `BASTION_SSH_CIDRS` to your public `/32` (not `0.0.0.0/0`), re-run `apply`, then use the `ssh -J` command the helper prints. PEM is `heavy-rental/ssh/bastion` — never echo it in logs.
 
 Ansible and app CD still use SSM. The bastion is break-glass only.
@@ -442,6 +445,84 @@ Ansible and app CD still use SSM. The bastion is break-glass only.
 | Stop NAT/ALB charges | `destroy` |
 
 App CD workflows must **not** run Terraform. This repo owns the estate.
+
+---
+
+## Portal `/api` through NAT
+
+The React app is served on the **portal** ALB (`:80`). Browser JS calls **same-origin `/api`**. Guest nginx proxies that to `REST_BASE_URL=http://<rest_alb_dns>:8080`.
+
+That REST DNS is internet-facing, so it is a **public IP**. Portal guests sit in private app subnets with **no public IP**. They cannot talk to that public IP as a VPC neighbour. They send the packet **out** the same-AZ NAT Gateway; it comes back to the REST ALB as ordinary internet `:8080`.
+
+NAT Gateways on this estate are **outbound only**. They rewrite the portal guest’s source to the NAT Elastic IP and send the packet to the internet gateway. Replies follow the same mapping. The internet cannot start a new connection **to** a portal or REST instance through NAT.
+
+```mermaid
+flowchart LR
+  browser[Browser]
+
+  subgraph public["Public subnets"]
+    igw[IGW]
+    albP["Portal ALB :80"]
+    albR["REST ALB :8080"]
+    nat["NAT Gateway + EIP"]
+  end
+
+  subgraph app["Private app subnets"]
+    portal["Portal nginx"]
+    rest["Spring :8080"]
+  end
+
+  browser -->|"GET / and GET /api/*"| igw
+  igw --> albP
+  albP --> portal
+  portal -->|"1. public REST IP :8080"| nat
+  nat -->|"2. SNAT to NAT EIP"| igw
+  igw -->|"3. internet :8080"| albR
+  albR -->|"4. private target"| rest
+```
+
+```mermaid
+sequenceDiagram
+  participant B as Browser
+  participant PA as Portal ALB :80
+  participant N as Portal nginx
+  participant NAT as NAT Gateway
+  participant RA as REST ALB :8080
+  participant S as Spring :8080
+
+  B->>PA: GET /api/…
+  PA->>N: same request
+  N->>NAT: TCP :8080 to public REST IP
+  NAT->>RA: source = NAT EIP
+  RA->>S: healthy asg-rest
+  S-->>RA: response
+  RA-->>NAT: NAT mapping
+  NAT-->>N: response
+  N-->>B: /api result
+```
+
+| Hop | Direction |
+| --- | --- |
+| Browser → portal ALB `:80` | Inbound (SPA) |
+| Portal nginx → NAT → public REST ALB `:8080` | **Outbound**, then inbound on the REST ALB |
+| REST ALB → Spring | Inside the VPC |
+
+`sg-portal` needs TCP 8080 egress to `0.0.0.0/0` (`portal_to_rest_public`) as well as to `sg-alb-rest`. The public DNS does not match the SG-to-SG rule. Terraform `apply` creates that CIDR rule. You do not need a new portal image.
+
+| What you see | Meaning |
+| --- | --- |
+| Portal `/` is **502** | nginx is not composed yet — run `deploy-projects` |
+| Portal `/` is **200**, `/api` is **504** after ~60s | Hairpin blocked or REST not answering through NAT. Laptop `http://<rest_alb>:8080/actuator/health` can still be 200 |
+| Portal `/` is **200**, `/api` is **502** immediately | REST ALB has no healthy target (`/actuator/health` not 2xx) |
+
+On a portal guest (bastion / SSM):
+
+```bash
+REST=$(grep REST_BASE_URL /opt/heavy-rental/.env | cut -d= -f2-)
+curl -sS -o /dev/null -w "%{http_code} time:%{time_total}\n" --max-time 10 "$REST/actuator/health"
+```
+
+Expect `200` in well under 10s after `apply` has `portal_to_rest_public`. Layout and the same diagrams: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#portal-api-hairpin-through-nat).
 
 ---
 

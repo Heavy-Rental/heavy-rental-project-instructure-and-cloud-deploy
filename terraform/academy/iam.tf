@@ -126,7 +126,8 @@ resource "aws_iam_instance_profile" "guest" {
   role     = aws_iam_role.guest[each.key].name
 }
 
-# Maintenance bastion: SSM + describe hop targets. No ECR, no app secrets.
+# Maintenance bastion: SSM + describe hop targets + SSH private-key secrets.
+# No ECR, no app secrets (portal/rest/haystack/neo4j JSON with Stripe/JWT).
 resource "aws_iam_role" "bastion" {
   count              = local.is_actual ? 1 : 0
   name               = "hr-paid-bastion"
@@ -161,6 +162,18 @@ resource "aws_iam_role_policy" "bastion_app" {
           "autoscaling:DescribeAutoScalingGroups",
         ]
         Resource = "*"
+      },
+      {
+        Sid    = "SshPemSecrets"
+        Effect = "Allow"
+        Action = ["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"]
+        Resource = [
+          "arn:aws:secretsmanager:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:secret:heavy-rental/ssh/portal-*",
+          "arn:aws:secretsmanager:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:secret:heavy-rental/ssh/rest-*",
+          "arn:aws:secretsmanager:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:secret:heavy-rental/ssh/haystack-*",
+          "arn:aws:secretsmanager:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:secret:heavy-rental/ssh/neo4j-*",
+          "arn:aws:secretsmanager:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:secret:heavy-rental/ssh/bastion-*",
+        ]
       },
     ]
   })

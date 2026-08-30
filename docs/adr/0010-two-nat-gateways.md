@@ -8,7 +8,7 @@
 
 ## Context
 
-ADR 0004 used one `t3.nano` NAT **instance** in public AZ-0 so the lab stayed at 9 EC2 and Vocareum could stop that guest with the rest of the fleet. Portal (React), REST (Spring Boot), and Haystack already run `desired=2` across both app AZs, but their outbound HTTPS (SSM, ECR, yum, Secrets Manager) still crossed to AZ-0. Losing AZ-0 killed outbound for every private guest.
+ADR 0004 used one `t3.nano` NAT **instance** in public AZ-0 so the lab stayed at 9 EC2 and Vocareum could stop that guest with the rest of the fleet. Portal (React), REST (Spring Boot), and Haystack already run `desired=2` across both app AZs, but their outbound HTTPS (SSM, ECR, yum, Secrets Manager) still crossed to AZ-0. Losing AZ-0 killed outbound for every private guest. After [0018](0018-public-rest-alb.md), portal nginx `/api` is another outbound flow: private guests hairpin to the **public** REST ALB DNS through the same-AZ Gateway.
 
 The operator accepted 24/7 NAT Gateway credit burn in exchange for same-AZ outbound.
 
@@ -23,6 +23,8 @@ Do **not** keep `aws_instance.nat`. NAT is not an EC2, so this decision left gue
 ## Consequences
 
 - AZ-0 loss no longer takes down AZ-1 outbound.
+- Gateways are **outbound only**: they SNAT connections **started by** private guests. The internet cannot open a new connection to a portal or REST instance through NAT.
+- Portal `/api` uses this outbound path (ADR 0018). `sg-portal` must egress TCP 8080 to `0.0.0.0/0`; SG-to-SG to `sg-alb-rest` does not match the public REST IPs.
 - Two NAT Gateway hours + two EIPs bill until destroy, including after session end.
 - Vocareum may reject `CreateNatGateway` / EIP. If apply fails, revert to the NAT instance (ADR 0004) rather than leaving a half-applied mix.
 - Apply this graph on a **clean** estate (`action=destroy` first). In-place replace of the NAT instance plus shared route tables is the same detach class of failure as the old dedicated ENI.

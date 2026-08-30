@@ -26,15 +26,17 @@ Terraform SHALL create `aws_instance.bastion` tagged `Name=hr-bastion` and `Role
 - AND TCP 22 from `0.0.0.0/0` is absent
 
 ### Requirement: Hop key only on the bastion
-`sync-ssh-keys` SHALL write `heavy-rental/ssh/bastion`, install that public key on the bastion and the four app roles, and write the matching private key only onto `hr-bastion`.
+`sync-ssh-keys` SHALL write `heavy-rental/ssh/bastion`, install that public key on the bastion and the four app roles, write the matching hop private key onto `hr-bastion` as `id_ed25519`, and copy the four role private keys from `heavy-rental/ssh/{portal,rest,haystack,neo4j}` onto the bastion as `id_{role}`.
 
 #### Scenario: App disks have no hop PEM
 - GIVEN four app ASGs are InService and `hr-bastion` is running
 - WHEN `sync-ssh-keys` completes
-- THEN `heavy-rental/ssh/bastion` contains `private_key_pem`
+- THEN `heavy-rental/ssh/bastion` contains `private_key_pem` (private key) and `public_key`
 - AND portal/rest/haystack/neo4j `authorized_keys` contain the bastion public key
-- AND those four roles do not have `/home/ec2-user/.ssh/id_ed25519` from this job
-- AND the bastion `~/.ssh/config` has Host aliases for each running app guest (`portal`, `rest-1`, …)
+- AND those four roles do not have `/home/ec2-user/.ssh/id_ed25519` or `id_{portal,rest,haystack,neo4j}` from this job
+- AND the bastion has those private-key files
+- AND the bastion `~/.ssh/config` has Host aliases for each running app guest (`portal`, `rest-1`, …) with `IdentityFile` for that role
+- AND interactive SSM on the bastion becomes `ec2-user` so `ssh portal` needs no operator SSH config
 
 ### Requirement: Ansible does not compose the bastion
 `configure.yml` and `site.yml` SHALL NOT target group `bastion`.

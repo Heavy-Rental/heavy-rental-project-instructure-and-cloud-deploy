@@ -4,7 +4,7 @@
 
 ADR 0016 put academy and paid on `aws-infra-academy.yml` so operators could pick Environment `academy` or `AWS_ACTUAL`. Vocareum key inputs stay on that form. Feasibility §6P and operators want a **second** file with no lab keys. Isolation (OIDC vs Vocareum, separate state, `hr-paid-*` guests) still holds.
 
-`hr-alb-rest` is internal in the app subnets. The portal reaches Spring only via that private DNS (`REST_BASE_URL`). Direct clients, mobile, and Stripe webhooks cannot hit Tomcat. REST **instances** already use NAT egress on :80/:443. Internet-facing ALBs must use public subnets; changing `internal` or subnets **replaces** the ALB (new DNS).
+`hr-alb-rest` **was** internal in the app subnets. The portal reached Spring only via that private DNS (`REST_BASE_URL`). Direct clients, mobile, and Stripe webhooks could not hit Tomcat. REST **instances** already used NAT egress on :80/:443. Internet-facing ALBs must use public subnets; changing `internal` or subnets **replaces** the ALB (new DNS).
 
 Ansible `amazon.aws.aws_ssm` uploads modules to S3. Academy LabRole already uses the tfstate bucket. Paid guests must not write `estate/terraform.tfstate`.
 
@@ -34,14 +34,14 @@ Ansible `amazon.aws.aws_ssm` uploads modules to S3. Academy LabRole already uses
 2. **Environment remains `AWS_ACTUAL` / `actual`.** S3 cannot use uppercase; ADR 0016 already shipped this mapping. Do not rename to `paid`.
 3. **OIDC role is out of band.** Sample trust policy in `docs/samples/github-oidc-paid.json`. Estate apply cannot create the role it assumes. Trust `repo:ORG/REPO:*` (no reusable `job_workflow_ref`).
 4. **Paid YAML SHALL NOT declare Vocareum key inputs.** Fail if `AWS_ACCESS_KEY_ID` is set or `AWS_ROLE_TO_ASSUME` is empty. Academy SHALL NOT receive `id-token: write`.
-5. **REST ALB `internal = false`, `subnets = public`.** Listener stays :8080 so `REST_BASE_URL=http://<dns>:8080` stays valid. Portal nginx still proxies `/api`. `sync-secrets` CORS includes both ALB origins. Haystack ALB stays internal. ADR 0018.
+5. **REST ALB `internal = false`, `subnets = public`.** Listener stays :8080 so `REST_BASE_URL=http://<dns>:8080` stays valid. Portal nginx still proxies `/api`. That DNS is public, so private portal guests hairpin via NAT: `sg-portal` SHALL egress TCP 8080 to `0.0.0.0/0` as well as to `sg-alb-rest`. `sync-secrets` CORS includes both ALB origins. Haystack ALB stays internal. ADR 0018.
 6. **Paid SSM bucket** `heavy-rental-ssm-<account>-actual`. Guest IAM GetObject/ListBucket only. Not the tfstate bucket (ADR 0012 consequence).
 7. **Conflict order:** OpenSpec → OpenSPDD Safeguards → ADR 0017/0018/0019 → YAML / `.tf`.
 
 ## Risks / Trade-offs
 
 - Replacing the REST ALB (scheme/subnet change) issues a new DNS name; `sync-secrets` must run after apply.
-- Portal in a private subnet reaches the public REST ALB via NAT (hairpin). Covered by 0.0.0.0/0 on :8080.
+- Portal in a private subnet reaches the public REST ALB via NAT (hairpin). REST ALB **ingress** 8080 from `0.0.0.0/0` is not enough: `sg-portal` must also **egress** TCP 8080 to `0.0.0.0/0` (`portal_to_rest_public`). SG-to-SG to `sg-alb-rest` matches the ALB private ENI only; the public DNS does not. Without the CIDR rule, nginx `/api` returns **504**.
 - Public Tomcat :8080. Blast radius stays REST ALB only: no public 8000/5432/7687; REST instances have no public IP.
 - HTTP only. Stripe webhooks that require HTTPS still need a later listener.
 - Paid first-compose is `deploy-projects` on the paid Action. Day-to-day paid rolls are the app-CD paid callers in the other repo.

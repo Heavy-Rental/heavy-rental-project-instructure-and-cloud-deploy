@@ -15,7 +15,7 @@ The estate exists. Shells are empty. Guests have no Docker compose. Operators ca
 | Terraform | Creates architecture and resources. Not guest Docker. |
 | Ansible | Configures existing guests only. No VPC/ASG/RDS create. |
 | sync-secrets | `put-secret-value` from Terraform outputs + Environment app secrets, including Haystack `SOURCE_*` / `TARGET_*` |
-| sync-ssh-keys | PEMs after InService; public key via SSM |
+| sync-ssh-keys | `private_key_pem` (private key) after InService; public key via SSM on guests; hop + role private keys on `hr-bastion` |
 | Apply Ansible | `configure.yml`: Docker on **app** guests (`portal`/`rest`/`haystack`/`neo4j`); compose **Neo4j only** (same as configure-only). App images wait for `deploy-projects`. `hr-bastion` is not a compose host (ADR 0021). |
 | configure-only | No Terraform apply. Same Ansible as apply. |
 | First compose | Later change: `action=deploy-projects` / `site.yml` |

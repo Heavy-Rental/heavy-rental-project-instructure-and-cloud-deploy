@@ -10,7 +10,7 @@
 | **Terraform** | Architecture and cloud **resources**: VPC, subnets, IGW, two NAT Gateways, four app ASGs + LTs, **`hr-bastion`** (single EC2), public portal ALB, **internet-facing REST ALB :8080**, internal Haystack ALB, Bolt NLB, two Multi-AZ RDS, SM **shells**, S3 state, CloudTrail (S3), VPC flow logs (S3), ALB access logs, CloudWatch alarms + dashboard. Guests use **LabRole** / `LabInstanceProfile` only |
 | **Ansible** | Guest **configuration** only: Docker/Compose, map SM → `.env`, pull/load a CI image, compose, portal nginx `/api`, RDS *logical* grants/extensions. **No** `terraform apply`, no create-ASG, no create-RDS |
 
-`sync-secrets` and `sync-ssh-keys` are shell wrappers (not Terraform). They write JSON / PEMs into shells Terraform already created.
+`sync-secrets` and `sync-ssh-keys` are shell wrappers (not Terraform). They write JSON / SSH key material into shells Terraform already created. `private_key_pem` is the **private** OpenSSH key (not the public `.pub`). Bastion gets hop + role private keys; app guests get public keys only.
 
 ## Actions
 
@@ -71,6 +71,10 @@ Layout table: [`../../docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md). ASGs s
 | `tg-neo4j` | TCP `<instance-ip>:7687` | TCP |
 
 `site.yml` (deploy-projects) waits for REST and Haystack 2xx on those paths.
+
+## REST ALB
+
+`hr-alb-rest` is internet-facing on **:8080** (ADR 0018). `REST_BASE_URL=http://<rest_alb_dns>:8080`. `APP_CORS_ALLOWED_ORIGINS` is `http://<portal_alb_dns>,http://<rest_alb_dns>:8080`. Portal nginx `/api` hairpins to that public DNS via NAT; `sg-portal` egresses TCP 8080 to `0.0.0.0/0` as well as to `sg-alb-rest`. Without the CIDR rule, `/api` returns **504**. Haystack stays internal. HTTPS is not this pipeline. Same contract as [`infra-paid.md`](infra-paid.md). Diagrams: [`../../docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md#portal-api-hairpin-through-nat).
 
 ## Specs
 

@@ -35,3 +35,6 @@ Toolchain recorded **2026-08-25**. Estate runtime updated **2026-08-29** (`hr-ba
 | ALB `tg-rest` | `alb.tf` | `GET <instance>:8080/actuator/health`, matcher **`200-299`** (2xx). Not `GET /` (Spring 401). |
 | ALB `tg-haystack` | `alb.tf` | `GET <instance>:8000/health`, matcher **`200-299`** (2xx). Not `/` or `/docs`. |
 | ALB `tg-portal` | `alb.tf` | `GET <instance>:80/`, matcher `200-399`. |
+| REST ALB scheme | ADR 0018 | `hr-alb-rest` internet-facing `:8080` in public subnets. Haystack ALB stays internal. |
+| Portal `/api` hairpin | `security_groups.tf` | `sg-portal` egress TCP 8080 to `sg-alb-rest` **and** `0.0.0.0/0` (`portal_to_rest_public`). Public REST DNS uses NAT; SG-to-SG alone 504s. NAT Gateways are outbound only. |
+| Bastion SSH keys | `sync-ssh-keys.sh` | SM `heavy-rental/ssh/*`: `private_key_pem` = **private** OpenSSH key; `public_key` = authorized_keys line. Bastion: `id_ed25519` + `id_{portal,rest,haystack,neo4j}`. App guests: public key only. |
