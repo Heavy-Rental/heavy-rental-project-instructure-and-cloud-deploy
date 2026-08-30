@@ -82,7 +82,7 @@ Put the role ARN on Environment `AWS_ACTUAL` as **variable** or **secret** `AWS_
 
 ## REST ALB
 
-`hr-alb-rest` is internet-facing on **:8080** (ADR 0018). `REST_BASE_URL=http://<rest_alb_dns>:8080`. `APP_CORS_ALLOWED_ORIGINS` is `http://<portal_alb_dns>,http://<rest_alb_dns>:8080`. Portal nginx `/api` hairpins to that public DNS via NAT; `sg-portal` egresses TCP 8080 to `0.0.0.0/0` as well as to `sg-alb-rest`. Haystack stays internal. HTTPS is not this pipeline. This diverges from feasibility §6P (study said REST internal / no public 8080).
+`hr-alb-rest` is internet-facing on **:8080** (ADR 0018). `REST_BASE_URL=http://<rest_alb_dns>:8080`. `APP_CORS_ALLOWED_ORIGINS` is `http://<portal_alb_dns>,http://<rest_alb_dns>:8080` for **direct** REST ALB browser calls. Portal nginx `/api` is same-origin: it hairpins to that public DNS via NAT, sets `Host $proxy_host`, and **omits `Origin`**. `sg-portal` egresses TCP 8080 to `0.0.0.0/0` as well as to `sg-alb-rest`. Haystack stays internal. HTTPS is not this pipeline. This diverges from feasibility §6P (study said REST internal / no public 8080).
 
 **Health:** `tg-rest` waits for `GET <instance-ip>:8080/actuator/health` matcher **`200-299`** (2xx). `GET /` is Spring 401 and is not healthy. `tg-haystack` waits for `GET <instance-ip>:8000/health` matcher **`200-299`**. Table: [`../../docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md). OpenSpec: [`../../openspec/changes/add-infra-paid-pipeline/specs/infra-estate-rest-alb/spec.md`](../../openspec/changes/add-infra-paid-pipeline/specs/infra-estate-rest-alb/spec.md).
 

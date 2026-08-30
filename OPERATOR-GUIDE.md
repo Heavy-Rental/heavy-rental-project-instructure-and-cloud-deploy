@@ -117,7 +117,7 @@ Do this once if you will run **AWS infrastructure (paid)**. Do **not** paste Voc
 
 Then: **Actions → AWS infrastructure (paid)** → `aws_environment` = `AWS_ACTUAL` → `plan`, then `apply`, then a **later** `deploy-projects`. Same action meanings as academy. Paid first-compose is this Action’s `deploy-projects`. Day-to-day portal / REST / Haystack rolls are app CD in `heavy-rental-project-pipeline-development` (academy **and** paid callers).
 
-REST is reachable at `http://<rest_alb_dns>:8080` after compose (public ALB). Portal remains `http://<portal_alb_dns>/`. Haystack stays internal.
+REST is reachable at `http://<rest_alb_dns>:8080` after compose (public ALB; Spring CORS for **direct** browser calls). Login from the SPA: open **`http://<portal_alb_dns>/`** (portal `:80`), not REST `:8080`. Haystack stays internal.
 
 ---
 
@@ -450,7 +450,7 @@ App CD workflows must **not** run Terraform. This repo owns the estate.
 
 ## Portal `/api` through NAT
 
-The React app is served on the **portal** ALB (`:80`). Browser JS calls **same-origin `/api`**. Guest nginx proxies that to `REST_BASE_URL=http://<rest_alb_dns>:8080`.
+The React app is served on the **portal** ALB (`:80`). Open `http://<portal_alb_dns>/` — not the REST ALB `:8080`. Browser JS calls **same-origin `/api`**. Guest nginx proxies that to `REST_BASE_URL=http://<rest_alb_dns>:8080` and **omits `Origin`** so Spring CorsFilter does not treat the hairpin as CORS ([ADR 0018](docs/adr/0018-public-rest-alb.md)).
 
 That REST DNS is internet-facing, so it is a **public IP**. Portal guests sit in private app subnets with **no public IP**. They cannot talk to that public IP as a VPC neighbour. They send the packet **out** the same-AZ NAT Gateway; it comes back to the REST ALB as ordinary internet `:8080`.
 
@@ -492,6 +492,7 @@ sequenceDiagram
 
   B->>PA: GET /api/…
   PA->>N: same request
+  Note over N: omit Origin; Host $proxy_host
   N->>NAT: TCP :8080 to public REST IP
   NAT->>RA: source = NAT EIP
   RA->>S: healthy asg-rest
@@ -514,6 +515,8 @@ sequenceDiagram
 | Portal `/` is **502** | nginx is not composed yet — run `deploy-projects` |
 | Portal `/` is **200**, `/api` is **504** after ~60s | Hairpin blocked or REST not answering through NAT. Laptop `http://<rest_alb>:8080/actuator/health` can still be 200 |
 | Portal `/` is **200**, `/api` is **502** immediately | REST ALB has no healthy target (`/actuator/health` not 2xx) |
+| `GET /api/auth/getBearerToken` is **403** `Invalid CORS request`, then login **401** | nginx forwarded `Origin` (or you opened REST `:8080` / a URL that is not exactly `http://<portal_alb_dns>`). The SPA login helper does not check `ok` and POSTs that 403 body as the interim JWT. Redeploy portal so `/api/` omits `Origin`. Do not diagnose by clicking/resending `getBearerToken` in Firefox DevTools (`Origin` is often `null`). |
+| Login **401** with JSON `error: unauthorized` / `invalid_credentials` | CORS already passed. Wrong password, missing interim JWT, or prod seed users not loaded (`APP_SEED_DATA_SQL`) |
 
 On a portal guest (bastion / SSM):
 

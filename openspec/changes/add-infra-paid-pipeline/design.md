@@ -34,7 +34,7 @@ Ansible `amazon.aws.aws_ssm` uploads modules to S3. Academy LabRole already uses
 2. **Environment remains `AWS_ACTUAL` / `actual`.** S3 cannot use uppercase; ADR 0016 already shipped this mapping. Do not rename to `paid`.
 3. **OIDC role is out of band.** Sample trust policy in `docs/samples/github-oidc-paid.json`. Estate apply cannot create the role it assumes. Trust `repo:ORG/REPO:*` (no reusable `job_workflow_ref`).
 4. **Paid YAML SHALL NOT declare Vocareum key inputs.** Fail if `AWS_ACCESS_KEY_ID` is set or `AWS_ROLE_TO_ASSUME` is empty. Academy SHALL NOT receive `id-token: write`.
-5. **REST ALB `internal = false`, `subnets = public`.** Listener stays :8080 so `REST_BASE_URL=http://<dns>:8080` stays valid. Portal nginx still proxies `/api`. That DNS is public, so private portal guests hairpin via NAT: `sg-portal` SHALL egress TCP 8080 to `0.0.0.0/0` as well as to `sg-alb-rest`. `sync-secrets` CORS includes both ALB origins. Haystack ALB stays internal. ADR 0018.
+5. **REST ALB `internal = false`, `subnets = public`.** Listener stays :8080 so `REST_BASE_URL=http://<dns>:8080` stays valid. Portal nginx still proxies `/api` (omit `Origin`; `Host $proxy_host`; no trailing URI). That DNS is public, so private portal guests hairpin via NAT: `sg-portal` SHALL egress TCP 8080 to `0.0.0.0/0` as well as to `sg-alb-rest`. `sync-secrets` CORS includes both ALB origins for **direct** REST ALB browser calls (not the portal `/api` hop). Haystack ALB stays internal. ADR 0018.
 6. **Paid SSM bucket** `heavy-rental-ssm-<account>-actual`. Guest IAM GetObject/ListBucket only. Not the tfstate bucket (ADR 0012 consequence).
 7. **Conflict order:** OpenSpec → OpenSPDD Safeguards → ADR 0017/0018/0019 → YAML / `.tf`.
 

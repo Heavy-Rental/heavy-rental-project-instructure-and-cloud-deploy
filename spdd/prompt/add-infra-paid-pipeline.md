@@ -50,7 +50,7 @@ classDiagram
 1. Each operator YAML contains the full job graph. Delete `aws-infra-estate.yml`.
 2. Fail-closed Environment asserts. Academy has no `id-token: write`. Paid declares no Vocareum inputs.
 3. Terraform: REST ALB public + SG :8080 from internet; paid SSM bucket + guest GetObject; observe name from `var.deployment`.
-4. `sync-secrets` CORS = portal origin + `http://<rest_alb_dns>:8080`.
+4. `sync-secrets` CORS = portal origin + `http://<rest_alb_dns>:8080` (direct REST ALB callers). Portal nginx `/api` omits `Origin`.
 5. Reconcile/sweep require `DEPLOYMENT` and use that profile’s observe names.
 6. Docs: OIDC sample trust; REST public URL in apply summary.
 
