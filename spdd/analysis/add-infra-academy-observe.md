@@ -16,7 +16,7 @@ The estate is deployed and can be stopped or destroyed. Operators have no CloudT
 | S3-only trail | CloudTrail management events; **no** CloudWatch Logs on the trail |
 | LabRole | Pre-created Vocareum role inside `LabInstanceProfile`. **Never** create IAM. Do not attach LabRole to CloudTrail or flow-log delivery (wrong trust). |
 | Alarm shells | CloudWatch alarms on ALB / RDS / ASG standard metrics |
-| Log group shell | `/heavy-rental/{app}` with no agent writing to it |
+| Log group shell | `/heavy-rental/{app}`. No CloudWatch Agent. Docker Engine `awslogs` writes here when the `CreateLogStream` probe succeeds; otherwise `json-file` |
 | Paid | Still another workflow / state key |
 
 ## Stakeholders
@@ -33,6 +33,7 @@ The estate is deployed and can be stopped or destroyed. Operators have no CloudT
 4. **RDS enhanced monitoring** — allow-list and cost. Keep `monitoring_interval = 0`.
 5. **Second trail** — some labs allow one trail. Unique name + import on re-apply.
 6. **Observe S3 after session end** — still holds logs and bills a little until destroy.
+7. **ECS log-opts on dockerd** — `awslogs-stream-prefix` is ECS-only. Docker Engine rejects it and `docker.service` fails. Use Engine `tag`. If dockerd still rejects `daemon.json`, revert to `json-file` and do not fail the play.
 
 ## Strategy
 

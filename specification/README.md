@@ -15,7 +15,7 @@ Reference studies: `heavy-rental-project-pipeline-development/cloud-deployment-f
 | Redeploy a new portal / REST / Haystack CI image | Day-to-day: app CD. Optional first-compose: `action=deploy-projects` (after apply) |
 | Public AWS | Yes — `aws-infra-paid.yml`, Environment `AWS_ACTUAL`, OIDC (ADR 0017) |
 | Operate after go-live | SSM, break-glass SSH via `hr-bastion`, `stop`, `destroy` |
-| Monitor (CloudWatch / CloudTrail) | Yes — Terraform on `apply` (ADR 0015). Trail and flow logs are S3-only. Academy: LabRole only. Paid trail/dashboard `heavy-rental-actual`. |
+| Monitor (CloudWatch / CloudTrail) | Yes — Terraform on `apply` (ADR 0015). Trail and flow logs are S3-only. Academy: LabRole only. Paid trail/dashboard `heavy-rental-actual`. Guest Docker stdout: Ansible `guest_base` probes `CreateLogStream` and may set Engine `awslogs` (not ECS `awslogs-stream-prefix`); otherwise `json-file` |
 
 ## How to read the three frameworks
 

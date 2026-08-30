@@ -23,7 +23,7 @@ Delivered on this repo. Operator walkthrough: [`OPERATOR-GUIDE.md`](OPERATOR-GUI
 - `APP_CORS_ALLOWED_ORIGINS` includes portal origin and `http://<rest_alb_dns>:8080`
 - Remote Terraform state: S3 `use_lockfile=true`. Academy `assert-lab` / `ensure-backend` fail closed on `voc-cancel-cred` (HeadBucket 403 is not treated as a missing bucket)
 - Academy guests: `LabInstanceProfile` / `LabRole` only. Paid guests: `hr-paid-{portal,rest,haystack,neo4j,bastion}`
-- Observe: CloudTrail + flow logs + ALB access logs to S3; dashboard `heavy-rental-academy` or `heavy-rental-actual`. No CloudTrail → CloudWatch Logs. Guest Docker stdout uses the `awslogs` driver into `/heavy-rental/{app}` when the instance profile allows it (paid IAM; Academy LabRole probe)
+- Observe: CloudTrail + flow logs + ALB access logs to S3; dashboard `heavy-rental-academy` or `heavy-rental-actual`. No CloudTrail → CloudWatch Logs. Guest Docker stdout uses the Docker Engine `awslogs` driver into `/heavy-rental/{app}` when Ansible’s `CreateLogStream` probe succeeds (paid IAM `CreateLogStream`/`PutLogEvents`; Academy LabRole probe). `daemon.json` uses Engine log-opts (`awslogs-region`, `awslogs-group`, `tag`) — not ECS `awslogs-stream-prefix`. If the probe is denied or dockerd rejects the file, guests stay on `json-file` and the play continues.
 - ASG health stays `EC2` (ADR 0008) — unhealthy ALB targets do not replace instances
 - ALB `tg-rest` waits for `GET <instance>:8080/actuator/health` matcher **`200-299`** (2xx). `GET /` is Spring 401 and is not healthy
 - ALB `tg-haystack` waits for `GET <instance>:8000/health` matcher **`200-299`** (2xx). `/docs` is not the ALB check

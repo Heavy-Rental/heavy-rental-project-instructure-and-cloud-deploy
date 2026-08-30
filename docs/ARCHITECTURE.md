@@ -199,13 +199,13 @@ Terraform target groups probe each **registered instance private IP**. Matcher *
 | VPC accept/reject | Flow logs → same bucket (`vpc-flow/`). S3 destination — **not** LabRole (wrong trust). |
 | ALB requests | Access logs on portal / REST / Haystack ALBs → `alb/` |
 | Health | Dashboard `heavy-rental-academy`; alarms on ALB 5xx / unhealthy, RDS CPU / storage, four app ASG InService, `hr-bastion` `StatusCheckFailed` |
-| Guest logs | Docker `awslogs` driver → `/heavy-rental/{portal,rest,haystack,neo4j}` (instance profile). No CloudWatch Agent. If LabRole cannot `PutLogEvents`, guests stay on `json-file` and `docker logs` over SSM. |
+| Guest logs | Docker Engine `awslogs` → `/heavy-rental/{portal,rest,haystack,neo4j}` (instance profile). Ansible probes `logs:CreateLogStream`; `daemon.json` uses Engine log-opts (`awslogs-region`, `awslogs-group`, `tag`) — not ECS `awslogs-stream-prefix`. No CloudWatch Agent. If the probe is denied or dockerd rejects the file, guests stay on `json-file` and `docker logs` over SSM. |
 
 Optional Environment variable `ALARM_EMAIL` subscribes SNS topic `hr-academy-alarms` (confirm the AWS mail). Cost Explorer stays the Vocareum budget UI — not Terraform.
 
 ## Configure (Ansible)
 
-`action=apply` runs Terraform first, then `sync-secrets` → `sync-ssh-keys` → Ansible **`configure.yml`** (Docker + Compose on app guests; compose **Neo4j only**; hop keys on `hr-bastion`). `action=configure-only` does **not** run Terraform apply; Ansible is the **same** playbook. Neither action pulls portal / REST / Haystack images. Neither composes onto `hr-bastion`.
+`action=apply` runs Terraform first, then `sync-secrets` → `sync-ssh-keys` → Ansible **`configure.yml`** (Docker + Compose on app guests; compose **Neo4j only**; hop keys on `hr-bastion`). `guest_base` probes `logs:CreateLogStream` and may set Docker Engine `awslogs` (not ECS `awslogs-stream-prefix`); otherwise guests stay on `json-file`. `action=configure-only` does **not** run Terraform apply; Ansible is the **same** playbook. Neither action pulls portal / REST / Haystack images. Neither composes onto `hr-bastion`.
 
 `action=deploy-projects` is a **later** workflow run after apply or configure-only (ADR 0014). It is not a job at the end of apply. Preflight requires public GHCR or ECR tags, then Ansible **`site.yml`**. Day-to-day single-image rolls stay app CD.
 

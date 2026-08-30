@@ -51,7 +51,7 @@ classDiagram
 4. `aws_flow_log` `log_destination_type = s3`. No `iam_role_arn`.
 5. ALB `access_logs` on portal / REST / Haystack. ASG `enabled_metrics`.
 6. Metric alarms + dashboard. SNS topic; email subscription if `alarm_email` set.
-7. Four log groups. No CloudWatch Agent.
+7. Four log groups. No CloudWatch Agent. Ansible `guest_base` probes `logs:CreateLogStream` and, when allowed, writes Docker Engine `awslogs` into `/etc/docker/daemon.json` (`awslogs-region`, `awslogs-group`, `tag` — not ECS `awslogs-stream-prefix`). Denied probe or dockerd reject → `json-file`, play continues.
 8. Workflow `TF_VAR_alarm_email`. Reconcile + sweep named objects.
 
 ## S — Structure
@@ -72,7 +72,8 @@ docs/adr/0015-academy-observe-no-iam.md
 | --- | --- |
 | plan / apply | Import leftovers, then create/update trail, bucket, alarms, dashboard |
 | destroy | Destroy + sweep trail, observe bucket, alarms, flow logs |
-| configure-only / stop / deploy-projects | Unchanged (no Terraform observe job) |
+| configure-only / deploy-projects / app CD | No Terraform observe job. Ansible `guest_base` probes CloudWatch Logs and may set Engine `awslogs` |
+| stop | Unchanged (no Terraform observe job) |
 
 ## N — Norms
 
@@ -89,3 +90,4 @@ docs/adr/0015-academy-observe-no-iam.md
 - No X-Ray, AMP, OpenSearch, GuardDuty, Config, Budgets resources.
 - Do not attach LabRole to CloudTrail or flow-log delivery (trust is EC2).
 - Launch templates stay on `LabInstanceProfile`.
+- Do not put ECS-only `awslogs-stream-prefix` in `/etc/docker/daemon.json`. Docker Engine log-opts only (`awslogs-region`, `awslogs-group`, `tag`). If dockerd rejects the file, revert to `json-file` and do not fail the play.

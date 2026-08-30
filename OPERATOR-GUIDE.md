@@ -267,7 +267,7 @@ It does **not** pull portal, REST, or Haystack images. That is why apply no long
 
 **Billing:** NAT Gateways and ALBs start billing now. CloudTrail, VPC flow logs, and the observe bucket are small next to NAT. They keep billing after `stop` and after the Vocareum session ends, until `destroy`.
 
-**Watch the lab:** Console → CloudWatch → Dashboards → `heavy-rental-academy`. Trail files are in the observe bucket prefix `cloudtrail/`. Guest Docker logs: CloudWatch → Logs → `/heavy-rental/{portal,rest,haystack,neo4j}` after `configure-only` / `deploy-projects` (or app CD) if the instance profile can `PutLogEvents`. If LabRole denies that, use `docker logs` over SSM. If you set `ALARM_EMAIL`, confirm the AWS SNS mail.
+**Watch the lab:** Console → CloudWatch → Dashboards → `heavy-rental-academy`. Trail files are in the observe bucket prefix `cloudtrail/`. Guest Docker logs: CloudWatch → Logs → `/heavy-rental/{portal,rest,haystack,neo4j}` after `configure-only` / `deploy-projects` (or app CD) if Ansible’s `CreateLogStream` probe succeeds (paid `hr-paid-*` also has `PutLogEvents`). If LabRole denies the probe, or Docker stays on `json-file` because dockerd rejected `daemon.json`, use `docker logs` over SSM. If you set `ALARM_EMAIL`, confirm the AWS SNS mail.
 
 ---
 
@@ -279,7 +279,7 @@ It does **not** pull portal, REST, or Haystack images. That is why apply no long
 
 **Form:** Same as `apply`, but `action` = `configure-only`.
 
-**Success:** Docker is on the guests. Neo4j is up. Apps are still whatever they were (or still absent).
+**Success:** Docker is on the guests. Neo4j is up. Apps are still whatever they were (or still absent). If a previous run left `docker.service` failed (`Unable to restart service docker` / unknown log opt `awslogs-stream-prefix`), this action drops the invalid `daemon.json` and starts Docker again.
 
 **Do not:** Use this as the first action on an empty account — there are no ASGs yet. Run `apply` first.
 
